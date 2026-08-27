@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // GET /api/stream is how a client follows state without re-reading the world.
@@ -24,8 +24,8 @@ const (
 	//
 	// The primary wake-up is the store's in-process notification, which fires the
 	// moment a change is appended. This tick exists only because a second process
-	// can write the same database file — `sergeant mcp` records envelopes while
-	// `sergeant ui` serves this stream — and an in-process notification cannot see
+	// can write the same database file — `sgt mcp` records envelopes while
+	// `sgt ui` serves this stream — and an in-process notification cannot see
 	// that. Without it, an MCP-driven change would never reach the dashboard.
 	streamTailInterval = time.Second
 

@@ -17,8 +17,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/callmeradical/sergeant/internal/naming"
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/naming"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // Scenario: A recognized type is accepted.
@@ -76,7 +76,7 @@ func assertDispatchLeftNoTrace(t *testing.T, st *store.Store, dbPath, fleetRoot 
 func TestDispatchWithNoTypeIsRefusedAndCreatesNothing(t *testing.T) {
 	mux, st, repoPaths, dbPath := dispatchFixtureRepos(t, "svc")
 	fleetRoot := t.TempDir()
-	t.Setenv("SERGEANT_FLEET_DIR", fleetRoot)
+	t.Setenv("SGT_FLEET_DIR", fleetRoot)
 
 	const changeID = "add-stripe-webhooks"
 	if err := os.MkdirAll(filepath.Join(repoPaths["svc"], "openspec", "changes", changeID), 0o755); err != nil {
@@ -99,7 +99,7 @@ func TestDispatchWithNoTypeIsRefusedAndCreatesNothing(t *testing.T) {
 func TestDispatchWithAnUnrecognizedTypeIsRefusedAndCreatesNothing(t *testing.T) {
 	mux, st, repoPaths, dbPath := dispatchFixtureRepos(t, "svc")
 	fleetRoot := t.TempDir()
-	t.Setenv("SERGEANT_FLEET_DIR", fleetRoot)
+	t.Setenv("SGT_FLEET_DIR", fleetRoot)
 
 	const changeID = "add-stripe-webhooks"
 	if err := os.MkdirAll(filepath.Join(repoPaths["svc"], "openspec", "changes", changeID), 0o755); err != nil {
@@ -241,8 +241,8 @@ func gitDispatchFixtureStandaloneServer(t *testing.T) (srv *Server, st *store.St
 	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("SERGEANT_CONFIG", cfgDir)
-	t.Setenv("SERGEANT_FLEET_DIR", filepath.Join(base, "fleet"))
+	t.Setenv("SGT_CONFIG", cfgDir)
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(base, "fleet"))
 
 	repoPath = filepath.Join(base, "svc")
 	initGitRepo(t, repoPath)

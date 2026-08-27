@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/callmeradical/sergeant/internal/config"
+	"github.com/callmeradical/sgt/internal/config"
 )
 
 // writeGraphFixture writes raw (a hand-authored graph.json body) to a fresh

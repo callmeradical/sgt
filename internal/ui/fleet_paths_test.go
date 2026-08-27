@@ -85,14 +85,14 @@ func TestPruneOnlyOffersWorktreesUnderTheConfiguredRoot(t *testing.T) {
 	}
 }
 
-// configuredFleetRoot is the root the test fixture pointed SERGEANT_FLEET_DIR at.
+// configuredFleetRoot is the root the test fixture pointed SGT_FLEET_DIR at.
 // Reading it back from the environment is deliberate: the assertion is that the
 // handlers honour that variable, so the test must not compute the path itself.
 func configuredFleetRoot(t *testing.T) string {
 	t.Helper()
-	root := os.Getenv("SERGEANT_FLEET_DIR")
+	root := os.Getenv("SGT_FLEET_DIR")
 	if root == "" {
-		t.Fatal("fixture did not set SERGEANT_FLEET_DIR, so this test cannot prove which root is read")
+		t.Fatal("fixture did not set SGT_FLEET_DIR, so this test cannot prove which root is read")
 	}
 	return root
 }

@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/callmeradical/sergeant/internal/dag"
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/dag"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // fleetRunSource is the subset of *store.Store the fleet cleaner needs: which
@@ -273,7 +273,7 @@ const fleetCleanupInterval = 1 * time.Hour
 func (fc *fleetCleaner) reclaimEligibleFleetDirs() {
 	runs, err := fc.runs.RunsEligibleForCleanup(time.Now().Add(-fleetCleanupRetention))
 	if err != nil {
-		log.Printf("sergeant: fleet cleanup: listing eligible runs: %v", err)
+		log.Printf("sgt: fleet cleanup: listing eligible runs: %v", err)
 		return
 	}
 
@@ -284,7 +284,7 @@ func (fc *fleetCleaner) reclaimEligibleFleetDirs() {
 			continue
 		}
 		if removed, _ := reclaimFleetDir(fleetDir, run.Status, false, false); removed {
-			log.Printf("sergeant: fleet cleanup: reclaimed %s (run %s, status %s)", fleetDir, run.ID, run.Status)
+			log.Printf("sgt: fleet cleanup: reclaimed %s (run %s, status %s)", fleetDir, run.ID, run.Status)
 		}
 	}
 }

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // terminalRunFixture is a server holding one running run, its intent and two
@@ -99,7 +99,7 @@ func TestAPassedRunMovesItsBulletsToGreen(t *testing.T) {
 	}
 }
 
-// Decision D6: sergeant never merges and never opens the pull request on this
+// Decision D6: sgt never merges and never opens the pull request on this
 // path. Passing gates says the work exists, not that it was submitted or
 // delivered, so neither sealed nor merged is reachable from a run outcome.
 func TestAPassedRunDoesNotSealOrMergeItsBullets(t *testing.T) {
@@ -123,7 +123,7 @@ func TestAPassingRunLeavesItsIntentInProgress(t *testing.T) {
 	srv.recordTerminalRun("sgt-run", "passed")
 
 	if got := intentStatus(t, st, "sgt-run-intent"); got != "in_progress" {
-		t.Errorf("intent status = %q after a passing run, want in_progress; sergeant never merges", got)
+		t.Errorf("intent status = %q after a passing run, want in_progress; sgt never merges", got)
 	}
 }
 
@@ -161,7 +161,7 @@ func TestAFailedRunBlocksItsBulletsWithTheAgentReportedReason(t *testing.T) {
 		Stage:         "build",
 		Type:          "phase.completed",
 		SchemaVersion: "1",
-		Producer:      "sergeant/runner",
+		Producer:      "sgt/runner",
 		CorrelationID: "sgt-run",
 		Data:          []byte(`{"blocked_reason":"requirement is ambiguous; needs a human decision"}`),
 	}); err != nil {
@@ -199,7 +199,7 @@ func TestABlockedReasonWithASecretIsRedactedOnTheBullet(t *testing.T) {
 		Stage:         "build",
 		Type:          "phase.completed",
 		SchemaVersion: "1",
-		Producer:      "sergeant/runner",
+		Producer:      "sgt/runner",
 		CorrelationID: "sgt-run",
 		Data:          []byte(`{"blocked_reason":"needs a key: ` + secret + `"}`),
 	}); err != nil {
@@ -237,7 +237,7 @@ func TestABlockingReviewFindingBlocksTheBulletWithItsSummaryAsReason(t *testing.
 		Stage:         "review",
 		Type:          "phase.completed",
 		SchemaVersion: "1",
-		Producer:      "sergeant/runner",
+		Producer:      "sgt/runner",
 		CorrelationID: "sgt-run",
 		Data:          []byte(`{"findings":[{"axis":"spec","severity":"error","summary":"diff does not implement the retry requirement"}]}`),
 	}); err != nil {
@@ -271,7 +271,7 @@ func TestMultipleBlockingReviewFindingsProduceOneJoinedReason(t *testing.T) {
 		Stage:         "review",
 		Type:          "phase.completed",
 		SchemaVersion: "1",
-		Producer:      "sergeant/runner",
+		Producer:      "sgt/runner",
 		CorrelationID: "sgt-run",
 		Data:          []byte(`{"findings":[{"axis":"spec","severity":"error","summary":"missing failing test"},{"axis":"security","severity":"error","summary":"secret written to a log file"}]}`),
 	}); err != nil {
@@ -309,7 +309,7 @@ func TestNonBlockingReviewFindingsDoNotSupplyABlockedReason(t *testing.T) {
 		Stage:         "review",
 		Type:          "phase.completed",
 		SchemaVersion: "1",
-		Producer:      "sergeant/runner",
+		Producer:      "sgt/runner",
 		CorrelationID: "sgt-run",
 		Data:          []byte(`{"findings":[{"axis":"style","severity":"info","summary":"consider renaming x"}]}`),
 	}); err != nil {

@@ -1,4 +1,4 @@
-module github.com/callmeradical/sergeant
+module github.com/callmeradical/sgt
 
 go 1.26.5
 

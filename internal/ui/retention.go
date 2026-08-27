@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/callmeradical/sergeant/internal/config"
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/config"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // retentionInterval is how often the automatic rotation pass runs. Fixed,
@@ -47,7 +47,7 @@ func newRetentionRotator(s *store.Store) *retentionRotator {
 func (r *retentionRotator) rotateAll() {
 	projects, err := config.ListProjects()
 	if err != nil {
-		log.Printf("sergeant: retention: listing projects: %v", err)
+		log.Printf("sgt: retention: listing projects: %v", err)
 		return
 	}
 
@@ -61,7 +61,7 @@ func (r *retentionRotator) rotateAll() {
 
 		runsRotated, err := r.store.RotateProject(p.Name, runCutoff)
 		if err != nil {
-			log.Printf("sergeant: retention: rotating project %q runs: %v", p.Name, err)
+			log.Printf("sgt: retention: rotating project %q runs: %v", p.Name, err)
 			continue
 		}
 		// RotateArtifacts has no project scope of its own — the artifacts
@@ -74,7 +74,7 @@ func (r *retentionRotator) rotateAll() {
 		// proposal.md.
 		artifactsRotated, err := r.store.RotateArtifacts(artifactCutoff)
 		if err != nil {
-			log.Printf("sergeant: retention: rotating project %q artifacts: %v", p.Name, err)
+			log.Printf("sgt: retention: rotating project %q artifacts: %v", p.Name, err)
 			continue
 		}
 

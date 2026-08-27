@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/callmeradical/sergeant/internal/changerequest"
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/changerequest"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // mergeStatusFixture builds a server backed by a fresh store holding one

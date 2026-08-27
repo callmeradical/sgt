@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/callmeradical/sergeant/internal/handoff"
-	"github.com/callmeradical/sergeant/internal/runner"
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/handoff"
+	"github.com/callmeradical/sgt/internal/runner"
+	"github.com/callmeradical/sgt/internal/store"
 
 	_ "modernc.org/sqlite"
 )
@@ -125,7 +125,7 @@ func TestHandleArtifactContentServesBytesWithRecordedContentType(t *testing.T) {
 }
 
 // TestHandleArtifactContentReturns404ForUnknownID covers spec.md's
-// requirement that an id sergeant does not recognise 404s.
+// requirement that an id sgt does not recognise 404s.
 func TestHandleArtifactContentReturns404ForUnknownID(t *testing.T) {
 	srv, _ := artifactsFixture(t)
 	mux := srv.Handler()
@@ -139,7 +139,7 @@ func TestHandleArtifactContentReturns404ForUnknownID(t *testing.T) {
 
 // TestArtifactCapturedByRealGateIsServedAsAnImage is the end-to-end check
 // tasks.md's Task 2 verification asks for: a gate that writes a PNG to
-// $SERGEANT_ARTIFACT_DIR is captured by the real mechanism (RunCodeGate ->
+// $SGT_ARTIFACT_DIR is captured by the real mechanism (RunCodeGate ->
 // captureArtifacts), then served back through the real HTTP routes with an
 // image/* content type — exactly what the dashboard's artifactItemHTML
 // switches on to decide whether to render a thumbnail. This repo has no
@@ -152,7 +152,7 @@ func TestArtifactCapturedByRealGateIsServedAsAnImage(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = st.Close() })
-	t.Setenv("SERGEANT_ARTIFACTS_ROOT", t.TempDir())
+	t.Setenv("SGT_ARTIFACTS_ROOT", t.TempDir())
 
 	const runID = "run-real-capture"
 	if err := st.CreateRun(&store.RunRecord{ID: runID, Project: "p", TaskID: runID, Status: "running"}); err != nil {
@@ -168,7 +168,7 @@ func TestArtifactCapturedByRealGateIsServedAsAnImage(t *testing.T) {
 	}
 	pngBytes := "\x89PNG\r\n\x1a\nfake-but-real-enough"
 	res, err := pr.RunCodeGate(context.Background(), "screenshot-gate",
-		`printf '`+pngBytes+`' > "$SERGEANT_ARTIFACT_DIR/shot.png"`)
+		`printf '`+pngBytes+`' > "$SGT_ARTIFACT_DIR/shot.png"`)
 	if err != nil {
 		t.Fatalf("RunCodeGate: %v", err)
 	}

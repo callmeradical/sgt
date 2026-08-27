@@ -52,7 +52,7 @@ func TestStoreOperations(t *testing.T) {
 		Type:          "phase.completed",
 		SchemaVersion: "1",
 		OccurredAt:    time.Now().UTC(),
-		Producer:      "sergeant/test",
+		Producer:      "sgt/test",
 		CorrelationID: "run-123",
 	}
 	if err := st.RecordEnvelope(env); err != nil {
@@ -746,7 +746,7 @@ func TestSealBulletForRunRefusesWhenNoBulletMatchesRepo(t *testing.T) {
 
 // R4.4: RecordPhase redacts at the single choke point every PhaseRecord
 // passes through, regardless of which caller built it. Five independent
-// call-site point-fixes (RunAgentPhase, RunCodeGate, sergeant_emit_envelope,
+// call-site point-fixes (RunAgentPhase, RunCodeGate, sgt_emit_envelope,
 // ...) each closed one leak but kept missing others built the same way
 // (progress.html Reviews 014-016) — this proves the guarantee holds here
 // even for a caller that never calls redact itself.
@@ -793,7 +793,7 @@ func TestRecordPhaseRedactsErrorAndPayload(t *testing.T) {
 
 // Same guarantee for RecordEnvelope, including Artifacts — the field Review
 // 016 found unredacted in every call site that builds one (RunAgentPhase and
-// sergeant_emit_envelope alike), because no call site had ever redacted it.
+// sgt_emit_envelope alike), because no call site had ever redacted it.
 func TestRecordEnvelopeRedactsSummaryDataAndArtifacts(t *testing.T) {
 	st, _ := openTestStore(t)
 	if err := st.CreateRun(&RunRecord{ID: "run-1", Project: "p", TaskID: "run-1", Status: "running"}); err != nil {

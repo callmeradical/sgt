@@ -1,10 +1,10 @@
 [tools]
-# Sergeant supports Bash 3.2+ and uses Python 3 for bounded JSON/state handling.
+# Sgt supports Bash 3.2+ and uses Python 3 for bounded JSON/state handling.
 
 # ── Tasks ─────────────────────────────────────────────────────────────────────
 
 [tasks.install]
-description = "Symlink wiki-daily-digest into ~/.local/bin and build the sergeant binary"
+description = "Symlink wiki-daily-digest into ~/.local/bin and build the sgt binary"
 run = """
 #!/usr/bin/env bash
 set -euo pipefail
@@ -26,7 +26,7 @@ for f in "$BIN_DIR/wiki-daily-digest"; do
   linked=$((linked+1))
 done
 
-# Remove legacy oc-inject links that may still exist from earlier Sergeant
+# Remove legacy oc-inject links that may still exist from earlier Sgt
 # checkouts. oc-inject was deleted in August 2026 (GH #179). The file no
 # longer ships in bin/ so any remaining symlinks are stale.
 for deprecated_link in "$TARGET_DIR/oc-inject" "$HOME/.config/opencode/plugins/oc-inject.js"; do
@@ -41,13 +41,13 @@ echo "Installed $linked scripts to $TARGET_DIR"
 # Build the Go engine/MCP binary if Go is available
 if command -v go &>/dev/null; then
   echo ""
-  echo "Building sergeant (native v2 engine + MCP)..."
-  (cd "$REPO_DIR" && go build -ldflags="-s -w" -o bin/sergeant ./cmd/sergeant/) && \
-    echo "  built: $REPO_DIR/bin/sergeant" || \
-    echo "  WARNING: go build failed — sergeant not available"
+  echo "Building sgt (native v2 engine + MCP)..."
+  (cd "$REPO_DIR" && go build -ldflags="-s -w" -o bin/sgt ./cmd/sgt/) && \
+    echo "  built: $REPO_DIR/bin/sgt" || \
+    echo "  WARNING: go build failed — sgt not available"
 else
   echo ""
-  echo "NOTE: go not found — skipping sergeant build. Install Go 1.21+ and run 'mise run build'."
+  echo "NOTE: go not found — skipping sgt build. Install Go 1.21+ and run 'mise run build'."
 fi
 
 # Check PATH
@@ -115,7 +115,7 @@ echo "Removed $removed git hooks."
 """
 
 [tasks.uninstall]
-description = "Remove Sergeant symlinks from ~/.local/bin"
+description = "Remove Sgt symlinks from ~/.local/bin"
 run = """
 #!/usr/bin/env bash
 set -euo pipefail
@@ -125,9 +125,9 @@ removed=0
 
 for f in "$TARGET_DIR/wiki-daily-digest"; do
   [[ -L "$f" ]] || continue
-  # Only remove if it points back into the sergeant repo
+  # Only remove if it points back into the sgt repo
   target="$(readlink "$f")"
-  if [[ "$target" == *"/sergeant/bin/"* ]]; then
+  if [[ "$target" == *"/sgt/bin/"* ]]; then
     rm "$f"
     echo "  removed: $f"
     removed=$((removed+1))
@@ -143,7 +143,7 @@ description = "Verify the prerequisites the v2 Go engine actually uses"
 run = """
 #!/usr/bin/env bash
 # Everything below is derived from exec.Command call sites in internal/ and
-# cmd/sergeant/. tmux is forbidden as a factory dependency (D7) and is not
+# cmd/sgt/. tmux is forbidden as a factory dependency (D7) and is not
 # checked for here.
 ok=true
 
@@ -191,7 +191,7 @@ run = """
 set -euo pipefail
 
 REPO_DIR="$(git -C "${MISE_PROJECT_ROOT:-.}" rev-parse --show-toplevel)"
-echo "Pulling latest sergeant ..."
+echo "Pulling latest sgt ..."
 git -C "$REPO_DIR" pull --ff-only
 echo ""
 echo "Reinstalling ..."
@@ -199,31 +199,31 @@ mise run install
 """
 
 [tasks.build]
-description = "Build the sergeant Go binary for the current OS/arch"
+description = "Build the sgt Go binary for the current OS/arch"
 run = """
 #!/usr/bin/env bash
 set -euo pipefail
 REPO_DIR="$(git -C "${MISE_PROJECT_ROOT:-.}" rev-parse --show-toplevel)"
 cd "$REPO_DIR"
 if ! command -v go &>/dev/null; then
-  echo "ERROR: go not found. Install Go 1.21+ to build sergeant."
+  echo "ERROR: go not found. Install Go 1.21+ to build sgt."
   exit 1
 fi
-echo "Building sergeant (native v2 engine + MCP)..."
+echo "Building sgt (native v2 engine + MCP)..."
 go build -ldflags="-s -w -X main.version=$(git describe --tags --always --dirty 2>/dev/null || echo dev)" \
-  -o bin/sergeant ./cmd/sergeant/
-echo "Built: bin/sergeant"
+  -o bin/sgt ./cmd/sgt/
+echo "Built: bin/sgt"
 """
 
 [tasks."build:all"]
-description = "Cross-compile sergeant for all supported platforms (darwin/linux x amd64/arm64)"
+description = "Cross-compile sgt for all supported platforms (darwin/linux x amd64/arm64)"
 run = """
 #!/usr/bin/env bash
 set -euo pipefail
 REPO_DIR="$(git -C "${MISE_PROJECT_ROOT:-.}" rev-parse --show-toplevel)"
 cd "$REPO_DIR"
 if ! command -v go &>/dev/null; then
-  echo "ERROR: go not found. Install Go 1.21+ to build sergeant."
+  echo "ERROR: go not found. Install Go 1.21+ to build sgt."
   exit 1
 fi
 VERSION="$(git describe --tags --always --dirty 2>/dev/null || echo dev)"
@@ -240,23 +240,23 @@ targets=(
 for target in "${targets[@]}"; do
   os="${target%/*}"
   arch="${target#*/}"
-  out="dist/sergeant-${os}-${arch}"
+  out="dist/sgt-${os}-${arch}"
   echo "Building $out..."
-  GOOS="$os" GOARCH="$arch" go build -ldflags="$LDFLAGS" -o "$out" ./cmd/sergeant/
+  GOOS="$os" GOARCH="$arch" go build -ldflags="$LDFLAGS" -o "$out" ./cmd/sgt/
 done
 
 echo ""
 echo "Built:"
-ls -lh dist/sergeant-*
+ls -lh dist/sgt-*
 """
 
 [tasks."build:clean"]
-description = "Remove built binaries (bin/sergeant and dist/)"
+description = "Remove built binaries (bin/sgt and dist/)"
 run = """
 #!/usr/bin/env bash
 set -euo pipefail
 REPO_DIR="$(git -C "${MISE_PROJECT_ROOT:-.}" rev-parse --show-toplevel)"
-rm -f "$REPO_DIR/bin/sergeant"
+rm -f "$REPO_DIR/bin/sgt"
 rm -rf "$REPO_DIR/dist/"
 echo "Cleaned."
 """

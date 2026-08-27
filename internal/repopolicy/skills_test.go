@@ -13,7 +13,7 @@ import (
 
 // expectedCanonicalSkills is the inventory .agents/skills/ is expected to
 // hold. Ported verbatim from tests/repo-skills-test.sh, including its
-// pre-existing drift against the real directory (sergeant-setup is listed
+// pre-existing drift against the real directory (sgt-setup is listed
 // here but does not exist on disk; "progress" and "to-tickets" exist on
 // disk but one of them is not listed here) -- TestCanonicalSkillInventoryMatchesExpected
 // already fails on main for this exact reason before this port, and
@@ -30,7 +30,7 @@ var expectedCanonicalSkills = []string{
 	"prototype",
 	"research",
 	"resolving-merge-conflicts",
-	"sergeant-setup",
+	"sgt-setup",
 	"tdd",
 	"to-spec",
 	"to-tickets",
@@ -173,7 +173,7 @@ func TestProceduralSkillFrontmatter(t *testing.T) {
 		skillFile := filepath.Join(root, "skills", skill, "SKILL.md")
 		f, err := os.Open(skillFile)
 		if err != nil {
-			t.Errorf("missing Sergeant procedural skill: %s (%v)", skill, err)
+			t.Errorf("missing Sgt procedural skill: %s (%v)", skill, err)
 			continue
 		}
 		scanner := bufio.NewScanner(f)
@@ -246,8 +246,8 @@ func TestThirdPartyNoticesAndProvenanceNameEveryVendoredSkill(t *testing.T) {
 	if !strings.Contains(notices, "`no-mistakes`") {
 		t.Error("THIRD_PARTY_NOTICES.md missing no-mistakes notice")
 	}
-	if !strings.Contains(notices, "`sergeant-setup`") {
-		t.Error("THIRD_PARTY_NOTICES.md missing sergeant-setup notice")
+	if !strings.Contains(notices, "`sgt-setup`") {
+		t.Error("THIRD_PARTY_NOTICES.md missing sgt-setup notice")
 	}
 
 	provenance, err := readFile(t, root, filepath.Join(".agents", "skills", "PROVENANCE.md"))

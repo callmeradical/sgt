@@ -9,11 +9,11 @@ import (
 // RunShippingGate is not a *PhaseRunner method: a shipping gate evaluates an
 // intent as a whole, which may span several worktrees, so there is no single
 // pr.Worktree to run it in. Instead it publishes the bullets' worktree paths,
-// comma-joined in merge order, as SERGEANT_BULLET_WORKTREES — the substrate a
+// comma-joined in merge order, as SGT_BULLET_WORKTREES — the substrate a
 // project's shipping-gate command needs to actually inspect more than one
 // repo.
 func TestRunShippingGateSetsBulletWorktreesEnvVar(t *testing.T) {
-	res, err := RunShippingGate(context.Background(), "cross-repo", `echo "$SERGEANT_BULLET_WORKTREES"`, []string{"/tmp/a", "/tmp/b"})
+	res, err := RunShippingGate(context.Background(), "cross-repo", `echo "$SGT_BULLET_WORKTREES"`, []string{"/tmp/a", "/tmp/b"})
 	if err != nil {
 		t.Fatalf("RunShippingGate error: %v", err)
 	}
@@ -21,7 +21,7 @@ func TestRunShippingGateSetsBulletWorktreesEnvVar(t *testing.T) {
 		t.Fatalf("expected the gate to pass, output=%q", res.Output)
 	}
 	if !strings.Contains(res.Output, "/tmp/a,/tmp/b") {
-		t.Errorf("output = %q, want it to contain the comma-joined worktrees from SERGEANT_BULLET_WORKTREES", res.Output)
+		t.Errorf("output = %q, want it to contain the comma-joined worktrees from SGT_BULLET_WORKTREES", res.Output)
 	}
 }
 

@@ -3,7 +3,7 @@ package ui
 import (
 	"net/http"
 
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // handleListArtifacts answers a run-scoped view of captured artifacts (the

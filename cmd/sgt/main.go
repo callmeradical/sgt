@@ -7,14 +7,14 @@ import (
 	"path/filepath"
 	"text/tabwriter"
 
-	"github.com/callmeradical/sergeant/internal/config"
-	"github.com/callmeradical/sergeant/internal/dag"
-	"github.com/callmeradical/sergeant/internal/export"
-	"github.com/callmeradical/sergeant/internal/handoff"
-	"github.com/callmeradical/sergeant/internal/mcp"
-	"github.com/callmeradical/sergeant/internal/naming"
-	"github.com/callmeradical/sergeant/internal/store"
-	"github.com/callmeradical/sergeant/internal/ui"
+	"github.com/callmeradical/sgt/internal/config"
+	"github.com/callmeradical/sgt/internal/dag"
+	"github.com/callmeradical/sgt/internal/export"
+	"github.com/callmeradical/sgt/internal/handoff"
+	"github.com/callmeradical/sgt/internal/mcp"
+	"github.com/callmeradical/sgt/internal/naming"
+	"github.com/callmeradical/sgt/internal/store"
+	"github.com/callmeradical/sgt/internal/ui"
 )
 
 func main() {
@@ -27,7 +27,7 @@ func main() {
 	switch command {
 	case "run":
 		if len(os.Args) < 3 {
-			fmt.Fprintf(os.Stderr, "Usage: sergeant run <project-name-or-file>\n")
+			fmt.Fprintf(os.Stderr, "Usage: sgt run <project-name-or-file>\n")
 			os.Exit(1)
 		}
 		runProject(os.Args[2])
@@ -38,7 +38,7 @@ func main() {
 	case "mcp":
 		startMCP()
 	case "version":
-		fmt.Println("sergeant v0.2.1 (Go Native Multi-Repo Software Factory Engine + Goose MCP Extension)")
+		fmt.Println("sgt v0.2.1 (Go Native Multi-Repo Software Factory Engine + Goose MCP Extension)")
 	default:
 		printUsage()
 		os.Exit(1)
@@ -46,18 +46,18 @@ func main() {
 }
 
 func printUsage() {
-	fmt.Println("Sergeant - Multi-Repo Software Factory Orchestrator")
+	fmt.Println("Sgt - Multi-Repo Software Factory Orchestrator")
 	fmt.Println("\nUsage:")
-	fmt.Println("  sergeant run <project>    Run a multi-repo factory pipeline DAG")
-	fmt.Println("  sergeant status           Show recent factory runs and phase states")
-	fmt.Println("  sergeant ui               Start embedded Web UI dashboard (http://127.0.0.1:8484)")
-	fmt.Println("  sergeant mcp              Start MCP JSON-RPC stdio server for Goose / Claude")
-	fmt.Println("  sergeant version          Print version info")
+	fmt.Println("  sgt run <project>    Run a multi-repo factory pipeline DAG")
+	fmt.Println("  sgt status           Show recent factory runs and phase states")
+	fmt.Println("  sgt ui               Start embedded Web UI dashboard (http://127.0.0.1:8484)")
+	fmt.Println("  sgt mcp              Start MCP JSON-RPC stdio server for Goose / Claude")
+	fmt.Println("  sgt version          Print version info")
 }
 
 func startMCP() {
 	home, _ := os.UserHomeDir()
-	dbPath := filepath.Join(home, ".local", "share", "sergeant", "sergeant.db")
+	dbPath := filepath.Join(home, ".local", "share", "sgt", "sgt.db")
 	st, err := store.Open(dbPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error opening store: %v\n", err)
@@ -80,7 +80,7 @@ func runProject(projName string) {
 	}
 
 	home, _ := os.UserHomeDir()
-	dbPath := filepath.Join(home, ".local", "share", "sergeant", "sergeant.db")
+	dbPath := filepath.Join(home, ".local", "share", "sgt", "sgt.db")
 	st, err := store.Open(dbPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error opening store: %v\n", err)
@@ -128,7 +128,7 @@ func runProject(projName string) {
 
 func showStatus() {
 	home, _ := os.UserHomeDir()
-	dbPath := filepath.Join(home, ".local", "share", "sergeant", "sergeant.db")
+	dbPath := filepath.Join(home, ".local", "share", "sgt", "sgt.db")
 	st, err := store.Open(dbPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error opening store: %v\n", err)
@@ -152,7 +152,7 @@ func showStatus() {
 
 func startUI() {
 	home, _ := os.UserHomeDir()
-	dbPath := filepath.Join(home, ".local", "share", "sergeant", "sergeant.db")
+	dbPath := filepath.Join(home, ".local", "share", "sgt", "sgt.db")
 	st, err := store.Open(dbPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error opening store: %v\n", err)

@@ -37,7 +37,7 @@ func TestRouterEnvelopePassing(t *testing.T) {
 		t.Fatalf("failed to inject handoff: %v", err)
 	}
 
-	injectedFile := filepath.Join(downstreamWorktree, ".sergeant", "handoff", "backend", "envelope_latest.json")
+	injectedFile := filepath.Join(downstreamWorktree, ".sgt", "handoff", "backend", "envelope_latest.json")
 	if _, err := os.Stat(injectedFile); os.IsNotExist(err) {
 		t.Errorf("expected injected handoff file to exist at %s", injectedFile)
 	}

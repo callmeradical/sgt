@@ -47,7 +47,7 @@ func newTerminalManager() *terminalManager {
 
 // Start spawns a real shell PTY with the given size and working directory.
 // An empty cwd leaves cmd.Dir unset, which os/exec already treats as "the
-// sergeant process's own working directory". cols/rows default to 80/24 when
+// sgt process's own working directory". cols/rows default to 80/24 when
 // zero, matching the frontend's full-size fallback before its first resize.
 func (m *terminalManager) Start(cwd string, cols, rows int) (*terminalSession, error) {
 	if cols <= 0 {

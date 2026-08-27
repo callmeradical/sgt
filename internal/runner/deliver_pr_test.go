@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/callmeradical/sergeant/internal/naming"
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/naming"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // DeliverPullRequest returns gh pr create's raw stdout/stderr verbatim on
@@ -41,7 +41,7 @@ func TestDeliverPullRequestRedactsGHOutput(t *testing.T) {
 	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	pr := &PhaseRunner{Worktree: worktree, RepoName: "svc", RunID: "run-1"}
-	out, err := pr.DeliverPullRequest(context.Background(), "sergeant/run-1", "title", "body")
+	out, err := pr.DeliverPullRequest(context.Background(), "sgt/run-1", "title", "body")
 	if err != nil {
 		t.Fatalf("DeliverPullRequest returned an error: %v", err)
 	}
@@ -57,7 +57,7 @@ func TestDeliverPullRequestRedactsGHOutput(t *testing.T) {
 // empty branch (its caller passing "") must compute the same
 // naming.BranchName(run.Type, run.ChangeID) every other call site uses,
 // looked up via pr.Store.GetRun(pr.RunID) — not a hand-built
-// "sergeant/<run>-<repo>" string independent of the branch actually created.
+// "sgt/<run>-<repo>" string independent of the branch actually created.
 func TestDeliverPullRequestFallsBackToNamingBranchNameWhenBranchIsEmpty(t *testing.T) {
 	worktree := t.TempDir()
 	runGit := func(args ...string) {

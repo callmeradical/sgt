@@ -14,7 +14,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/callmeradical/sergeant/internal/config"
+	"github.com/callmeradical/sgt/internal/config"
 )
 
 // runCommand executes name with args, capturing combined output. It is a
@@ -55,7 +55,7 @@ func BuildProjectGraph(proj *config.Project) error {
 		return fmt.Errorf("no participating repositories for project %q graph build (check include_groups)", proj.Name)
 	}
 
-	scratch, err := os.MkdirTemp("", "sergeant-graphify-*")
+	scratch, err := os.MkdirTemp("", "sgt-graphify-*")
 	if err != nil {
 		return fmt.Errorf("creating scratch dir: %w", err)
 	}
@@ -131,7 +131,7 @@ func BuildProjectGraph(proj *config.Project) error {
 	output := proj.Graphify.Output
 	var backup string
 	if _, err := os.Stat(output); err == nil {
-		backup = filepath.Join(filepath.Dir(output), fmt.Sprintf(".sergeant-graphify-old-%d", time.Now().UnixNano()))
+		backup = filepath.Join(filepath.Dir(output), fmt.Sprintf(".sgt-graphify-old-%d", time.Now().UnixNano()))
 		if err := os.Rename(output, backup); err != nil {
 			return fmt.Errorf("backing up prior output before publish: %w", err)
 		}

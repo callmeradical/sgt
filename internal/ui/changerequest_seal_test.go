@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // changeRequestFixture builds a server backed by a fresh store holding one

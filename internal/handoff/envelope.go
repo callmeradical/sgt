@@ -130,14 +130,14 @@ func (r *Router) ReadLatestEnvelope(repo string) (*Envelope, error) {
 	return &env, nil
 }
 
-// InjectHandoffToWorktree copies all upstream artifacts into the downstream worktree's .sergeant/handoff directory.
+// InjectHandoffToWorktree copies all upstream artifacts into the downstream worktree's .sgt/handoff directory.
 func (r *Router) InjectHandoffToWorktree(upstreamRepo, downstreamWorktree string) error {
 	srcDir := filepath.Join(r.BaseDir, upstreamRepo)
 	if _, err := os.Stat(srcDir); os.IsNotExist(err) {
 		return nil // No handoff to inject
 	}
 
-	destDir := filepath.Join(downstreamWorktree, ".sergeant", "handoff", upstreamRepo)
+	destDir := filepath.Join(downstreamWorktree, ".sgt", "handoff", upstreamRepo)
 	if err := os.MkdirAll(destDir, 0755); err != nil {
 		return fmt.Errorf("creating downstream handoff dir: %w", err)
 	}

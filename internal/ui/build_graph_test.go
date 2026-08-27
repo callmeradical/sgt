@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 func gitRepoWithOneFileForGraphTest(t *testing.T) string {
@@ -48,7 +48,7 @@ func TestBuildGraphEndpointBuildsAndPublishes(t *testing.T) {
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("SERGEANT_CONFIG", configDir)
+	t.Setenv("SGT_CONFIG", configDir)
 
 	repo := gitRepoWithOneFileForGraphTest(t)
 	output := filepath.Join(tempDir, "published")
@@ -97,7 +97,7 @@ func TestBuildGraphEndpointRejectsProjectWithoutGraphifyBlock(t *testing.T) {
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("SERGEANT_CONFIG", configDir)
+	t.Setenv("SGT_CONFIG", configDir)
 
 	projYAML := "project: no-graph\n" +
 		"repos:\n" +

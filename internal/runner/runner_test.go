@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/callmeradical/sergeant/internal/handoff"
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/handoff"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // runGit runs a git command in dir, failing the test on error. It exists
@@ -165,7 +165,7 @@ func TestAgentPhaseFailureIsNotRecordedAsPassed(t *testing.T) {
 // independent read of the raw output buffer (to embed it for a human
 // debugging the failure) — that read must not bypass redaction, or a failing
 // agent that printed a secret leaks it into the returned error and, via
-// cmd/sergeant, straight to stderr (Review 016).
+// cmd/sgt, straight to stderr (Review 016).
 func TestAgentPhaseFailureErrorIsRedacted(t *testing.T) {
 	dir := t.TempDir()
 	secret := "sk-abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP"
@@ -306,7 +306,7 @@ func TestAgentPhaseEnvelopesChainCausation(t *testing.T) {
 // A gate keeps its default. A gate is a deterministic command, so a gate that
 // stops making progress is genuinely hung and killing it is correct.
 func TestAgentPhaseHasNoDefaultTimeout(t *testing.T) {
-	t.Setenv("SERGEANT_AGENT_TIMEOUT", "")
+	t.Setenv("SGT_AGENT_TIMEOUT", "")
 	pr, _ := newRunner(t, "opencode", 0)
 
 	if got := pr.agentTimeout(); got != 0 {
@@ -322,7 +322,7 @@ func TestAgentPhaseHasNoDefaultTimeout(t *testing.T) {
 
 // The budget remains available, opt-in, for an operator who wants one.
 func TestAgentTimeoutIsOptIn(t *testing.T) {
-	t.Setenv("SERGEANT_AGENT_TIMEOUT", "45s")
+	t.Setenv("SGT_AGENT_TIMEOUT", "45s")
 	pr, _ := newRunner(t, "opencode", 0)
 	if got := pr.agentTimeout(); got != 45*time.Second {
 		t.Errorf("agentTimeout() with env set = %v, want 45s", got)
@@ -488,7 +488,7 @@ func payloadProvenance(t *testing.T, payload json.RawMessage) (model, provider s
 }
 
 // A goose phase whose raw output contains the startup banner records the
-// provider and model it names, even though sergeant synthesized the envelope
+// provider and model it names, even though sgt synthesized the envelope
 // (the fake agent here writes no envelope.json of its own).
 func TestGooseAgentPhaseRecordsModelAndProvider(t *testing.T) {
 	dir := t.TempDir()
@@ -570,7 +570,7 @@ func TestClaudeAgentPhaseRecordsAnthropicProviderAndRequestedModel(t *testing.T)
 
 // A claude dispatch with no explicit --model still has a known provider
 // (an environment fact), but the specific model claude chose on its own is
-// genuinely unknown to sergeant — recording one would be exactly the guess
+// genuinely unknown to sgt — recording one would be exactly the guess
 // TestUnparsedAgentProvenanceIsEmptyNotGuessed already forbids for other
 // agents.
 func TestClaudeAgentWithNoRequestedModelLeavesModelEmpty(t *testing.T) {
@@ -663,15 +663,15 @@ func TestUnparsedAgentProvenanceIsEmptyNotGuessed(t *testing.T) {
 }
 
 // A successful phase whose envelope was written by the agent itself (not
-// synthesized by sergeant) must still carry model/provider — provenance is
+// synthesized by sgt) must still carry model/provider — provenance is
 // attached after both env-building branches converge, not only inside the
 // synthesized one.
 func TestAgentAuthoredEnvelopeStillGetsProvenance(t *testing.T) {
 	dir := t.TempDir()
 	script := `#!/bin/sh
 echo '` + "●" + ` new session ` + "·" + ` anthropic claude-sonnet-4-6'
-mkdir -p .sergeant
-cat > .sergeant/envelope.json <<'EOF'
+mkdir -p .sgt
+cat > .sgt/envelope.json <<'EOF'
 {"task_id":"run-1","repo":"svc","stage":"build","summary":"agent authored this envelope","payload":{"custom":"value"}}
 EOF
 exit 0
@@ -724,18 +724,18 @@ exit 0
 	}
 }
 
-// An agent-authored envelope.json is not built by sergeant field-by-field,
+// An agent-authored envelope.json is not built by sgt field-by-field,
 // so it is never redacted at the point of construction the way a synthesized
 // envelope's raw_output is. A secret the agent writes into its own summary
 // or payload must still be redacted before it reaches the returned envelope
 // or any persisted record — closing that gap is not optional just because
-// sergeant did not write the content itself.
+// sgt did not write the content itself.
 func TestAgentAuthoredEnvelopeIsRedacted(t *testing.T) {
 	dir := t.TempDir()
 	secret := "sk-abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP"
 	script := `#!/bin/sh
-mkdir -p .sergeant
-cat > .sergeant/envelope.json <<EOF
+mkdir -p .sgt
+cat > .sgt/envelope.json <<EOF
 {"task_id":"run-1","repo":"svc","stage":"build","summary":"leaked ` + secret + `","payload":{"nested":{"note":"` + secret + `"}}}
 EOF
 exit 0
@@ -794,8 +794,8 @@ exit 0
 func TestRunAgentPhaseReturnsAgentReportedBlockedReason(t *testing.T) {
 	dir := t.TempDir()
 	script := `#!/bin/sh
-mkdir -p .sergeant
-cat > .sergeant/envelope.json <<'EOF'
+mkdir -p .sgt
+cat > .sgt/envelope.json <<'EOF'
 {"task_id":"run-1","repo":"svc","stage":"build","summary":"could not proceed","payload":{"blocked_reason":"requirement is ambiguous; needs a human decision"}}
 EOF
 exit 0
@@ -838,8 +838,8 @@ func TestRunAgentPhaseRedactsTheReturnedBlockedReason(t *testing.T) {
 	dir := t.TempDir()
 	secret := "sk-abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP"
 	script := `#!/bin/sh
-mkdir -p .sergeant
-cat > .sergeant/envelope.json <<EOF
+mkdir -p .sgt
+cat > .sgt/envelope.json <<EOF
 {"task_id":"run-1","repo":"svc","stage":"build","summary":"could not proceed","payload":{"blocked_reason":"needs a key: ` + secret + `"}}
 EOF
 exit 0
@@ -874,8 +874,8 @@ func TestAgentAuthoredEnvelopeArtifactsAreRedactedBeforeDiskWrite(t *testing.T) 
 	dir := t.TempDir()
 	secret := "sk-abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP"
 	script := `#!/bin/sh
-mkdir -p .sergeant
-cat > .sergeant/envelope.json <<EOF
+mkdir -p .sgt
+cat > .sgt/envelope.json <<EOF
 {"task_id":"run-1","repo":"svc","stage":"build","summary":"ok","artifacts":["API_KEY=` + secret + `"],"payload":{}}
 EOF
 exit 0
@@ -1285,8 +1285,8 @@ func TestDiffAgainstBaseErrorsOutsideAGitRepo(t *testing.T) {
 func TestReviewFindingsRoundTripThroughRunAgentPhase(t *testing.T) {
 	dir := t.TempDir()
 	script := `#!/bin/sh
-mkdir -p .sergeant
-cat > .sergeant/envelope.json <<'EOF'
+mkdir -p .sgt
+cat > .sgt/envelope.json <<'EOF'
 {"task_id":"run-1","repo":"svc","stage":"review","summary":"reviewed the diff","payload":{"findings":[{"axis":"spec","severity":"error","summary":"missing failing test","disposition":"add one"},{"axis":"style","severity":"info","summary":"consider renaming x","disposition":"optional"}]}}
 EOF
 exit 0

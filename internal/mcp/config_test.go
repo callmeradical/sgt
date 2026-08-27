@@ -14,7 +14,7 @@ import (
 // matter how well they work.
 //
 // This is a regression test for a real defect. mcp.json declared exactly one
-// server, ./bin/sergeant-mcp, and that binary was absent from the tree: a client
+// server, ./bin/sgt-mcp, and that binary was absent from the tree: a client
 // loading the documented config started nothing at all. The native tools were
 // verified by running the binary directly, which is why the gap survived — the
 // binary worked, the configuration did not. Assert against the configuration.
@@ -45,7 +45,7 @@ func TestEveryServerDeclaredInMCPConfigIsBuildable(t *testing.T) {
 	// it. Asserting the source package exists catches a command path that no
 	// build target will ever satisfy.
 	sources := map[string]string{
-		"./bin/sergeant": "cmd/sergeant",
+		"./bin/sgt": "cmd/sgt",
 	}
 
 	for name, spec := range cfg.MCPServers {
@@ -78,7 +78,7 @@ func TestNativeServerExposesTheRunFollowingTools(t *testing.T) {
 	for _, tool := range Tools() {
 		got[tool.Name] = true
 	}
-	for _, want := range []string{"sergeant_run_status", "sergeant_run_wait"} {
+	for _, want := range []string{"sgt_run_status", "sgt_run_wait"} {
 		if !got[want] {
 			t.Errorf("the native MCP server does not expose %q; a client cannot follow a run", want)
 		}

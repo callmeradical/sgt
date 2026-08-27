@@ -26,14 +26,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/callmeradical/sergeant/internal/config"
-	"github.com/callmeradical/sergeant/internal/dag"
-	"github.com/callmeradical/sergeant/internal/handoff"
-	"github.com/callmeradical/sergeant/internal/naming"
-	"github.com/callmeradical/sergeant/internal/plan"
-	"github.com/callmeradical/sergeant/internal/redact"
-	"github.com/callmeradical/sergeant/internal/runner"
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/config"
+	"github.com/callmeradical/sgt/internal/dag"
+	"github.com/callmeradical/sgt/internal/handoff"
+	"github.com/callmeradical/sgt/internal/naming"
+	"github.com/callmeradical/sgt/internal/plan"
+	"github.com/callmeradical/sgt/internal/redact"
+	"github.com/callmeradical/sgt/internal/runner"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // stageRunner is the one method executeRun needs from a stage-execution
@@ -277,7 +277,7 @@ func (srv *Server) createRunAndDispatch(
 	}
 
 	if existingIntentID == "" {
-		// Decision D4: sergeant stores intents and bullets itself, and decision
+		// Decision D4: sgt stores intents and bullets itself, and decision
 		// D8 makes the intent the dashboard's primary noun.
 		if err := srv.Store.CreateIntent(&store.IntentRecord{
 			ID:        intentID,
@@ -309,7 +309,7 @@ func (srv *Server) createRunAndDispatch(
 	router := handoff.NewRouter(handoffBase)
 	engine := dag.NewEngine(proj, srv.Store, router)
 	// Thread the change directory into the engine so RunStage can seed
-	// .sergeant/plan.json into each worktree after prepareWorktree succeeds
+	// .sgt/plan.json into each worktree after prepareWorktree succeeds
 	// but before the first agent phase starts. Set here, on the concrete
 	// engine, rather than inside executeRun: executeRun's engine parameter is
 	// stageRunner (a 1-method interface), which does not expose ChangeDir.
@@ -431,7 +431,7 @@ func (srv *Server) executeRun(
 	defer cancel()
 	defer srv.finishRun(taskID)
 
-	// Sample .sergeant/plan.json periodically while the run is in flight and
+	// Sample .sgt/plan.json periodically while the run is in flight and
 	// publish progress to the change stream so dashboard clients receive it over
 	// the existing SSE connection. The goroutine stops when ctx is cancelled.
 	//
@@ -487,13 +487,13 @@ func (srv *Server) executeRun(
 	// destroyed by an unrelated click. Committing also makes it reviewable.
 	commitMsg := firstLine(brief)
 	if commitMsg == "" {
-		commitMsg = "sergeant: automated changes"
+		commitMsg = "sgt: automated changes"
 	}
 	commitAll := func() {
 		for _, stage := range stages {
 			for _, repoName := range stage.Repos {
 				if _, _, err := dag.CommitRunOutput(context.Background(), taskID, repoName, commitMsg); err != nil {
-					log.Printf("sergeant: commit failed for run %s repo %s: %v", taskID, repoName, err)
+					log.Printf("sgt: commit failed for run %s repo %s: %v", taskID, repoName, err)
 				}
 			}
 		}
@@ -510,7 +510,7 @@ func (srv *Server) executeRun(
 	//   - Sampling is best-effort: errors are silently swallowed (the plan file
 	//     must not be able to fail the run).
 	//   - The goroutine stops when ctx is cancelled or the stages loop exits.
-	//   - Sergeant only reads here; the agent is the sole writer after seeding.
+	//   - Sgt only reads here; the agent is the sole writer after seeding.
 	progressCtx, stopProgress := context.WithCancel(ctx)
 	defer stopProgress()
 	go func() {
@@ -569,7 +569,7 @@ func (srv *Server) executeRun(
 		Type:          "run.delivered",
 		SchemaVersion: "1",
 		OccurredAt:    deliveryNow,
-		Producer:      "sergeant/ui",
+		Producer:      "sgt/ui",
 		CorrelationID: taskID,
 		CausationID:   srv.Store.CausationFromLatest(taskID, delivery.Repo),
 	})
@@ -594,7 +594,7 @@ func (srv *Server) executeRun(
 // run knows whether the intent is complete.
 func (srv *Server) recordTerminalRun(runID, status string) {
 	if err := srv.Store.UpdateRunStatus(runID, status); err != nil {
-		log.Printf("sergeant: recording terminal status %s for run %s: %v", status, runID, err)
+		log.Printf("sgt: recording terminal status %s for run %s: %v", status, runID, err)
 		return
 	}
 	bulletStatus, advances := bulletStatusForRunOutcome(status)
@@ -603,7 +603,7 @@ func (srv *Server) recordTerminalRun(runID, status string) {
 	}
 	reason := srv.blockedReasonForRun(runID, bulletStatus)
 	if err := srv.Store.AdvanceBulletsForRun(runID, bulletStatus, reason); err != nil {
-		log.Printf("sergeant: advancing the bullets of run %s to %s: %v", runID, bulletStatus, err)
+		log.Printf("sgt: advancing the bullets of run %s to %s: %v", runID, bulletStatus, err)
 	}
 }
 
@@ -621,7 +621,7 @@ func (srv *Server) recordTerminalRun(runID, status string) {
 // the synthesized string for that envelope. Envelopes are read in the order
 // they were recorded, and the last one naming a reason wins either way, so
 // the run's most recent word on why it is stuck is what a human sees. When
-// no envelope named one, a synthesized reason is used: sergeant dispatches a
+// no envelope named one, a synthesized reason is used: sgt dispatches a
 // bullet's work exactly once per run and a run's own retry budget is already
 // exhausted by the time it concludes without passing, so a human is never
 // left with "blocked" and no explanation at all.
@@ -631,7 +631,7 @@ func (srv *Server) blockedReasonForRun(runID, bulletStatus string) string {
 	}
 	envelopes, err := srv.Store.ListEnvelopesForRun(runID)
 	if err != nil {
-		log.Printf("sergeant: loading envelopes for run %s to resolve a blocked reason: %v", runID, err)
+		log.Printf("sgt: loading envelopes for run %s to resolve a blocked reason: %v", runID, err)
 	}
 	var reason string
 	for _, e := range envelopes {
@@ -691,7 +691,7 @@ func (srv *Server) passedPhaseNames(runID string) []string {
 	return out
 }
 
-// appendRunProgress samples .sergeant/plan.json from every worktree belonging
+// appendRunProgress samples .sgt/plan.json from every worktree belonging
 // to runID and appends a progress change to the change sequence so dashboard
 // clients learn about it over the existing SSE stream.
 //
@@ -739,7 +739,7 @@ func (srv *Server) appendRunProgress(runID string) {
 			items = append(items, itemStatus{
 				ID:     it.ID,
 				Status: it.Status,
-				// Scenario is sergeant-seeded from the spec and the agent is
+				// Scenario is sgt-seeded from the spec and the agent is
 				// instructed not to alter it, but plan.json is a file the
 				// agent has raw write access to and nothing enforces that
 				// instruction in code — and AppendChange writes straight to

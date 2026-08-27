@@ -24,21 +24,21 @@ const v1FleetRoot = "share/sergeant/fleet"
 // Scenario: The helper honours the environment override.
 func TestFleetRootHonoursEnvironmentOverride(t *testing.T) {
 	want := t.TempDir()
-	t.Setenv("SERGEANT_FLEET_DIR", want)
+	t.Setenv("SGT_FLEET_DIR", want)
 
 	if got := FleetRoot(); got != want {
-		t.Errorf("FleetRoot() = %q, want the SERGEANT_FLEET_DIR value %q", got, want)
+		t.Errorf("FleetRoot() = %q, want the SGT_FLEET_DIR value %q", got, want)
 	}
 }
 
 // Scenario: The helper defaults to the v2 root, never v1's.
 func TestFleetRootDefaultsToV2RootNeverV1(t *testing.T) {
-	t.Setenv("SERGEANT_FLEET_DIR", "")
+	t.Setenv("SGT_FLEET_DIR", "")
 
 	got := filepath.ToSlash(FleetRoot())
 
-	if !strings.HasSuffix(got, "share/sergeant-v2/fleet") {
-		t.Errorf("FleetRoot() = %q, want a path ending %q", got, "share/sergeant-v2/fleet")
+	if !strings.HasSuffix(got, "share/sgt-v2/fleet") {
+		t.Errorf("FleetRoot() = %q, want a path ending %q", got, "share/sgt-v2/fleet")
 	}
 	if strings.Contains(got, v1FleetRoot) {
 		t.Errorf("FleetRoot() = %q, must not contain v1 root %q", got, v1FleetRoot)
@@ -59,7 +59,7 @@ func TestFleetDirIsFleetRootJoinedWithRunAndRepo(t *testing.T) {
 		{name: "override unset", fleet: ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Setenv("SERGEANT_FLEET_DIR", tc.fleet)
+			t.Setenv("SGT_FLEET_DIR", tc.fleet)
 
 			want := filepath.Join(FleetRoot(), "run-7", "backend")
 			if got := FleetDir("run-7", "backend"); got != want {
@@ -90,14 +90,14 @@ func TestFleetDirIsFleetRootJoinedWithRunAndRepo(t *testing.T) {
 //     segments before matching.
 //
 // The store's database path is out of scope for this change and stays out of
-// scope here by construction: it builds share/sergeant/sergeant.db, which does
+// scope here by construction: it builds share/sgt/sgt.db, which does
 // not contain share/sergeant/fleet.
 func TestNoSourceOutsideTheHelperNamesV1FleetRoot(t *testing.T) {
 	internalDir := internalSourceDir(t)
 	repoRoot := filepath.Dir(internalDir)
 
 	// Scan the whole repository, not just internal/. The first version of this
-	// scan walked internal/ alone, and cmd/sergeant/main.go went on building v1's
+	// scan walked internal/ alone, and cmd/sgt/main.go went on building v1's
 	// fleet root unnoticed: a binary is exactly as capable of writing into the
 	// wrong directory as a library is. Scoping an invariant to one subtree only
 	// moves where it can be broken.

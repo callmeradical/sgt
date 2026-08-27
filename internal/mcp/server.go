@@ -11,13 +11,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/callmeradical/sergeant/internal/config"
-	"github.com/callmeradical/sergeant/internal/dag"
-	"github.com/callmeradical/sergeant/internal/graphify"
-	"github.com/callmeradical/sergeant/internal/naming"
-	"github.com/callmeradical/sergeant/internal/redact"
-	"github.com/callmeradical/sergeant/internal/runner"
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/config"
+	"github.com/callmeradical/sgt/internal/dag"
+	"github.com/callmeradical/sgt/internal/graphify"
+	"github.com/callmeradical/sgt/internal/naming"
+	"github.com/callmeradical/sgt/internal/redact"
+	"github.com/callmeradical/sgt/internal/runner"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 type JSONRPCRequest struct {
@@ -89,8 +89,8 @@ func (s *MCPServer) ServeStdio() error {
 func Tools() []Tool {
 	return []Tool{
 		{
-			Name:        "sergeant_status",
-			Description: "Get the current Sergeant factory status, active runs, and project topology.",
+			Name:        "sgt_status",
+			Description: "Get the current Sgt factory status, active runs, and project topology.",
 			InputSchema: map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{
@@ -99,7 +99,7 @@ func Tools() []Tool {
 			},
 		},
 		{
-			Name:        "sergeant_get_brief",
+			Name:        "sgt_get_brief",
 			Description: "Get the intent brief, acceptance criteria, and worktree paths for a project stage.",
 			InputSchema: map[string]interface{}{
 				"type": "object",
@@ -111,7 +111,7 @@ func Tools() []Tool {
 			},
 		},
 		{
-			Name:        "sergeant_run_gates",
+			Name:        "sgt_run_gates",
 			Description: "Execute 100% deterministic zero-token code quality gates (test, lint) for a repository.",
 			InputSchema: map[string]interface{}{
 				"type": "object",
@@ -123,7 +123,7 @@ func Tools() []Tool {
 			},
 		},
 		{
-			Name:        "sergeant_emit_envelope",
+			Name:        "sgt_emit_envelope",
 			Description: "Emit a typed machine handoff envelope for downstream stage workers in the factory spine.",
 			InputSchema: map[string]interface{}{
 				"type": "object",
@@ -139,7 +139,7 @@ func Tools() []Tool {
 			},
 		},
 		{
-			Name:        "sergeant_seal_pr",
+			Name:        "sgt_seal_pr",
 			Description: "Seal the verified worktree changes and open a GitHub / Gitea Pull Request.",
 			InputSchema: map[string]interface{}{
 				"type": "object",
@@ -156,10 +156,10 @@ func Tools() []Tool {
 		// Following a run a client dispatched. Decision D1 makes the agent-driven
 		// path equal in standing to the coordinator-driven one, so an agent must be
 		// able to observe its own work without scraping the dashboard's HTTP
-		// endpoints or guessing a duration. sergeant_status enumerates runs; neither
+		// endpoints or guessing a duration. sgt_status enumerates runs; neither
 		// of these two is expressible through it, because it cannot address one run.
 		{
-			Name: "sergeant_run_status",
+			Name: "sgt_run_status",
 			Description: "Get one run's status, slug and phase results by run id. " +
 				"Reports an explicit not-found for an unknown id rather than an empty status.",
 			InputSchema: map[string]interface{}{
@@ -171,7 +171,7 @@ func Tools() []Tool {
 			},
 		},
 		{
-			Name: "sergeant_run_wait",
+			Name: "sgt_run_wait",
 			Description: "Block until a run reaches a terminal status, then report it. " +
 				"Returns immediately if the run has already finished. On exceeding the " +
 				"caller-supplied bound it reports the run as still executing and never " +
@@ -195,7 +195,7 @@ func Tools() []Tool {
 		// implements — so a dispatched agent can navigate a project by its
 		// graph rather than by grepping files.
 		{
-			Name:        "sergeant_graph_query",
+			Name:        "sgt_graph_query",
 			Description: "Run a BFS graph query against a project's published code graph. Reports a clear error if no graph has been built for the project yet.",
 			InputSchema: map[string]interface{}{
 				"type": "object",
@@ -207,7 +207,7 @@ func Tools() []Tool {
 			},
 		},
 		{
-			Name:        "sergeant_graph_explain",
+			Name:        "sgt_graph_explain",
 			Description: "Get a plain-language explanation of a node and its neighbors in a project's published code graph. Reports a clear error if no graph has been built for the project yet.",
 			InputSchema: map[string]interface{}{
 				"type": "object",
@@ -219,7 +219,7 @@ func Tools() []Tool {
 			},
 		},
 		{
-			Name:        "sergeant_graph_affected",
+			Name:        "sgt_graph_affected",
 			Description: "Reverse-traverse a project's published code graph to find nodes affected by a change to the named node. Reports a clear error if no graph has been built for the project yet.",
 			InputSchema: map[string]interface{}{
 				"type": "object",
@@ -242,7 +242,7 @@ func (s *MCPServer) handleRequest(req *JSONRPCRequest) {
 				"tools": map[string]bool{"listChanged": false},
 			},
 			"serverInfo": map[string]string{
-				"name":    "sergeant-goose-extension",
+				"name":    "sgt-goose-extension",
 				"version": "0.2.1",
 			},
 		}
@@ -289,7 +289,7 @@ func (s *MCPServer) handleRequest(req *JSONRPCRequest) {
 
 func (s *MCPServer) executeTool(name string, args map[string]interface{}) (string, error) {
 	switch name {
-	case "sergeant_status":
+	case "sgt_status":
 		runs, err := s.Store.ListRecentRuns(10)
 		if err != nil {
 			return "", err
@@ -297,7 +297,7 @@ func (s *MCPServer) executeTool(name string, args map[string]interface{}) (strin
 		out, _ := json.MarshalIndent(runs, "", "  ")
 		return string(out), nil
 
-	case "sergeant_get_brief":
+	case "sgt_get_brief":
 		intentID, _ := args["intent_id"].(string)
 		repo, _ := args["repo"].(string)
 		intent, err := s.Store.GetIntent(intentID)
@@ -315,7 +315,7 @@ func (s *MCPServer) executeTool(name string, args map[string]interface{}) (strin
 		gates := dag.SortedGateNames(repoCfg)
 		return s.Store.RenderIntentBrief(intentID, repo, gates)
 
-	case "sergeant_run_gates":
+	case "sgt_run_gates":
 		projName, _ := args["project"].(string)
 		repoName, _ := args["repo"].(string)
 		proj, err := config.LoadProject(projName)
@@ -363,7 +363,7 @@ func (s *MCPServer) executeTool(name string, args map[string]interface{}) (strin
 		out, _ := json.MarshalIndent(results, "", "  ")
 		return string(out), nil
 
-	case "sergeant_emit_envelope":
+	case "sgt_emit_envelope":
 		runID, _ := args["run_id"].(string)
 		repo, _ := args["repo"].(string)
 		stage, _ := args["stage"].(string)
@@ -378,7 +378,7 @@ func (s *MCPServer) executeTool(name string, args map[string]interface{}) (strin
 		}
 
 		// summary and payload are supplied directly by the calling agent, not
-		// built by sergeant field-by-field — the same reason an agent-authored
+		// built by sgt field-by-field — the same reason an agent-authored
 		// envelope.json must be redacted before it reaches a durable record
 		// (internal/runner.RunAgentPhase). This is a second, independent MCP
 		// entry point into the same table, so it needs the same guarantee.
@@ -395,7 +395,7 @@ func (s *MCPServer) executeTool(name string, args map[string]interface{}) (strin
 			Type:          "phase.completed",
 			SchemaVersion: "1",
 			OccurredAt:    now,
-			Producer:      "sergeant/mcp",
+			Producer:      "sgt/mcp",
 			CorrelationID: runID,
 			CausationID:   s.Store.CausationFromLatest(runID, repo),
 		}
@@ -404,7 +404,7 @@ func (s *MCPServer) executeTool(name string, args map[string]interface{}) (strin
 		}
 		return fmt.Sprintf("Envelope '%s' for stage '%s' recorded successfully!", envRec.ID, stage), nil
 
-	case "sergeant_seal_pr":
+	case "sgt_seal_pr":
 		runID, _ := args["run_id"].(string)
 		projName, _ := args["project"].(string)
 		repo, _ := args["repo"].(string)
@@ -443,15 +443,15 @@ func (s *MCPServer) executeTool(name string, args map[string]interface{}) (strin
 		}
 		return msg, nil
 
-	case "sergeant_run_status":
+	case "sgt_run_status":
 		runID, _ := args["run_id"].(string)
 		return s.runStatus(runID)
 
-	case "sergeant_run_wait":
+	case "sgt_run_wait":
 		runID, _ := args["run_id"].(string)
 		return s.runWait(runID, runWaitBound(args["timeout_seconds"]))
 
-	case "sergeant_graph_query":
+	case "sgt_graph_query":
 		projName, _ := args["project"].(string)
 		question, _ := args["question"].(string)
 		g, err := projectGraphify(projName)
@@ -460,7 +460,7 @@ func (s *MCPServer) executeTool(name string, args map[string]interface{}) (strin
 		}
 		return graphify.Query(g, question)
 
-	case "sergeant_graph_explain":
+	case "sgt_graph_explain":
 		projName, _ := args["project"].(string)
 		node, _ := args["node"].(string)
 		g, err := projectGraphify(projName)
@@ -469,7 +469,7 @@ func (s *MCPServer) executeTool(name string, args map[string]interface{}) (strin
 		}
 		return graphify.Explain(g, node)
 
-	case "sergeant_graph_affected":
+	case "sgt_graph_affected":
 		projName, _ := args["project"].(string)
 		node, _ := args["node"].(string)
 		g, err := projectGraphify(projName)

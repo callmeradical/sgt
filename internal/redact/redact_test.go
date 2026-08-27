@@ -244,7 +244,7 @@ func TestTextRedactsProviderKeysGluedToTrailingText(t *testing.T) {
 }
 
 // JSON must redact string leaves anywhere in an arbitrary JSON document,
-// since an envelope's payload is not always built by sergeant field-by-field
+// since an envelope's payload is not always built by sgt field-by-field
 // — a dispatched agent can write its own envelope.json.
 func TestJSONRedactsStringLeavesAtAnyDepth(t *testing.T) {
 	secret := "sk-abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP"

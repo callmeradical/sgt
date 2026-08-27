@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // The stage matrix is rendered in JavaScript inside the embedded index.html, so
@@ -268,7 +268,7 @@ func TestGraphNodeShowsWhereTheWorkHappened(t *testing.T) {
 	def := defFor(WorkflowNode{ID: "stage:build", Label: "build", Kind: "stage", Group: "svc"})
 	phases := []store.PhaseRecord{{
 		Repo: "svc", Name: "build", Kind: "agent", Status: "passed", DurationMs: 1000,
-		Payload: []byte(`{"worktree":"/Users/x/.local/share/sergeant-v2/fleet/sgt-1/svc","branch":"sergeant/sgt-1"}`),
+		Payload: []byte(`{"worktree":"/Users/x/.local/share/sgt-v2/fleet/sgt-1/svc","branch":"sgt/sgt-1"}`),
 	}}
 
 	html := renderLane(t, "svc", def, phases)
@@ -279,10 +279,10 @@ func TestGraphNodeShowsWhereTheWorkHappened(t *testing.T) {
 	if !strings.Contains(html, "fa-folder-tree") {
 		t.Errorf("a phase with a recorded location must be marked as having one\n%s", html)
 	}
-	if !strings.Contains(html, "sergeant/sgt-1") {
+	if !strings.Contains(html, "sgt/sgt-1") {
 		t.Errorf("the branch must be discoverable on the node (tooltip)\n%s", html)
 	}
-	if !strings.Contains(html, "/Users/x/.local/share/sergeant-v2/fleet/sgt-1/svc") {
+	if !strings.Contains(html, "/Users/x/.local/share/sgt-v2/fleet/sgt-1/svc") {
 		t.Errorf("the full worktree path must be discoverable on the node\n%s", html)
 	}
 }
@@ -364,7 +364,7 @@ func TestGraphDeliveryWithNoBulletRendersAllNotStarted(t *testing.T) {
 }
 
 // An operator seeing "sealed" or "merged" for the first time has no way to
-// learn what sergeant means by them without reading the source — every
+// learn what sgt means by them without reading the source — every
 // lifecycle node must carry an explanatory tooltip.
 func TestGraphDeliveryNodesHaveExplanatoryTooltips(t *testing.T) {
 	def := defFor(lifecycleNodes()...)

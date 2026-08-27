@@ -4,11 +4,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
-// sergeant_emit_envelope's summary and payload are supplied directly by the
-// calling agent, not built by sergeant field-by-field. This is a second,
+// sgt_emit_envelope's summary and payload are supplied directly by the
+// calling agent, not built by sgt field-by-field. This is a second,
 // independent write path into EnvelopeRecord (alongside
 // internal/runner.RunAgentPhase's agent-authored envelope.json branch), and
 // it needs the same redaction guarantee (R4.4) — an MCP tool call is exactly
@@ -21,7 +21,7 @@ func TestEmitEnvelopeRedactsAgentSuppliedContent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	text, err := s.executeTool("sergeant_emit_envelope", map[string]interface{}{
+	text, err := s.executeTool("sgt_emit_envelope", map[string]interface{}{
 		"run_id":  "run-1",
 		"repo":    "svc",
 		"stage":   "build",
@@ -29,7 +29,7 @@ func TestEmitEnvelopeRedactsAgentSuppliedContent(t *testing.T) {
 		"payload": map[string]interface{}{"nested": map[string]interface{}{"note": secret}},
 	})
 	if err != nil {
-		t.Fatalf("sergeant_emit_envelope returned an error: %v", err)
+		t.Fatalf("sgt_emit_envelope returned an error: %v", err)
 	}
 	if strings.Contains(text, secret) {
 		t.Errorf("tool response leaked the secret: %q", text)

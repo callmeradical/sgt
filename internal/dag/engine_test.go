@@ -11,16 +11,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/callmeradical/sergeant/internal/config"
-	"github.com/callmeradical/sergeant/internal/handoff"
-	"github.com/callmeradical/sergeant/internal/naming"
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/config"
+	"github.com/callmeradical/sgt/internal/handoff"
+	"github.com/callmeradical/sgt/internal/naming"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // testWorkType is the work type engine tests dispatch as, wherever the test is
 // not itself about which type was recorded. testBranch is the branch that
 // naming.BranchName produces for a run created with this type and a change id
-// equal to the run's own id — the same shape "sergeant/<run-id>" used to be.
+// equal to the run's own id — the same shape "sgt/<run-id>" used to be.
 const testWorkType = "feat"
 
 func testBranch(runID string) string { return naming.BranchName(testWorkType, runID) }
@@ -80,7 +80,7 @@ func newEngine(t *testing.T, proj *config.Project) *Engine {
 // operator's configured checkout.
 func TestRunStageIsolatesWorkInAWorktree(t *testing.T) {
 	tempDir := t.TempDir()
-	t.Setenv("SERGEANT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
 
 	backendDir := filepath.Join(tempDir, "backend")
 	newGitRepo(t, backendDir)
@@ -133,7 +133,7 @@ func TestRunStageIsolatesWorkInAWorktree(t *testing.T) {
 // A repo that cannot be isolated must be refused, not silently mutated in place.
 func TestRunStageRefusesNonGitRepo(t *testing.T) {
 	tempDir := t.TempDir()
-	t.Setenv("SERGEANT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
 
 	plainDir := filepath.Join(tempDir, "not-a-repo")
 	if err := os.MkdirAll(plainDir, 0755); err != nil {
@@ -165,7 +165,7 @@ func TestRunStageRefusesNonGitRepo(t *testing.T) {
 // one did not.
 func TestRunStageDeliversHandoffFromUpstreamEnvelope(t *testing.T) {
 	tempDir := t.TempDir()
-	t.Setenv("SERGEANT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
 
 	upstreamDir := filepath.Join(tempDir, "upstream")
 	newGitRepo(t, upstreamDir)
@@ -209,7 +209,7 @@ func TestRunStageDeliversHandoffFromUpstreamEnvelope(t *testing.T) {
 	}
 
 	downstreamWorktree := FleetDir(runID, "downstream")
-	injected := filepath.Join(downstreamWorktree, ".sergeant", "handoff", "upstream", "envelope_latest.json")
+	injected := filepath.Join(downstreamWorktree, ".sgt", "handoff", "upstream", "envelope_latest.json")
 	if _, err := os.Stat(injected); err != nil {
 		t.Fatalf("expected injected handoff file at %s: %v", injected, err)
 	}
@@ -231,7 +231,7 @@ func TestRunStageDeliversHandoffFromUpstreamEnvelope(t *testing.T) {
 // work in a fleet worktree exists nowhere else and is destroyed by prune.
 func TestCommitRunOutputMakesWorkRecoverable(t *testing.T) {
 	tempDir := t.TempDir()
-	t.Setenv("SERGEANT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
 
 	src := filepath.Join(tempDir, "svc")
 	newGitRepo(t, src)
@@ -291,7 +291,7 @@ func TestCommitRunOutputMakesWorkRecoverable(t *testing.T) {
 func TestGatesRunInDeterministicOrder(t *testing.T) {
 	order := func() []string {
 		tempDir := t.TempDir()
-		t.Setenv("SERGEANT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
+		t.Setenv("SGT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
 		src := filepath.Join(tempDir, "svc")
 		newGitRepo(t, src)
 
@@ -418,7 +418,7 @@ func latestPhaseByName(t *testing.T, eng *Engine, runID, name string) *store.Pha
 // D3: the red state is a real failing gate result, recorded on the run.
 func TestRecordRedStateAcceptsAFailingGate(t *testing.T) {
 	tempDir := t.TempDir()
-	t.Setenv("SERGEANT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
 
 	src := filepath.Join(tempDir, "svc")
 	newTDDRepo(t, src, false)
@@ -467,7 +467,7 @@ func TestRecordRedStateAcceptsAFailingGate(t *testing.T) {
 // refused, not silently accepted as a red state.
 func TestRecordRedStateRefusesWhenEveryGatePasses(t *testing.T) {
 	tempDir := t.TempDir()
-	t.Setenv("SERGEANT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
 
 	src := filepath.Join(tempDir, "svc")
 	newTDDRepo(t, src, true) // implementation already committed: gate passes
@@ -496,7 +496,7 @@ func TestRecordRedStateRefusesWhenEveryGatePasses(t *testing.T) {
 // D3: red→green. The same gate must fail before implementation and pass after.
 func TestRecordGreenStateRequiresEveryGateToPass(t *testing.T) {
 	tempDir := t.TempDir()
-	t.Setenv("SERGEANT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
 
 	src := filepath.Join(tempDir, "svc")
 	newTDDRepo(t, src, false)
@@ -562,7 +562,7 @@ func TestRecordGreenStateRequiresEveryGateToPass(t *testing.T) {
 // back to a gate that always passes would manufacture evidence.
 func TestRedStateRequiresConfiguredGates(t *testing.T) {
 	tempDir := t.TempDir()
-	t.Setenv("SERGEANT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
 
 	src := filepath.Join(tempDir, "svc")
 	newGitRepo(t, src)
@@ -586,7 +586,7 @@ func TestRedStateRequiresConfiguredGates(t *testing.T) {
 // indistinguishable from skipping the rule.
 func TestRedExemptionRequiresAReason(t *testing.T) {
 	tempDir := t.TempDir()
-	t.Setenv("SERGEANT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
 
 	src := filepath.Join(tempDir, "svc")
 	newTDDRepo(t, src, false)
@@ -616,7 +616,7 @@ func TestRedExemptionRequiresAReason(t *testing.T) {
 // D3: a granted exemption is durable and visible on the run.
 func TestRedExemptionIsRecordedAsAPhase(t *testing.T) {
 	tempDir := t.TempDir()
-	t.Setenv("SERGEANT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
 
 	src := filepath.Join(tempDir, "svc")
 	newTDDRepo(t, src, false)
@@ -657,12 +657,12 @@ func TestRedExemptionIsRecordedAsAPhase(t *testing.T) {
 // ~/.local/share/sergeant/fleet/<task>/<repo>/ as a metadata directory, so
 // writing worktrees there would corrupt v1's layout.
 func TestFleetDirDefaultsToV2Root(t *testing.T) {
-	t.Setenv("SERGEANT_FLEET_DIR", "")
+	t.Setenv("SGT_FLEET_DIR", "")
 
 	got := filepath.ToSlash(FleetDir("run-default-root", "backend"))
 
-	if !strings.Contains(got, "sergeant-v2") {
-		t.Errorf("FleetDir default = %q, want a path containing %q", got, "sergeant-v2")
+	if !strings.Contains(got, "sgt-v2") {
+		t.Errorf("FleetDir default = %q, want a path containing %q", got, "sgt-v2")
 	}
 	if strings.Contains(got, "share/sergeant/fleet") {
 		t.Errorf("FleetDir default = %q, must not use v1 root %q", got, "share/sergeant/fleet")
@@ -678,12 +678,12 @@ func TestFleetDirDefaultsToV2Root(t *testing.T) {
 // discards every commit the previous attempt made.
 //
 // Run sgt-1787427981 is exactly this shape: killed at its timeout with a good
-// commit on sergeant/sgt-1787427981 and nothing to pick it back up with.
+// commit on sgt/sgt-1787427981 and nothing to pick it back up with.
 func TestPrepareWorktreeDoesNotDiscardCommitsOnAnExistingBranch(t *testing.T) {
 	ctx := context.Background()
 	src := filepath.Join(t.TempDir(), "svc")
 	newGitRepo(t, src)
-	t.Setenv("SERGEANT_FLEET_DIR", t.TempDir())
+	t.Setenv("SGT_FLEET_DIR", t.TempDir())
 
 	proj := &config.Project{Name: "p", Repos: map[string]config.Repo{"svc": {Path: src}}}
 	eng := newEngine(t, proj)
@@ -731,7 +731,7 @@ func TestPrepareWorktreeDoesNotDiscardCommitsOnAnExistingBranch(t *testing.T) {
 // invocation to re-derive it.
 func TestResumeSkipsPhasesThatAlreadyPassed(t *testing.T) {
 	tempDir := t.TempDir()
-	t.Setenv("SERGEANT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
 
 	repoDir := filepath.Join(tempDir, "svc")
 	newGitRepo(t, repoDir)
@@ -808,7 +808,7 @@ func TestResumeSkipsPhasesThatAlreadyPassed(t *testing.T) {
 // another run's results.
 func TestFreshRunDoesNotSkipPhases(t *testing.T) {
 	tempDir := t.TempDir()
-	t.Setenv("SERGEANT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
 	repoDir := filepath.Join(tempDir, "svc")
 	newGitRepo(t, repoDir)
 
@@ -853,7 +853,7 @@ func TestFreshRunDoesNotSkipPhases(t *testing.T) {
 // exactly 2 phase records (1 original + 1 retry).
 func TestEnginePassesResolvedRetriesToAgentPhase(t *testing.T) {
 	tempDir := t.TempDir()
-	t.Setenv("SERGEANT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
 
 	repoDir := filepath.Join(tempDir, "svc")
 	newGitRepo(t, repoDir)
@@ -910,7 +910,7 @@ func TestEnginePassesResolvedRetriesToAgentPhase(t *testing.T) {
 // get a different answer contradicts R2.5 and R2.6.
 func TestGateIsNeverRetriedEvenWithRetryCount(t *testing.T) {
 	tempDir := t.TempDir()
-	t.Setenv("SERGEANT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
 
 	repoDir := filepath.Join(tempDir, "svc")
 	newGitRepo(t, repoDir)
@@ -952,7 +952,7 @@ func TestGateIsNeverRetriedEvenWithRetryCount(t *testing.T) {
 // A repo-level retry count overrides the project default in the engine.
 func TestEngineUsesRepoRetryOverride(t *testing.T) {
 	tempDir := t.TempDir()
-	t.Setenv("SERGEANT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
 
 	repoDir := filepath.Join(tempDir, "svc")
 	newGitRepo(t, repoDir)
@@ -1006,7 +1006,7 @@ func TestEngineUsesRepoRetryOverride(t *testing.T) {
 // what it actually received, before any agent invocation.
 func readPromptFile(t *testing.T, runID, repoName, phase string) string {
 	t.Helper()
-	path := filepath.Join(FleetDir(runID, repoName), ".sergeant", fmt.Sprintf("prompt_%s.txt", phase))
+	path := filepath.Join(FleetDir(runID, repoName), ".sgt", fmt.Sprintf("prompt_%s.txt", phase))
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("reading prompt file %s: %v", path, err)
@@ -1035,7 +1035,7 @@ func fakeAgentThatSucceeds(t *testing.T, tempDir string) string {
 // statement and bullet state.
 func TestRunStagePromptIncludesIntentStatementAndBulletState(t *testing.T) {
 	tempDir := t.TempDir()
-	t.Setenv("SERGEANT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
 
 	repoDir := filepath.Join(tempDir, "svc")
 	newGitRepo(t, repoDir)
@@ -1089,7 +1089,7 @@ func TestRunStagePromptIncludesIntentStatementAndBulletState(t *testing.T) {
 // Scenario: A run with no intent id still receives stage.Brief.
 func TestRunStageWithNoIntentIDStillReceivesStageBrief(t *testing.T) {
 	tempDir := t.TempDir()
-	t.Setenv("SERGEANT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
 
 	repoDir := filepath.Join(tempDir, "svc")
 	newGitRepo(t, repoDir)
@@ -1150,7 +1150,7 @@ func TestReviewPromptExcludesPriorPhaseEnvelopeContent(t *testing.T) {
 // passing).
 func TestRunStagePipelineWithoutReviewIsUnaffected(t *testing.T) {
 	tempDir := t.TempDir()
-	t.Setenv("SERGEANT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
 
 	repoDir := filepath.Join(tempDir, "svc")
 	newGitRepo(t, repoDir)
@@ -1197,8 +1197,8 @@ func TestRunStagePipelineWithoutReviewIsUnaffected(t *testing.T) {
 // RunStage's own DiffAgainstBase call is what is under test elsewhere.
 func reviewAgentScript(findingsJSON string) string {
 	return "#!/bin/sh\n" +
-		"mkdir -p .sergeant\n" +
-		"cat > .sergeant/envelope.json <<'EOF'\n" +
+		"mkdir -p .sgt\n" +
+		"cat > .sgt/envelope.json <<'EOF'\n" +
 		`{"task_id":"t","repo":"svc","stage":"review","summary":"reviewed","payload":{"findings":` + findingsJSON + `}}` + "\n" +
 		"EOF\n" +
 		"exit 0\n"
@@ -1208,7 +1208,7 @@ func reviewAgentScript(findingsJSON string) string {
 // the phase — the run proceeds to conclude on the rest of the pipeline.
 func TestRunStageReviewPhaseWithOnlyNonBlockingFindingsSucceeds(t *testing.T) {
 	tempDir := t.TempDir()
-	t.Setenv("SERGEANT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
 
 	repoDir := filepath.Join(tempDir, "svc")
 	newGitRepo(t, repoDir)
@@ -1265,7 +1265,7 @@ func TestRunStageReviewPhaseWithOnlyNonBlockingFindingsSucceeds(t *testing.T) {
 // takes over.
 func TestRunStageReviewPhaseWithBlockingFindingFailsTheStage(t *testing.T) {
 	tempDir := t.TempDir()
-	t.Setenv("SERGEANT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
 
 	repoDir := filepath.Join(tempDir, "svc")
 	newGitRepo(t, repoDir)

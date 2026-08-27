@@ -1,6 +1,6 @@
 package export
 
-import "github.com/callmeradical/sergeant/internal/config"
+import "github.com/callmeradical/sgt/internal/config"
 
 // Constructor builds a Target for one project's export configuration.
 type Constructor func(cfg config.Export) (Target, error)
@@ -10,7 +10,7 @@ type Constructor func(cfg config.Export) (Target, error)
 // Target implementation exists yet, which docs/prd-task-tracking-export.md
 // already decided is correctly out of scope until a concrete external
 // tracker is chosen. A future backend registers into this map from its own
-// package (an init(), or an explicit call before cmd/sergeant/main.go's
+// package (an init(), or an explicit call before cmd/sgt/main.go's
 // startExportRunners runs), so adding a backend never requires editing
 // startExportRunners again.
 var Backends = map[string]Constructor{}

@@ -10,13 +10,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/callmeradical/sergeant/internal/config"
+	"github.com/callmeradical/sgt/internal/config"
 )
 
-// Decision O3 of docs/prd-sergeant-v2.md: a dispatch must resolve to an OpenSpec
-// change, and sergeant scaffolds one from the brief if none is referenced, before
-// any worktree is created. Sergeant dispatches agents that write code and open
-// PRs; exempting dispatched work would make sergeant the largest producer of the
+// Decision O3 of docs/prd-sgt-v2.md: a dispatch must resolve to an OpenSpec
+// change, and sgt scaffolds one from the brief if none is referenced, before
+// any worktree is created. Sgt dispatches agents that write code and open
+// PRs; exempting dispatched work would make sgt the largest producer of the
 // undocumented work OpenSpec is adopted to eliminate.
 //
 // Decision O1 puts planning per repository, so the change lives in the target

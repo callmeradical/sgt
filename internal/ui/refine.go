@@ -47,10 +47,10 @@ func (srv *Server) handleRefineProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cfgDir := os.Getenv("SERGEANT_CONFIG")
+	cfgDir := os.Getenv("SGT_CONFIG")
 	if cfgDir == "" {
 		home, _ := os.UserHomeDir()
-		cfgDir = filepath.Join(home, ".config", "sergeant")
+		cfgDir = filepath.Join(home, ".config", "sgt")
 	}
 	_ = os.MkdirAll(cfgDir, 0755)
 

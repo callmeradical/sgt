@@ -15,7 +15,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // TestInterruptedRunIsAcceptedByResume: the resume endpoint must accept an

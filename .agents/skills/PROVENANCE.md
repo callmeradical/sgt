@@ -26,11 +26,11 @@ Last synced: 2026-07-30 (added 7 skills; initial import 2026-07-21 covered 7).
 | `triage` | `skills/engineering/triage/SKILL.md` | `258364be8354f726bf4080077cd92d86d08c69eb` |
 | `wayfinder` | `skills/engineering/wayfinder/SKILL.md` | `33ed747fb30668c0e7b61698af5268c25c0d75cb` |
 
-The custom `to-tickets` skill is Sergeant project-authored material owned by
+The custom `to-tickets` skill is Sgt project-authored material owned by
 Lars Cromley and explicitly authorized for MIT redistribution:
 `Copyright (c) 2026 Lars Cromley`.
 
-The custom `sergeant-setup` skill is Sergeant project-authored material owned by
+The custom `sgt-setup` skill is Sgt project-authored material owned by
 Lars Cromley and explicitly authorized for MIT redistribution:
 `Copyright (c) 2026 Lars Cromley`.
 
@@ -45,4 +45,4 @@ contract when the brief references it.
 the frontmatter and rewrites the `description` field to prevent agents in
 worker worktrees from auto-loading this skill as an invocation target. A
 worker-restriction callout block is also prepended to the skill body. These
-changes are Sergeant-local and are not upstreamed.
+changes are Sgt-local and are not upstreamed.

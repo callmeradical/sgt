@@ -19,7 +19,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 func doPlanAction(t *testing.T, mux http.Handler, method, path string) *httptest.ResponseRecorder {

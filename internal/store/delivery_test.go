@@ -40,7 +40,7 @@ func openDeliveryTestStore(t *testing.T) (*Store, string /*envelopeID*/) {
 		Summary:       "test envelope",
 		Type:          "phase.completed",
 		SchemaVersion: "1",
-		Producer:      "sergeant/test",
+		Producer:      "sgt/test",
 		CorrelationID: "run-del-1",
 	}
 	if err := st.RecordEnvelope(env); err != nil {
@@ -422,7 +422,7 @@ func TestListDeliveriesForRunReturnsAcrossEnvelopesAndConsumers(t *testing.T) {
 		Summary:       "second envelope",
 		Type:          "phase.completed",
 		SchemaVersion: "1",
-		Producer:      "sergeant/test",
+		Producer:      "sgt/test",
 		CorrelationID: runID,
 	}
 	if err := st.RecordEnvelope(env2); err != nil {

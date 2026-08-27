@@ -6,15 +6,15 @@ import (
 	"strings"
 )
 
-// ListProjects scans ~/.config/sergeant for all available project yaml files.
+// ListProjects scans ~/.config/sgt for all available project yaml files.
 func ListProjects() ([]*Project, error) {
-	configDir := os.Getenv("SERGEANT_CONFIG")
+	configDir := os.Getenv("SGT_CONFIG")
 	if configDir == "" {
 		home, err := os.UserHomeDir()
 		if err != nil {
 			return nil, err
 		}
-		configDir = filepath.Join(home, ".config", "sergeant")
+		configDir = filepath.Join(home, ".config", "sgt")
 	}
 
 	if _, err := os.Stat(configDir); os.IsNotExist(err) {

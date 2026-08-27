@@ -15,7 +15,7 @@ import (
 var runIDCounter uint32
 
 // RunID is a run's identity. It names the run row, the git branch
-// (sergeant/<id>) and the worktree directory, so it must be unique and must hold
+// (sgt/<id>) and the worktree directory, so it must be unique and must hold
 // nothing that needs quoting in a shell, a path or a git refname.
 //
 // The form is sgt-<unix seconds>-<hex>. The epoch is kept because it lets an

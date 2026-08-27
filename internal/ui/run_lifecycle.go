@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/callmeradical/sergeant/internal/config"
-	"github.com/callmeradical/sergeant/internal/dag"
-	"github.com/callmeradical/sergeant/internal/handoff"
+	"github.com/callmeradical/sgt/internal/config"
+	"github.com/callmeradical/sgt/internal/dag"
+	"github.com/callmeradical/sgt/internal/handoff"
 )
 
 func (srv *Server) handleRunCancel(w http.ResponseWriter, r *http.Request) {

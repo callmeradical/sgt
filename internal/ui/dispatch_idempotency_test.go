@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/callmeradical/sergeant/internal/dag"
-	"github.com/callmeradical/sergeant/internal/naming"
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/dag"
+	"github.com/callmeradical/sgt/internal/naming"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // Requirement: a dispatch is idempotent under a caller-supplied key.
@@ -189,7 +189,7 @@ func TestDispatchWithARepeatedRequestIDInsideOneSecondDeduplicates(t *testing.T)
 	}
 
 	// handleDispatch runs the actual pipeline in a background goroutine.
-	// dispatchFixture's t.Setenv(SERGEANT_CONFIG/SERGEANT_FLEET_DIR) is
+	// dispatchFixture's t.Setenv(SGT_CONFIG/SGT_FLEET_DIR) is
 	// process-global, so a goroutine this test leaves running past its own
 	// return observes whatever a LATER test's dispatchFixture has since set
 	// those variables to, and writes to this test's already-closed store —
@@ -272,7 +272,7 @@ func TestDispatchWithoutARequestIDCreatesANewRunEachTime(t *testing.T) {
 	// wait for both background dispatch goroutines to finish before this
 	// test's own store closes, so they cannot leak into a later test's
 	// dispatchFixture (which reassigns the same process-global
-	// SERGEANT_CONFIG/SERGEANT_FLEET_DIR env vars this test used).
+	// SGT_CONFIG/SGT_FLEET_DIR env vars this test used).
 	waitForTerminalRun(t, st, a.TaskID)
 	waitForTerminalRun(t, st, b.TaskID)
 }
@@ -489,8 +489,8 @@ func gitDispatchFixtureStandalone(t *testing.T) (mux http.Handler, st *store.Sto
 	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("SERGEANT_CONFIG", cfgDir)
-	t.Setenv("SERGEANT_FLEET_DIR", filepath.Join(base, "fleet"))
+	t.Setenv("SGT_CONFIG", cfgDir)
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(base, "fleet"))
 
 	repoPath = filepath.Join(base, "svc")
 	initGitRepo(t, repoPath)
@@ -522,8 +522,8 @@ func initGitRepo(t *testing.T, dir string) {
 		t.Fatal(err)
 	}
 	gitIn(t, dir, "init", "-q", "-b", "main")
-	gitIn(t, dir, "config", "user.name", "sergeant-test")
-	gitIn(t, dir, "config", "user.email", "sergeant-test@example.com")
+	gitIn(t, dir, "config", "user.name", "sgt-test")
+	gitIn(t, dir, "config", "user.email", "sgt-test@example.com")
 	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("seed\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

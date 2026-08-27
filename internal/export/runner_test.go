@@ -9,8 +9,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/callmeradical/sergeant/internal/redact"
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/redact"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // fakeTarget records every Record it receives, in delivery order, and can be

@@ -53,7 +53,7 @@ func TestRenderIntentBriefOmitsBlockedReasonLineWhenNotBlocked(t *testing.T) {
 	}
 }
 
-// Scenario: sergeant_get_brief and the dispatch-time prompt agree.
+// Scenario: sgt_get_brief and the dispatch-time prompt agree.
 //
 // Both call sites resolve to the same intent id, repo and gate names before
 // calling RenderIntentBrief; this asserts the function itself returns
@@ -70,14 +70,14 @@ func TestRenderIntentBriefAgreesForTheSameArguments(t *testing.T) {
 	}
 	mcpRendered, err := st.RenderIntentBrief("intent-agree", "api", gates)
 	if err != nil {
-		t.Fatalf("simulating sergeant_get_brief render: %v", err)
+		t.Fatalf("simulating sgt_get_brief render: %v", err)
 	}
 	if dispatchTimeRendered != mcpRendered {
-		t.Errorf("dispatch-time and sergeant_get_brief renders differ:\n%q\nvs\n%q", dispatchTimeRendered, mcpRendered)
+		t.Errorf("dispatch-time and sgt_get_brief renders differ:\n%q\nvs\n%q", dispatchTimeRendered, mcpRendered)
 	}
 }
 
-// Scenario: sergeant_get_brief refuses a repo with no matching bullet.
+// Scenario: sgt_get_brief refuses a repo with no matching bullet.
 func TestRenderIntentBriefRefusesRepoWithNoMatchingBullet(t *testing.T) {
 	st, _ := openTestStore(t)
 	seedBriefFixture(t, st, "intent-solo", "api", "pending", "")

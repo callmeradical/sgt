@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/callmeradical/sergeant/internal/config"
-	"github.com/callmeradical/sergeant/internal/export"
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/config"
+	"github.com/callmeradical/sgt/internal/export"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // recordingTarget is a test-only export.Target that counts how many times
@@ -36,7 +36,7 @@ func writeProjectYAML(t *testing.T, dir, filename, body string) {
 
 func openTestStore(t *testing.T) *store.Store {
 	t.Helper()
-	st, err := store.Open(filepath.Join(t.TempDir(), "sergeant.db"))
+	st, err := store.Open(filepath.Join(t.TempDir(), "sgt.db"))
 	if err != nil {
 		t.Fatalf("opening store: %v", err)
 	}
@@ -50,7 +50,7 @@ func openTestStore(t *testing.T) *store.Store {
 // ticker interval, so a bounded poll (well under defaultInterval) is enough.
 func TestRegisteredBackendStartsExporting(t *testing.T) {
 	configDir := t.TempDir()
-	t.Setenv("SERGEANT_CONFIG", configDir)
+	t.Setenv("SGT_CONFIG", configDir)
 	writeProjectYAML(t, configDir, "proj.yaml", `
 project: proj
 repos:
@@ -91,7 +91,7 @@ export:
 // nothing constructed, nothing started.
 func TestUnregisteredBackendNameStartsNothing(t *testing.T) {
 	configDir := t.TempDir()
-	t.Setenv("SERGEANT_CONFIG", configDir)
+	t.Setenv("SGT_CONFIG", configDir)
 	writeProjectYAML(t, configDir, "proj.yaml", `
 project: proj
 repos:
@@ -128,7 +128,7 @@ export:
 // construction, and no report.
 func TestNoExportBlockStartsAndReportsNothing(t *testing.T) {
 	configDir := t.TempDir()
-	t.Setenv("SERGEANT_CONFIG", configDir)
+	t.Setenv("SGT_CONFIG", configDir)
 	writeProjectYAML(t, configDir, "proj.yaml", `
 project: proj
 repos:

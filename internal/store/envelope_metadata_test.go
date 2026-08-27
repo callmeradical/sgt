@@ -30,7 +30,7 @@ func minimalValidEnvelope() *EnvelopeRecord {
 		Type:          "phase.completed",
 		SchemaVersion: "1",
 		OccurredAt:    now.Add(-5 * time.Second),
-		Producer:      "sergeant/runner",
+		Producer:      "sgt/runner",
 		CorrelationID: "run-abc",
 		Summary:       "test envelope",
 		Data:          json.RawMessage(`{}`),
@@ -258,7 +258,7 @@ func TestRecordEnvelopeRefusesEmptyCorrelationID(t *testing.T) {
 func TestRecordEnvelopeRoundTripsProducer(t *testing.T) {
 	st := openTestStoreWithRun(t, "run-abc")
 	e := minimalValidEnvelope()
-	e.Producer = "sergeant/mcp"
+	e.Producer = "sgt/mcp"
 
 	if err := st.RecordEnvelope(e); err != nil {
 		t.Fatalf("RecordEnvelope: %v", err)
@@ -268,8 +268,8 @@ func TestRecordEnvelopeRoundTripsProducer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetLatestEnvelope: %v", err)
 	}
-	if got.Producer != "sergeant/mcp" {
-		t.Errorf("Producer = %q, want %q", got.Producer, "sergeant/mcp")
+	if got.Producer != "sgt/mcp" {
+		t.Errorf("Producer = %q, want %q", got.Producer, "sgt/mcp")
 	}
 }
 
@@ -468,7 +468,7 @@ func TestListEnvelopesForRunIncludesNewFields(t *testing.T) {
 	e := minimalValidEnvelope()
 	e.Type = "phase.completed"
 	e.SchemaVersion = "1"
-	e.Producer = "sergeant/runner"
+	e.Producer = "sgt/runner"
 	e.CorrelationID = "run-abc"
 
 	if err := st.RecordEnvelope(e); err != nil {
@@ -486,8 +486,8 @@ func TestListEnvelopesForRunIncludesNewFields(t *testing.T) {
 	if got.Type != "phase.completed" {
 		t.Errorf("Type = %q, want phase.completed", got.Type)
 	}
-	if got.Producer != "sergeant/runner" {
-		t.Errorf("Producer = %q, want sergeant/runner", got.Producer)
+	if got.Producer != "sgt/runner" {
+		t.Errorf("Producer = %q, want sgt/runner", got.Producer)
 	}
 	if got.CorrelationID != "run-abc" {
 		t.Errorf("CorrelationID = %q, want run-abc", got.CorrelationID)

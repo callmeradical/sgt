@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // bulletApprovalFixture builds a server backed by a fresh store holding one

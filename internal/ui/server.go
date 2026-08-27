@@ -12,13 +12,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/callmeradical/sergeant/internal/changerequest"
-	"github.com/callmeradical/sergeant/internal/config"
-	"github.com/callmeradical/sergeant/internal/graphify"
-	"github.com/callmeradical/sergeant/internal/naming"
-	"github.com/callmeradical/sergeant/internal/redact"
-	"github.com/callmeradical/sergeant/internal/runner"
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/changerequest"
+	"github.com/callmeradical/sgt/internal/config"
+	"github.com/callmeradical/sgt/internal/graphify"
+	"github.com/callmeradical/sgt/internal/naming"
+	"github.com/callmeradical/sgt/internal/redact"
+	"github.com/callmeradical/sgt/internal/runner"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 //go:embed static/*
@@ -197,9 +197,9 @@ func (srv *Server) Start() error {
 	// ReconcileOrphanedRuns must NEVER be called again after this point. Mid-life
 	// it would reconcile a live run out from under itself.
 	if result, err := srv.Store.ReconcileOrphanedRuns(); err != nil {
-		log.Printf("sergeant: startup reconciliation failed: %v", err)
+		log.Printf("sgt: startup reconciliation failed: %v", err)
 	} else if result.RunsReconciled > 0 {
-		log.Printf("sergeant: reconciled %d orphaned run(s) and %d phase(s) to interrupted",
+		log.Printf("sgt: reconciled %d orphaned run(s) and %d phase(s) to interrupted",
 			result.RunsReconciled, result.PhasesReconciled)
 	}
 
@@ -215,7 +215,7 @@ func (srv *Server) Start() error {
 
 	handler := srv.Handler()
 	addr := fmt.Sprintf("127.0.0.1:%d", srv.Port)
-	fmt.Printf("🌐 Sergeant Factory UI running at http://%s\n", addr)
+	fmt.Printf("🌐 Sgt Factory UI running at http://%s\n", addr)
 	return http.ListenAndServe(addr, handler)
 }
 
@@ -506,12 +506,12 @@ func (srv *Server) handleCreatePR(w http.ResponseWriter, r *http.Request) {
 		Repo:          req.Repo,
 		Stage:         "review",
 		Summary:       summary,
-		Artifacts:     []string{prURL, ".sergeant/review.json"},
+		Artifacts:     []string{prURL, ".sgt/review.json"},
 		Data:          json.RawMessage(fmt.Sprintf(`{"pr_url": %q, "branch": %q, "remote_base": %q, "error": %q}`, prURL, branch, remoteBase, prError)),
 		Type:          "pr.staged",
 		SchemaVersion: "1",
 		OccurredAt:    prNow,
-		Producer:      "sergeant/ui",
+		Producer:      "sgt/ui",
 		CorrelationID: req.RunID,
 		CausationID:   srv.Store.CausationFromLatest(req.RunID, req.Repo),
 	}
@@ -731,7 +731,7 @@ func (srv *Server) handleBullets(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// A run written before intent tracking existed carries no intent id; that
-	// is not an error, it means the run served no bullets sergeant can name.
+	// is not an error, it means the run served no bullets sgt can name.
 	bullets := []store.BulletRecord{}
 	if run.IntentID != "" {
 		listed, err := srv.Store.ListBulletsForIntent(run.IntentID)
@@ -853,7 +853,7 @@ func (srv *Server) handleBuildGraph(w http.ResponseWriter, r *http.Request) {
 // exists, not that it was reviewed, submitted or delivered (decision D6). sealed
 // stays owned by the pull-request path and merged by observed PR state.
 //
-// failed becomes blocked, carrying a reason (decision D5(b)): sergeant dispatches
+// failed becomes blocked, carrying a reason (decision D5(b)): sgt dispatches
 // a bullet's work exactly once per run and a run's own retry budget is already
 // exhausted by the time it concludes without passing, so a bullet reaching this
 // case already means no further automatic attempt is going to help — which is a

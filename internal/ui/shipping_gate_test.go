@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/callmeradical/sergeant/internal/runner"
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/runner"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // shippingGateFixture builds a server backed by a fresh store holding one

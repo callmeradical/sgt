@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // runPayload is a run as a client receives it: the stored record, plus the

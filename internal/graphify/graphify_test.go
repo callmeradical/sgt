@@ -10,7 +10,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/callmeradical/sergeant/internal/config"
+	"github.com/callmeradical/sgt/internal/config"
 )
 
 // newTestRepo creates a minimal git repository containing one trivial file

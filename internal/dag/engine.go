@@ -11,12 +11,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/callmeradical/sergeant/internal/config"
-	"github.com/callmeradical/sergeant/internal/handoff"
-	"github.com/callmeradical/sergeant/internal/naming"
-	"github.com/callmeradical/sergeant/internal/plan"
-	"github.com/callmeradical/sergeant/internal/runner"
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/config"
+	"github.com/callmeradical/sgt/internal/handoff"
+	"github.com/callmeradical/sgt/internal/naming"
+	"github.com/callmeradical/sgt/internal/plan"
+	"github.com/callmeradical/sgt/internal/runner"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 type Engine struct {
@@ -31,7 +31,7 @@ type Engine struct {
 
 	// ChangeDir is the absolute path to the OpenSpec change directory that this
 	// run is accountable to (openspec/changes/<id>/). When set, RunStage seeds
-	// .sergeant/plan.json into each worktree after prepareWorktree succeeds and
+	// .sgt/plan.json into each worktree after prepareWorktree succeeds and
 	// before the first agent phase starts.
 	// An empty string disables seeding silently — older callers and resume paths
 	// that do not carry the change dir are unaffected.
@@ -78,9 +78,9 @@ func expandPath(p string) string {
 // FleetRoot is the base directory for all run state: worktrees, handoff
 // artifacts, and anything else scoped to a run. It is the single authority on
 // where that root is, so that no caller resolves it independently.
-// SERGEANT_FLEET_DIR overrides it so tests never touch the real user path.
+// SGT_FLEET_DIR overrides it so tests never touch the real user path.
 //
-// The default root is ~/.local/share/sergeant-v2/fleet, not v1's
+// The default root is ~/.local/share/sgt-v2/fleet, not v1's
 // ~/.local/share/sergeant/fleet. The two layouts have the same shape but
 // incompatible meaning: v1 stores per-repo metadata under
 // fleet/<task>/<repo>/, whereas v2 puts the actual git worktree there. A path
@@ -88,13 +88,13 @@ func expandPath(p string) string {
 // and AGENTS.md decision D7 forbids v2 writing under v1's root at all.
 //
 // Resolution happens per call, not once at init, because tests set
-// SERGEANT_FLEET_DIR per test with t.Setenv.
+// SGT_FLEET_DIR per test with t.Setenv.
 func FleetRoot() string {
-	if base := os.Getenv("SERGEANT_FLEET_DIR"); base != "" {
+	if base := os.Getenv("SGT_FLEET_DIR"); base != "" {
 		return base
 	}
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".local", "share", "sergeant-v2", "fleet")
+	return filepath.Join(home, ".local", "share", "sgt-v2", "fleet")
 }
 
 // FleetDir is where a run's isolated worktree for one repository is created.
@@ -225,8 +225,8 @@ func CommitRunOutput(ctx context.Context, runID, repoName, message string) (bool
 	// Identity is set explicitly so the commit succeeds even when the environment
 	// has no global git identity, and so the author is unambiguously the tool.
 	cmd.Env = append(os.Environ(),
-		"GIT_AUTHOR_NAME=sergeant", "GIT_AUTHOR_EMAIL=sergeant@localhost",
-		"GIT_COMMITTER_NAME=sergeant", "GIT_COMMITTER_EMAIL=sergeant@localhost",
+		"GIT_AUTHOR_NAME=sgt", "GIT_AUTHOR_EMAIL=sgt@localhost",
+		"GIT_COMMITTER_NAME=sgt", "GIT_COMMITTER_EMAIL=sgt@localhost",
 	)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return false, "", fmt.Errorf("committing %s: %v: %s", repoName, err, strings.TrimSpace(string(out)))
@@ -338,7 +338,7 @@ func (e *Engine) RunStage(ctx context.Context, runID string, stage *config.DAGSt
 			}
 		}
 
-		// Seed .sergeant/plan.json BEFORE the first agent phase starts so the
+		// Seed .sgt/plan.json BEFORE the first agent phase starts so the
 		// agent always finds the checklist ready. A seed failure is logged but
 		// never fails the run — the plan file is a reporting aid, not a gate.
 		// An empty ChangeDir (resume paths or callers that predate this field)

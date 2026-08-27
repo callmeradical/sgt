@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // Following a run an agent dispatched.
@@ -20,7 +20,7 @@ import (
 // instead — the dashboard polled every two seconds forever, and an operating
 // agent slept for a guessed interval and re-read the run list.
 //
-// Both tools read sergeant's own store, and nothing else. Decision D7 forbids
+// Both tools read sgt's own store, and nothing else. Decision D7 forbids
 // reaching v1 for this: no bin/sgt-* helper, no tmux.
 
 const (
@@ -38,14 +38,14 @@ const (
 	//
 	// The primary wake-up is the store's change notification, which fires the
 	// moment a transition is appended. This tick exists because the run may be
-	// driven by a different process — `sergeant ui` executes the run while
-	// `sergeant mcp` waits on it — and an in-process notification cannot see that
+	// driven by a different process — `sgt ui` executes the run while
+	// `sgt mcp` waits on it — and an in-process notification cannot see that
 	// write. Without it a wait would sit until its bound elapsed and then report a
 	// run that had finished long before as still executing.
 	runWaitPollInterval = time.Second
 )
 
-// runNotFound is the answer to a run id sergeant holds no record of.
+// runNotFound is the answer to a run id sgt holds no record of.
 //
 // It is a distinct shape from runStatusResult and carries no status field at all.
 // An empty status would be indistinguishable from a run that has not started
@@ -60,7 +60,7 @@ func notFound(runID string) runNotFound {
 	return runNotFound{
 		RunID: runID,
 		Found: false,
-		Error: fmt.Sprintf("no run with id %q: sergeant holds no record of it", runID),
+		Error: fmt.Sprintf("no run with id %q: sgt holds no record of it", runID),
 	}
 }
 

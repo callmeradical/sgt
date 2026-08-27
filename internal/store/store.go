@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/callmeradical/sergeant/internal/naming"
-	"github.com/callmeradical/sergeant/internal/redact"
+	"github.com/callmeradical/sgt/internal/naming"
+	"github.com/callmeradical/sgt/internal/redact"
 
 	// Imported for its name, not only for its driver registration: classifying a
 	// unique-index violation requires the driver's error type, and that
@@ -55,7 +55,7 @@ type RunRecord struct {
 	// a display and speech label only; ID remains the run's identity.
 	Slug string `json:"slug"`
 	// RequestID is the caller's idempotency key (decision D10, from AHP's
-	// runAutomation). It is not sergeant's identifier for the run — ID is — it is
+	// runAutomation). It is not sgt's identifier for the run — ID is — it is
 	// the caller's statement that a second POST is a retry of the first rather
 	// than a new request. Empty means the caller supplied none, and two runs that
 	// supplied none never deduplicate against each other: the absent case is
@@ -194,7 +194,7 @@ type EnvelopeRecord struct {
 	// They are separate because collapsing them hides transport delay.
 	OccurredAt  time.Time `json:"occurred_at"`
 	PublishedAt time.Time `json:"published_at"`
-	// Producer names what emitted this envelope (e.g. "sergeant/runner").
+	// Producer names what emitted this envelope (e.g. "sgt/runner").
 	Producer string `json:"producer"`
 	// CorrelationID is stable across all envelopes belonging to one run.
 	// It is set to the run id so the chain cannot drift from the records it
@@ -215,7 +215,7 @@ func Open(dbPath string) (*Store, error) {
 		if err != nil {
 			return nil, fmt.Errorf("resolving home directory: %w", err)
 		}
-		dbPath = filepath.Join(home, ".local", "share", "sergeant", "sergeant.db")
+		dbPath = filepath.Join(home, ".local", "share", "sgt", "sgt.db")
 	}
 
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
@@ -806,7 +806,7 @@ func (s *Store) RecordPhase(p *PhaseRecord) error {
 	// R4.4: redact here, at the one place every PhaseRecord passes through no
 	// matter which caller built it, rather than trusting each call site to
 	// remember to redact before constructing one. Point-fixing individual
-	// call sites (RunAgentPhase, RunCodeGate, sergeant_emit_envelope) closed
+	// call sites (RunAgentPhase, RunCodeGate, sgt_emit_envelope) closed
 	// specific leaks across several review rounds but kept missing others
 	// built the same way — this is the choke point instead of another one.
 	p.Error = redact.Text(p.Error)
@@ -1652,7 +1652,7 @@ func (s *Store) RecomputeIntentStatus(intentID string) (string, error) {
 // DeriveIntentStatus reads an intent's status from its bullets.
 //
 // An intent is satisfied only when every one of its bullets is merged, and merged
-// is reachable only from observed pull-request state. Decision D6 says sergeant
+// is reachable only from observed pull-request state. Decision D6 says sgt
 // never merges, so this is what keeps "satisfied" out of reach of any automatic
 // transition: there is no argument to this function that a run outcome alone can
 // produce.

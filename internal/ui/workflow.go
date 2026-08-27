@@ -11,9 +11,9 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/callmeradical/sergeant/internal/config"
-	"github.com/callmeradical/sergeant/internal/dag"
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/config"
+	"github.com/callmeradical/sgt/internal/dag"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // The workflow graph is served from the project *definition*, not from phase
@@ -280,10 +280,10 @@ func (srv *Server) handleSaveDAG(w http.ResponseWriter, r *http.Request) {
 	}
 	proj.DAG.Stages = req.Stages
 
-	cfgDir := os.Getenv("SERGEANT_CONFIG")
+	cfgDir := os.Getenv("SGT_CONFIG")
 	if cfgDir == "" {
 		home, _ := os.UserHomeDir()
-		cfgDir = filepath.Join(home, ".config", "sergeant")
+		cfgDir = filepath.Join(home, ".config", "sgt")
 	}
 	filePath := filepath.Join(cfgDir, fmt.Sprintf("%s.yaml", proj.Name))
 

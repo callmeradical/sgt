@@ -9,12 +9,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/store"
 
 	_ "modernc.org/sqlite"
 )
 
-// retentionFixture opens a store and points SERGEANT_CONFIG at a fresh temp
+// retentionFixture opens a store and points SGT_CONFIG at a fresh temp
 // directory, so a test can write its own project YAML files without ever
 // touching the operator's real config.
 func retentionFixture(t *testing.T) (srv *Server, st *store.Store, configDir, dbPath string) {
@@ -24,7 +24,7 @@ func retentionFixture(t *testing.T) (srv *Server, st *store.Store, configDir, db
 	if err := os.MkdirAll(configDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("SERGEANT_CONFIG", configDir)
+	t.Setenv("SGT_CONFIG", configDir)
 
 	dbPath = filepath.Join(base, "t.db")
 	var err error

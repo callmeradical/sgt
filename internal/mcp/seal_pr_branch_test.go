@@ -7,13 +7,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/callmeradical/sergeant/internal/naming"
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/naming"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // Scenario (specs/work-type/spec.md): pull-request creation targets the exact
-// branch that was created for a run. sergeant_seal_pr used to hand-build
-// fmt.Sprintf("sergeant/%s", runID) independently of the branch
+// branch that was created for a run. sgt_seal_pr used to hand-build
+// fmt.Sprintf("sgt/%s", runID) independently of the branch
 // prepareWorktree actually created; this proves it now looks the run up and
 // computes the same naming.BranchName(run.Type, run.ChangeID) every other
 // call site uses.
@@ -58,10 +58,10 @@ func TestSealPRInvokesGHAgainstTheRunsActualBranch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := s.executeTool("sergeant_seal_pr", map[string]interface{}{
+	if _, err := s.executeTool("sgt_seal_pr", map[string]interface{}{
 		"run_id": runID, "project": projPath, "repo": "svc", "title": "t", "body": "b",
 	}); err != nil {
-		t.Fatalf("sergeant_seal_pr returned an error: %v", err)
+		t.Fatalf("sgt_seal_pr returned an error: %v", err)
 	}
 
 	argBytes, err := os.ReadFile(argsFile)

@@ -1,6 +1,6 @@
 // Package export provides a read-only, out-of-band export of intent and
 // bullet transitions to an external task tracker (D4: exporting a copy is
-// optional; Sergeant remains the sole authority over the state itself).
+// optional; Sgt remains the sole authority over the state itself).
 package export
 
 import (
@@ -18,7 +18,7 @@ type Target interface {
 
 // Record is a redacted, minimal projection of one intent or bullet
 // transition — never the row itself. Field names are exporter-neutral (no
-// Sergeant-internal column names) since a Target may map them onto an
+// Sgt-internal column names) since a Target may map them onto an
 // arbitrary external schema.
 type Record struct {
 	Kind      string // "intent" or "bullet"

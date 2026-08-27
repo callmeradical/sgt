@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/callmeradical/sergeant/internal/changerequest"
+	"github.com/callmeradical/sgt/internal/changerequest"
 )
 
 // fakeChangeRequestProvider is a swappable stand-in for changerequest.Provider.

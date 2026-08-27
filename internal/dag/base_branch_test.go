@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/callmeradical/sergeant/internal/config"
+	"github.com/callmeradical/sgt/internal/config"
 )
 
 // Scenario: "A run's first worktree creation records its real base branch"
@@ -16,7 +16,7 @@ func TestPrepareWorktreeRecordsTheSourceRepoRealBaseBranch(t *testing.T) {
 	ctx := context.Background()
 	src := filepath.Join(t.TempDir(), "svc")
 	newGitRepo(t, src)
-	t.Setenv("SERGEANT_FLEET_DIR", t.TempDir())
+	t.Setenv("SGT_FLEET_DIR", t.TempDir())
 
 	proj := &config.Project{Name: "p", Repos: map[string]config.Repo{"svc": {Path: src}}}
 	eng := newEngine(t, proj)
@@ -44,7 +44,7 @@ func TestResumingARunDoesNotOverwriteItsRecordedBaseBranch(t *testing.T) {
 	ctx := context.Background()
 	src := filepath.Join(t.TempDir(), "svc")
 	newGitRepo(t, src)
-	t.Setenv("SERGEANT_FLEET_DIR", t.TempDir())
+	t.Setenv("SGT_FLEET_DIR", t.TempDir())
 
 	proj := &config.Project{Name: "p", Repos: map[string]config.Repo{"svc": {Path: src}}}
 	eng := newEngine(t, proj)

@@ -31,10 +31,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/callmeradical/sergeant/internal/config"
-	"github.com/callmeradical/sergeant/internal/dag"
-	"github.com/callmeradical/sergeant/internal/handoff"
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/config"
+	"github.com/callmeradical/sgt/internal/dag"
+	"github.com/callmeradical/sgt/internal/handoff"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // Scenario: executeRun runs configured stages in order.
@@ -48,8 +48,8 @@ func TestExecuteRunRunsConfiguredStagesInOrder(t *testing.T) {
 	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("SERGEANT_CONFIG", cfgDir)
-	t.Setenv("SERGEANT_FLEET_DIR", filepath.Join(base, "fleet"))
+	t.Setenv("SGT_CONFIG", cfgDir)
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(base, "fleet"))
 
 	repoA := filepath.Join(base, "repoA")
 	repoB := filepath.Join(base, "repoB")
@@ -176,7 +176,7 @@ func (c *cancellingStageRunner) RunStage(ctx context.Context, runID string, stag
 // gate/agent failure.
 func TestStageFailureCausedByCancellationRecordsCancelledNotFailed(t *testing.T) {
 	base := t.TempDir()
-	t.Setenv("SERGEANT_FLEET_DIR", filepath.Join(base, "fleet"))
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(base, "fleet"))
 
 	proj := &config.Project{
 		Name: "cancel-race-proj",
@@ -226,7 +226,7 @@ func TestStageFailureCausedByCancellationRecordsCancelledNotFailed(t *testing.T)
 func TestExecuteRunIsTestableWithAFakeStageRunner(t *testing.T) {
 	base := t.TempDir()
 	fleetRoot := filepath.Join(base, "fleet")
-	t.Setenv("SERGEANT_FLEET_DIR", fleetRoot)
+	t.Setenv("SGT_FLEET_DIR", fleetRoot)
 
 	proj := &config.Project{
 		Name: "fake-proj",

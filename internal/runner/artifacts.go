@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // maxArtifactCount and maxArtifactTotalBytes bound how much one phase's
-// $SERGEANT_ARTIFACT_DIR capture can add to the durable artifacts root.
+// $SGT_ARTIFACT_DIR capture can add to the durable artifacts root.
 // Fixed constants, not config: a runaway gate writing unbounded evidence
 // (or a misbehaving script looping on screenshots) must not be able to fill
 // disk regardless of project configuration. Captured artifacts are expected
@@ -27,15 +27,15 @@ const (
 
 // artifactsRoot is the durable root every captured artifact is copied under,
 // outside any run's worktree so it survives that worktree's later reclaim by
-// automated-fleet-cleanup. SERGEANT_ARTIFACTS_ROOT overrides it, mirroring
-// internal/ui/lock.go's SERGEANT_UI_LOCK pattern, so tests never write into
+// automated-fleet-cleanup. SGT_ARTIFACTS_ROOT overrides it, mirroring
+// internal/ui/lock.go's SGT_UI_LOCK pattern, so tests never write into
 // an operator's real home directory.
 func artifactsRoot() string {
-	if p := os.Getenv("SERGEANT_ARTIFACTS_ROOT"); p != "" {
+	if p := os.Getenv("SGT_ARTIFACTS_ROOT"); p != "" {
 		return p
 	}
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".local", "share", "sergeant", "artifacts")
+	return filepath.Join(home, ".local", "share", "sgt", "artifacts")
 }
 
 // captureArtifacts reads dir for files a just-finished gate/phase command
@@ -87,7 +87,7 @@ func captureArtifacts(st *store.Store, runID, phaseID, repo, dir string) {
 
 	destDir := filepath.Join(artifactsRoot(), runID, phaseID)
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
-		log.Printf("sergeant: capture artifacts for run %s phase %s: creating durable destination: %v", runID, phaseID, err)
+		log.Printf("sgt: capture artifacts for run %s phase %s: creating durable destination: %v", runID, phaseID, err)
 		recordDroppedArtifacts(st, runID, phaseID, repo, len(files),
 			fmt.Sprintf("durable artifact destination unwritable: %v", err))
 		return
@@ -136,7 +136,7 @@ func captureArtifacts(st *store.Store, runID, phaseID, repo, dir string) {
 			CapturedAt:  time.Now().UTC(),
 		}
 		if err := st.RecordArtifact(rec); err != nil {
-			log.Printf("sergeant: recording artifact %s for run %s phase %s: %v", f.name, runID, phaseID, err)
+			log.Printf("sgt: recording artifact %s for run %s phase %s: %v", f.name, runID, phaseID, err)
 			dropped = append(dropped, fmt.Sprintf("%s: recording artifact: %v", f.name, err))
 			continue
 		}
@@ -164,6 +164,6 @@ func recordDroppedArtifacts(st *store.Store, runID, phaseID, repo string, droppe
 		DroppedReason: reason,
 	}
 	if err := st.RecordArtifact(rec); err != nil {
-		log.Printf("sergeant: recording dropped-artifacts note for run %s phase %s: %v", runID, phaseID, err)
+		log.Printf("sgt: recording dropped-artifacts note for run %s phase %s: %v", runID, phaseID, err)
 	}
 }

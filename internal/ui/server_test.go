@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/callmeradical/sergeant/internal/config"
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/config"
+	"github.com/callmeradical/sgt/internal/store"
 
 	_ "modernc.org/sqlite"
 )
@@ -31,7 +31,7 @@ func TestUIFullSuiteAndTDD(t *testing.T) {
 	// 1. Create dummy project yaml in custom config dir
 	configDir := filepath.Join(tempDir, "config")
 	_ = os.MkdirAll(configDir, 0755)
-	t.Setenv("SERGEANT_CONFIG", configDir)
+	t.Setenv("SGT_CONFIG", configDir)
 
 	projYAML := `
 name: better-than-boxes
@@ -163,7 +163,7 @@ repos:
 // destroyed every repo, gate, pipeline and the whole `dag:` block.
 func TestRefineProjectPreservesUnmanagedConfig(t *testing.T) {
 	cfgDir := t.TempDir()
-	t.Setenv("SERGEANT_CONFIG", cfgDir)
+	t.Setenv("SGT_CONFIG", cfgDir)
 
 	original := `# hand-maintained, comments must survive
 name: canary
@@ -275,7 +275,7 @@ dag:
 
 // dispatchFixture builds a project whose single repo lives in a temp dir, so a
 // dispatch test can create and inspect openspec/changes/<id>/ without touching
-// any real checkout. SERGEANT_FLEET_DIR is redirected for the same reason.
+// any real checkout. SGT_FLEET_DIR is redirected for the same reason.
 func dispatchFixture(t *testing.T) (mux http.Handler, st *store.Store, repoPath string) {
 	t.Helper()
 	mux, st, repoPaths, _ := dispatchFixtureRepos(t, "svc")
@@ -294,8 +294,8 @@ func dispatchFixtureRepos(t *testing.T, repos ...string) (mux http.Handler, st *
 	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("SERGEANT_CONFIG", cfgDir)
-	t.Setenv("SERGEANT_FLEET_DIR", filepath.Join(base, "fleet"))
+	t.Setenv("SGT_CONFIG", cfgDir)
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(base, "fleet"))
 
 	repoPaths = map[string]string{}
 	projYAML := "name: o3\nrepos:\n"
@@ -349,7 +349,7 @@ func postDispatch(t *testing.T, mux http.Handler, body string) *httptest.Respons
 }
 
 // Decision O3: a dispatch must resolve to a change. Naming one that is absent is
-// an operator error, and sergeant must not fabricate the planning record — nor
+// an operator error, and sgt must not fabricate the planning record — nor
 // leave a run row behind for work it refused to start.
 func TestDispatchWithUnknownChangeIDIsRejectedAndCreatesNoRun(t *testing.T) {
 	mux, st, repoPath := dispatchFixture(t)
@@ -449,7 +449,7 @@ func TestDispatchRecordsAnExistingChangeIDOnTheRun(t *testing.T) {
 		t.Errorf("response change_id = %q, want %q", resp.ChangeID, changeID)
 	}
 	if resp.Created {
-		t.Error("response claims sergeant created a change that already existed")
+		t.Error("response claims sgt created a change that already existed")
 	}
 	if resp.Repo != "svc" {
 		t.Errorf("response change_repo = %q, want svc", resp.Repo)
@@ -470,7 +470,7 @@ func TestDispatchRecordsAnExistingChangeIDOnTheRun(t *testing.T) {
 	}
 }
 
-// Decision D4 puts intents and bullets in sergeant's own store, and decision D8
+// Decision D4 puts intents and bullets in sgt's own store, and decision D8
 // makes the intent the dashboard's primary noun. Neither is satisfiable while a
 // dispatch records only a run, so a dispatch must write the intent it serves and
 // one bullet per target repository.
@@ -575,7 +575,7 @@ func TestDispatchWithNoReposCreatesAProposedPlanAndStartsNothing(t *testing.T) {
 	// A seam to prove no worktree is created: a fresh, known-empty directory
 	// that the dispatch/worktree machinery would write beneath if it ran at all.
 	fleetRoot := t.TempDir()
-	t.Setenv("SERGEANT_FLEET_DIR", fleetRoot)
+	t.Setenv("SGT_FLEET_DIR", fleetRoot)
 
 	// With no requested repos, changeRepo falls back to the sorted repo list, so
 	// api owns the change.
@@ -769,7 +769,7 @@ func TestResolveChangeScaffoldsFromTheBrief(t *testing.T) {
 		t.Errorf("ref.ID = %q, want add-stripe-webhooks", ref.ID)
 	}
 	if !ref.Created {
-		t.Error("ref.Created = false for a change sergeant just scaffolded")
+		t.Error("ref.Created = false for a change sgt just scaffolded")
 	}
 	want := filepath.Join(repo, "openspec", "changes", "add-stripe-webhooks")
 	if ref.Dir != want {
@@ -903,7 +903,7 @@ func deliveryTestServer(t *testing.T) (mux http.Handler, st *store.Store, runID,
 	envelopeID = "env-dh-1"
 	if err := st.RecordEnvelope(&store.EnvelopeRecord{
 		ID: envelopeID, RunID: runID, Repo: "svc", Stage: "build", Summary: "test envelope",
-		Type: "phase.completed", SchemaVersion: "1", Producer: "sergeant/test", CorrelationID: runID,
+		Type: "phase.completed", SchemaVersion: "1", Producer: "sgt/test", CorrelationID: runID,
 	}); err != nil {
 		t.Fatal(err)
 	}

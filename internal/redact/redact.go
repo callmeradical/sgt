@@ -58,9 +58,9 @@ func Text(s string) string {
 
 // JSON walks an arbitrary JSON document and applies Text to every string
 // leaf, returning the re-marshaled result. It exists because an envelope's
-// payload is not always built by sergeant field-by-field — a dispatched
+// payload is not always built by sgt field-by-field — a dispatched
 // agent can write its own envelope.json, and that content must not bypass
-// redaction just because sergeant did not construct it itself. Malformed
+// redaction just because sgt did not construct it itself. Malformed
 // JSON is returned unchanged: redaction cannot inspect what it cannot parse,
 // and refusing an otherwise-valid envelope over that would be a worse
 // failure than a heuristic miss.

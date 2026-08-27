@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // Requirement: clients follow state by ordered sequence rather than polling.
@@ -34,7 +34,7 @@ import (
 func streamFixture(t *testing.T) (*httptest.Server, *store.Store, string) {
 	t.Helper()
 	base := t.TempDir()
-	t.Setenv("SERGEANT_FLEET_DIR", filepath.Join(base, "fleet"))
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(base, "fleet"))
 
 	dbPath := filepath.Join(base, "t.db")
 	st, err := store.Open(dbPath)

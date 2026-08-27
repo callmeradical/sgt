@@ -3,16 +3,16 @@
 //
 // Lifecycle:
 //
-//  1. Sergeant calls SeedPlan(changeDir, worktree) after the change is resolved
+//  1. Sgt calls SeedPlan(changeDir, worktree) after the change is resolved
 //     and the worktree is prepared, but BEFORE the agent phase starts.
 //
-//  2. The agent reads .sergeant/plan.json from its worktree and updates item
+//  2. The agent reads .sgt/plan.json from its worktree and updates item
 //     statuses as it works, marking items "in_progress" then "complete".
 //
-//  3. Sergeant calls ReadPlan(worktree) when the run is sampled and publishes
+//  3. Sgt calls ReadPlan(worktree) when the run is sampled and publishes
 //     the result over the existing change stream.
 //
-// Sergeant is the sole seeder and thereafter only reads. Two writers would make
+// Sgt is the sole seeder and thereafter only reads. Two writers would make
 // a stale read indistinguishable from a concurrent write.
 //
 // An absent or malformed plan.json returns nil from ReadPlan — "no progress
@@ -51,7 +51,7 @@ type PlanItem struct {
 	Status string `json:"status"`
 }
 
-// Plan is the serialised form of .sergeant/plan.json.
+// Plan is the serialised form of .sgt/plan.json.
 type Plan struct {
 	Items []PlanItem `json:"items"`
 }
@@ -140,10 +140,10 @@ func ParseScenariosFromDir(changeDir string) ([]string, error) {
 
 // planFilePath is the canonical path of plan.json inside a worktree.
 func planFilePath(worktree string) string {
-	return filepath.Join(worktree, ".sergeant", "plan.json")
+	return filepath.Join(worktree, ".sgt", "plan.json")
 }
 
-// SeedPlan writes .sergeant/plan.json into worktree, one pending item per
+// SeedPlan writes .sgt/plan.json into worktree, one pending item per
 // #### Scenario: found in changeDir/specs/**/*.md. It is idempotent on first
 // call: if plan.json already exists it is overwritten.
 //
@@ -151,7 +151,7 @@ func planFilePath(worktree string) string {
 // absence of scenarios is a fact about the change; a missing file would be
 // indistinguishable from a seed that failed.
 //
-// Sergeant seeds the file and then never writes to it again. The agent is the
+// Sgt seeds the file and then never writes to it again. The agent is the
 // only subsequent writer.
 func SeedPlan(changeDir, worktree string) error {
 	scenarios, err := ParseScenariosFromDir(changeDir)
@@ -176,7 +176,7 @@ func SeedPlan(changeDir, worktree string) error {
 
 	dir := filepath.Dir(planFilePath(worktree))
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("creating .sergeant dir in worktree: %w", err)
+		return fmt.Errorf("creating .sgt dir in worktree: %w", err)
 	}
 
 	if err := os.WriteFile(planFilePath(worktree), data, 0o644); err != nil {
@@ -185,11 +185,11 @@ func SeedPlan(changeDir, worktree string) error {
 	return nil
 }
 
-// ReadPlan reads .sergeant/plan.json from the worktree and returns the parsed
+// ReadPlan reads .sgt/plan.json from the worktree and returns the parsed
 // plan, or nil if the file is absent or cannot be parsed.
 //
 // nil means "no progress reported" — the caller must render this differently
-// from a plan with zero complete items. Sergeant never fails a run because the
+// from a plan with zero complete items. Sgt never fails a run because the
 // plan file is unreadable.
 func ReadPlan(worktree string) *Plan {
 	data, err := os.ReadFile(planFilePath(worktree))

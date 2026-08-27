@@ -10,21 +10,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/callmeradical/sergeant/internal/handoff"
-	"github.com/callmeradical/sergeant/internal/runner"
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/handoff"
+	"github.com/callmeradical/sgt/internal/runner"
+	"github.com/callmeradical/sgt/internal/store"
 
 	_ "modernc.org/sqlite"
 )
 
-// cleanupFixture opens a store and points SERGEANT_FLEET_DIR at a fresh temp
+// cleanupFixture opens a store and points SGT_FLEET_DIR at a fresh temp
 // directory, so a test can build fake fleet worktrees without ever touching
 // the real fleet root.
 func cleanupFixture(t *testing.T) (srv *Server, st *store.Store, fleetRoot, dbPath string) {
 	t.Helper()
 	base := t.TempDir()
 	fleetRoot = filepath.Join(base, "fleet")
-	t.Setenv("SERGEANT_FLEET_DIR", fleetRoot)
+	t.Setenv("SGT_FLEET_DIR", fleetRoot)
 
 	dbPath = filepath.Join(base, "t.db")
 	var err error
@@ -193,7 +193,7 @@ func TestReclaimEligibleFleetDirsLeavesDatabaseRecordsUntouched(t *testing.T) {
 	if err := st.RecordEnvelope(&store.EnvelopeRecord{
 		ID: "env-1", RunID: runID, Repo: "svc", Stage: "build", Summary: "built it",
 		Data: json.RawMessage(`{}`), Type: "phase.completed", SchemaVersion: "1",
-		OccurredAt: time.Now().UTC(), Producer: "sergeant/test", CorrelationID: runID,
+		OccurredAt: time.Now().UTC(), Producer: "sgt/test", CorrelationID: runID,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -282,7 +282,7 @@ func TestReclaimFleetDirRefusesARunningRunWithoutForce(t *testing.T) {
 // half of the ordering guarantee design.md states.
 func TestCapturedArtifactOutlivesWorktreeReclaim(t *testing.T) {
 	_, st, fleetRoot, _ := cleanupFixture(t)
-	t.Setenv("SERGEANT_ARTIFACTS_ROOT", t.TempDir())
+	t.Setenv("SGT_ARTIFACTS_ROOT", t.TempDir())
 
 	const runID = "run-with-artifact"
 	if err := st.CreateRun(&store.RunRecord{ID: runID, Project: "p", TaskID: runID, Status: "passed"}); err != nil {
@@ -302,7 +302,7 @@ func TestCapturedArtifactOutlivesWorktreeReclaim(t *testing.T) {
 		RunID:    runID,
 	}
 	res, err := pr.RunCodeGate(context.Background(), "screenshot-gate",
-		`echo -n "evidence" > "$SERGEANT_ARTIFACT_DIR/shot.png"`)
+		`echo -n "evidence" > "$SGT_ARTIFACT_DIR/shot.png"`)
 	if err != nil {
 		t.Fatalf("RunCodeGate: %v", err)
 	}

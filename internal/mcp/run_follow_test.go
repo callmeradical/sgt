@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // Requirement: an agent can follow a run it dispatched.
@@ -62,7 +62,7 @@ func TestRunStatusIsAddressableByRunID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := callTool(t, s, "sergeant_run_status", map[string]interface{}{"run_id": "sgt-abc"})
+	got := callTool(t, s, "sgt_run_status", map[string]interface{}{"run_id": "sgt-abc"})
 
 	if got["found"] != true {
 		t.Fatalf("found = %v, want true; result=%+v", got["found"], got)
@@ -106,7 +106,7 @@ func TestRunStatusIsAddressableByRunID(t *testing.T) {
 func TestAnUnknownRunIDIsReportedAsUnknown(t *testing.T) {
 	s, _ := mcpFixture(t)
 
-	got := callTool(t, s, "sergeant_run_status", map[string]interface{}{"run_id": "sgt-typo"})
+	got := callTool(t, s, "sgt_run_status", map[string]interface{}{"run_id": "sgt-typo"})
 
 	if got["found"] != false {
 		t.Fatalf("found = %v, want false; result=%+v", got["found"], got)
@@ -130,7 +130,7 @@ func TestWaitingOnAnUnknownRunIDIsReportedAsUnknown(t *testing.T) {
 	s, _ := mcpFixture(t)
 
 	start := time.Now()
-	got := callTool(t, s, "sergeant_run_wait", map[string]interface{}{
+	got := callTool(t, s, "sgt_run_wait", map[string]interface{}{
 		"run_id": "sgt-typo", "timeout_seconds": 30,
 	})
 	elapsed := time.Since(start)
@@ -159,7 +159,7 @@ func TestWaitingReturnsWhenTheRunReachesATerminalState(t *testing.T) {
 	}()
 
 	start := time.Now()
-	got := callTool(t, s, "sergeant_run_wait", map[string]interface{}{
+	got := callTool(t, s, "sgt_run_wait", map[string]interface{}{
 		"run_id": "sgt-live", "timeout_seconds": 20,
 	})
 	elapsed := time.Since(start)
@@ -196,7 +196,7 @@ func TestWaitingOnAnAlreadyTerminalRunReturnsWithoutDelay(t *testing.T) {
 	}
 
 	start := time.Now()
-	got := callTool(t, s, "sergeant_run_wait", map[string]interface{}{
+	got := callTool(t, s, "sgt_run_wait", map[string]interface{}{
 		"run_id": "sgt-done", "timeout_seconds": 60,
 	})
 	elapsed := time.Since(start)
@@ -224,7 +224,7 @@ func TestAnExceededWaitBoundReportsTheRunAsStillExecuting(t *testing.T) {
 	}
 
 	start := time.Now()
-	got := callTool(t, s, "sergeant_run_wait", map[string]interface{}{
+	got := callTool(t, s, "sgt_run_wait", map[string]interface{}{
 		"run_id": "sgt-slow", "timeout_seconds": 0.2,
 	})
 	elapsed := time.Since(start)
@@ -263,7 +263,7 @@ func TestTheRunFollowingToolsAreAdvertised(t *testing.T) {
 		advertised[tool.Name] = tool
 	}
 
-	for _, name := range []string{"sergeant_run_status", "sergeant_run_wait"} {
+	for _, name := range []string{"sgt_run_status", "sgt_run_wait"} {
 		tool, ok := advertised[name]
 		if !ok {
 			t.Fatalf("%s is not advertised in tools/list; the advertised set is %v", name, keysOf(advertised))
@@ -285,14 +285,14 @@ func TestTheRunFollowingToolsAreAdvertised(t *testing.T) {
 		}
 	}
 
-	if _, ok := advertised["sergeant_run_wait"].InputSchema.(map[string]interface{})["properties"].(map[string]interface{})["timeout_seconds"]; !ok {
-		t.Error("sergeant_run_wait does not accept timeout_seconds; the bound must come from the caller")
+	if _, ok := advertised["sgt_run_wait"].InputSchema.(map[string]interface{})["properties"].(map[string]interface{})["timeout_seconds"]; !ok {
+		t.Error("sgt_run_wait does not accept timeout_seconds; the bound must come from the caller")
 	}
 
 	// The five pre-existing tools must survive.
 	for _, name := range []string{
-		"sergeant_status", "sergeant_get_brief", "sergeant_run_gates",
-		"sergeant_emit_envelope", "sergeant_seal_pr",
+		"sgt_status", "sgt_get_brief", "sgt_run_gates",
+		"sgt_emit_envelope", "sgt_seal_pr",
 	} {
 		if _, ok := advertised[name]; !ok {
 			t.Errorf("%s is no longer advertised", name)

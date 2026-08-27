@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/callmeradical/sergeant/internal/config"
+	"github.com/callmeradical/sgt/internal/config"
 )
 
 // Scenario: "Discovering a workflow returns the same shape before and after."

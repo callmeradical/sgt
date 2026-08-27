@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/callmeradical/sergeant/internal/config"
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/config"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // planEntry is what an operator reviews before deciding on a proposed plan

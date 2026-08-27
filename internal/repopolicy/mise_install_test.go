@@ -7,12 +7,12 @@ import (
 	"testing"
 )
 
-// TestMiseInstallLinksWikiDigestAndBuildsSergeant runs mise.toml's real
+// TestMiseInstallLinksWikiDigestAndBuildsSgt runs mise.toml's real
 // [tasks.install] script (extracted, not reimplemented). It builds the real
-// bin/sergeant binary in this checkout as a side effect -- that is the
+// bin/sgt binary in this checkout as a side effect -- that is the
 // behavior under test, not an accident of the harness, so it is preserved
 // rather than redirected into a throwaway copy.
-func TestMiseInstallLinksWikiDigestAndBuildsSergeant(t *testing.T) {
+func TestMiseInstallLinksWikiDigestAndBuildsSgt(t *testing.T) {
 	root := repoRoot(t)
 	installScript := writeExecutableScript(t, t.TempDir(), "install.sh", extractMiseTaskScript(t, root, "[tasks.install]"))
 
@@ -59,11 +59,11 @@ func TestMiseInstallLinksWikiDigestAndBuildsSergeant(t *testing.T) {
 		t.Error("stale oc-inject.js symlink was not removed by mise run install")
 	}
 
-	info, err := os.Stat(filepath.Join(root, "bin", "sergeant"))
+	info, err := os.Stat(filepath.Join(root, "bin", "sgt"))
 	if err != nil {
-		t.Fatalf("mise run install did not build bin/sergeant: %v", err)
+		t.Fatalf("mise run install did not build bin/sgt: %v", err)
 	}
 	if info.Mode()&0o111 == 0 {
-		t.Error("bin/sergeant was built but is not executable")
+		t.Error("bin/sgt was built but is not executable")
 	}
 }

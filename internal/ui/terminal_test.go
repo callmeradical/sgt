@@ -20,7 +20,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 func newTerminalTestServer(t *testing.T) (*Server, *httptest.Server) {

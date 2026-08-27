@@ -32,7 +32,7 @@ const createArtifactsTable = `
 	);`
 
 // ArtifactRecord is one captured file (or one drop notice) produced by a
-// gate/agent phase's command writing into $SERGEANT_ARTIFACT_DIR. Path is a
+// gate/agent phase's command writing into $SGT_ARTIFACT_DIR. Path is a
 // filesystem path outside the run's worktree, durable across that worktree's
 // later reclaim by automated-fleet-cleanup — see internal/runner's
 // captureArtifacts, the only writer of this table.

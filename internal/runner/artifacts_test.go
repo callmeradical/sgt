@@ -11,14 +11,14 @@ import (
 
 // TestGateArtifactIsCapturedDurably covers spec.md's "A file written to the
 // artifact directory is captured durably": a gate command that writes a file
-// to $SERGEANT_ARTIFACT_DIR produces one durable ArtifactRecord, readable via
+// to $SGT_ARTIFACT_DIR produces one durable ArtifactRecord, readable via
 // ListArtifactsForRun, whose on-disk content matches what the command wrote.
 func TestGateArtifactIsCapturedDurably(t *testing.T) {
 	pr, st := newRunner(t, "", 0)
-	t.Setenv("SERGEANT_ARTIFACTS_ROOT", t.TempDir())
+	t.Setenv("SGT_ARTIFACTS_ROOT", t.TempDir())
 
 	res, err := pr.RunCodeGate(context.Background(), "screenshot-gate",
-		`echo -n "hello artifact" > "$SERGEANT_ARTIFACT_DIR/shot.png"`)
+		`echo -n "hello artifact" > "$SGT_ARTIFACT_DIR/shot.png"`)
 	if err != nil {
 		t.Fatalf("RunCodeGate: %v", err)
 	}
@@ -67,7 +67,7 @@ func TestGateArtifactIsCapturedDurably(t *testing.T) {
 // own pass/fail result is unaffected.
 func TestGateWithNoArtifactsProducesNoRecords(t *testing.T) {
 	pr, st := newRunner(t, "", 0)
-	t.Setenv("SERGEANT_ARTIFACTS_ROOT", t.TempDir())
+	t.Setenv("SGT_ARTIFACTS_ROOT", t.TempDir())
 
 	res, err := pr.RunCodeGate(context.Background(), "quiet-gate", "echo 'nothing written'")
 	if err != nil {
@@ -93,11 +93,11 @@ func TestGateWithNoArtifactsProducesNoRecords(t *testing.T) {
 // what was skipped.
 func TestExceedingArtifactCountCapIsRecordedNotDropped(t *testing.T) {
 	pr, st := newRunner(t, "", 0)
-	t.Setenv("SERGEANT_ARTIFACTS_ROOT", t.TempDir())
+	t.Setenv("SGT_ARTIFACTS_ROOT", t.TempDir())
 
 	var script strings.Builder
 	for i := 0; i < maxArtifactCount+1; i++ {
-		fmt.Fprintf(&script, "echo -n %d > \"$SERGEANT_ARTIFACT_DIR/f%02d.txt\"\n", i, i)
+		fmt.Fprintf(&script, "echo -n %d > \"$SGT_ARTIFACT_DIR/f%02d.txt\"\n", i, i)
 	}
 
 	res, err := pr.RunCodeGate(context.Background(), "many-files-gate", script.String())
@@ -145,12 +145,12 @@ func TestExceedingArtifactCountCapIsRecordedNotDropped(t *testing.T) {
 // the byte cap specifically, not the count cap).
 func TestExceedingArtifactTotalBytesCapIsRecordedNotDropped(t *testing.T) {
 	pr, st := newRunner(t, "", 0)
-	t.Setenv("SERGEANT_ARTIFACTS_ROOT", t.TempDir())
+	t.Setenv("SGT_ARTIFACTS_ROOT", t.TempDir())
 
 	bigSize := maxArtifactTotalBytes - 1024
 	script := fmt.Sprintf(
-		`head -c %d /dev/zero > "$SERGEANT_ARTIFACT_DIR/a-big.bin"
-head -c 4096 /dev/zero > "$SERGEANT_ARTIFACT_DIR/b-small.bin"`,
+		`head -c %d /dev/zero > "$SGT_ARTIFACT_DIR/a-big.bin"
+head -c 4096 /dev/zero > "$SGT_ARTIFACT_DIR/b-small.bin"`,
 		bigSize)
 
 	res, err := pr.RunCodeGate(context.Background(), "big-files-gate", script)
@@ -195,10 +195,10 @@ head -c 4096 /dev/zero > "$SERGEANT_ARTIFACT_DIR/b-small.bin"`,
 // passing.
 func TestFailingGateStillCapturesArtifacts(t *testing.T) {
 	pr, st := newRunner(t, "", 0)
-	t.Setenv("SERGEANT_ARTIFACTS_ROOT", t.TempDir())
+	t.Setenv("SGT_ARTIFACTS_ROOT", t.TempDir())
 
 	res, err := pr.RunCodeGate(context.Background(), "failing-gate",
-		`echo -n "evidence" > "$SERGEANT_ARTIFACT_DIR/failure.log"; exit 1`)
+		`echo -n "evidence" > "$SGT_ARTIFACT_DIR/failure.log"; exit 1`)
 	if err != nil {
 		t.Fatalf("RunCodeGate: %v", err)
 	}
@@ -228,10 +228,10 @@ func TestCaptureFailureDoesNotChangeGateResult(t *testing.T) {
 	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("SERGEANT_ARTIFACTS_ROOT", filepath.Join(blocker, "artifacts"))
+	t.Setenv("SGT_ARTIFACTS_ROOT", filepath.Join(blocker, "artifacts"))
 
 	res, err := pr.RunCodeGate(context.Background(), "would-pass-gate",
-		`echo -n "data" > "$SERGEANT_ARTIFACT_DIR/out.txt"`)
+		`echo -n "data" > "$SGT_ARTIFACT_DIR/out.txt"`)
 	if err != nil {
 		t.Fatalf("RunCodeGate: %v", err)
 	}
@@ -251,19 +251,19 @@ func TestCaptureFailureDoesNotChangeGateResult(t *testing.T) {
 // TestSuccessiveGatesInTheSameWorktreeDoNotLeakArtifacts guards the
 // "empty directory" half of spec.md's contract: internal/dag/engine.go runs
 // every configured gate against the same pr.Worktree, so
-// $SERGEANT_ARTIFACT_DIR resolves to the same on-disk path across calls. A
+// $SGT_ARTIFACT_DIR resolves to the same on-disk path across calls. A
 // second gate must not see (or capture as its own) a file the first gate
 // left behind.
 func TestSuccessiveGatesInTheSameWorktreeDoNotLeakArtifacts(t *testing.T) {
 	pr, st := newRunner(t, "", 0)
-	t.Setenv("SERGEANT_ARTIFACTS_ROOT", t.TempDir())
+	t.Setenv("SGT_ARTIFACTS_ROOT", t.TempDir())
 
 	if _, err := pr.RunCodeGate(context.Background(), "gate-one",
-		`echo -n "from gate one" > "$SERGEANT_ARTIFACT_DIR/one.txt"`); err != nil {
+		`echo -n "from gate one" > "$SGT_ARTIFACT_DIR/one.txt"`); err != nil {
 		t.Fatalf("RunCodeGate gate-one: %v", err)
 	}
 	if _, err := pr.RunCodeGate(context.Background(), "gate-two",
-		`echo -n "from gate two" > "$SERGEANT_ARTIFACT_DIR/two.txt"`); err != nil {
+		`echo -n "from gate two" > "$SGT_ARTIFACT_DIR/two.txt"`); err != nil {
 		t.Fatalf("RunCodeGate gate-two: %v", err)
 	}
 
@@ -293,13 +293,13 @@ func TestSuccessiveGatesInTheSameWorktreeDoNotLeakArtifacts(t *testing.T) {
 
 // TestAgentPhaseCapturesArtifacts proves the second capture site design.md
 // specifies (RunAgentPhase, not only RunCodeGate) is actually wired: an agent
-// command that writes to $SERGEANT_ARTIFACT_DIR gets the same durable capture
+// command that writes to $SGT_ARTIFACT_DIR gets the same durable capture
 // a gate command does.
 func TestAgentPhaseCapturesArtifacts(t *testing.T) {
 	agentDir := t.TempDir()
-	agent := fakeAgent(t, agentDir, "fake-agent.sh", `printf 'trace-data' > "$SERGEANT_ARTIFACT_DIR/trace.json"`)
+	agent := fakeAgent(t, agentDir, "fake-agent.sh", `printf 'trace-data' > "$SGT_ARTIFACT_DIR/trace.json"`)
 	pr, st := newRunner(t, agent, 0)
-	t.Setenv("SERGEANT_ARTIFACTS_ROOT", t.TempDir())
+	t.Setenv("SGT_ARTIFACTS_ROOT", t.TempDir())
 
 	_, _, err := pr.RunAgentPhase(context.Background(), "build", "do the thing", 0)
 	if err != nil {

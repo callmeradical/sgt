@@ -13,15 +13,19 @@ var requiredFiles = []string{
 	"skills/cross-repo-work/SKILL.md",
 	"skills/dispatch/SKILL.md",
 	"skills/wiki/SKILL.md",
-	"skills/sergeant-help/SKILL.md",
+	"skills/sgt-help/SKILL.md",
 
 	"docs/README.md",
 	"docs/troubleshooting.md",
 
-	// what-is-sergeant.md, getting-started.md, skills.md, and using-sergeant.md
-	// described the removed v1 sgt-* toolbelt throughout with no v2 procedure
-	// to substitute in-place; they were archived to docs/archive/v1/ rather
-	// than rewritten in place, so no live doc at those paths is required.
+	// what-is-sergeant.md, getting-started.md, skills.md, and
+	// using-sergeant.md described the removed v1 sgt-* toolbelt throughout
+	// with no v2 procedure to substitute in-place; they were archived to
+	// docs/archive/v1/ verbatim (original v1 names kept for historical
+	// fidelity -- v1 really was named Sergeant, and its sgt-* toolbelt
+	// predates and is unrelated to this project's sergeant->sgt rebrand)
+	// rather than rewritten in place, so no live doc at those paths is
+	// required.
 	"docs/archive/v1/what-is-sergeant.md",
 	"docs/archive/v1/getting-started.md",
 	"docs/archive/v1/skills.md",
@@ -35,13 +39,13 @@ type requiredText struct {
 
 var mustContain = []requiredText{
 	{"AGENTS.md", "## Procedural skills"},
-	{"AGENTS.md", "`sergeant-help`"},
-	{"AGENTS.md", ".sergeant-intent.md"},
+	{"AGENTS.md", "`sgt-help`"},
+	{"AGENTS.md", ".sgt-intent.md"},
 	{"AGENTS.md", "same canonical intent revision"},
 	// Matches skills/wiki/SKILL.md's own "When to use" wording exactly.
 	{"AGENTS.md", "ingest, backfill, regenerate, inspect, update, or change wiki output"},
 	{"skills/wiki/SKILL.md", "ingest, backfill, regenerate, inspect, update, or change wiki output"},
-	{"AGENTS.md", "Sergeant-owned procedural skills live at `skills/<name>/SKILL.md`"},
+	{"AGENTS.md", "Sgt-owned procedural skills live at `skills/<name>/SKILL.md`"},
 	{"AGENTS.md", "read that repository-local file directly"},
 	{"AGENTS.md", "takes precedence over any same-named registry skill"},
 	{"AGENTS.md", "Do not ask the owner or stop solely because the registry omits"},
@@ -57,8 +61,8 @@ var mustContain = []requiredText{
 	{"skills/load-project/SKILL.md", "## Project registration and edits"},
 	{"skills/load-project/SKILL.md", "## Project Graphify"},
 	{"skills/wiki/SKILL.md", "## When to use"},
-	{"skills/sergeant-help/SKILL.md", "## When to use"},
-	{"skills/sergeant-help/SKILL.md", "only when the command supports"},
+	{"skills/sgt-help/SKILL.md", "## When to use"},
+	{"skills/sgt-help/SKILL.md", "only when the command supports"},
 }
 
 var mustNotContain = []requiredText{
@@ -79,7 +83,7 @@ var mustNotContain = []requiredText{
 	{"AGENTS.md", "## Wiki integration"},
 	{"AGENTS.md", `no-mistakes axi run --intent "<the user`},
 
-	{"README.md", ".sergeant-intent.md"},
+	{"README.md", ".sgt-intent.md"},
 	{"README.md", "--intent-file"},
 	{"README.md", "bin/sgt-"},
 	{"README.md", "tmux new-session"},

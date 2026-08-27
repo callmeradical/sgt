@@ -7,12 +7,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/callmeradical/sergeant/internal/config"
-	"github.com/callmeradical/sergeant/internal/graphify"
+	"github.com/callmeradical/sgt/internal/config"
+	"github.com/callmeradical/sgt/internal/graphify"
 )
 
 // writeGraphProject writes a project YAML at an absolute path (so
-// config.LoadProject uses it directly, bypassing SERGEANT_CONFIG) declaring
+// config.LoadProject uses it directly, bypassing SGT_CONFIG) declaring
 // a graphify block whose output points at outputDir.
 func writeGraphProject(t *testing.T, name, repoPath, outputDir string) string {
 	t.Helper()
@@ -60,7 +60,7 @@ func TestGraphToolsAreAdvertised(t *testing.T) {
 	for _, tool := range Tools() {
 		names[tool.Name] = true
 	}
-	for _, want := range []string{"sergeant_graph_query", "sergeant_graph_explain", "sergeant_graph_affected"} {
+	for _, want := range []string{"sgt_graph_query", "sgt_graph_explain", "sgt_graph_affected"} {
 		if !names[want] {
 			t.Errorf("expected %s to be advertised in Tools()", want)
 		}
@@ -84,34 +84,34 @@ func TestMCPGraphQueryAgainstABuiltGraphReturnsAnswer(t *testing.T) {
 		t.Fatalf("BuildProjectGraph: %v", err)
 	}
 
-	out, err := s.executeTool("sergeant_graph_query", map[string]interface{}{
+	out, err := s.executeTool("sgt_graph_query", map[string]interface{}{
 		"project":  projPath,
 		"question": "add()",
 	})
 	if err != nil {
-		t.Fatalf("sergeant_graph_query returned an error: %v", err)
+		t.Fatalf("sgt_graph_query returned an error: %v", err)
 	}
 	if !strings.Contains(out, "add()") {
 		t.Errorf("query output = %q, want it to mention add()", out)
 	}
 
-	explainOut, err := s.executeTool("sergeant_graph_explain", map[string]interface{}{
+	explainOut, err := s.executeTool("sgt_graph_explain", map[string]interface{}{
 		"project": projPath,
 		"node":    "add()",
 	})
 	if err != nil {
-		t.Fatalf("sergeant_graph_explain returned an error: %v", err)
+		t.Fatalf("sgt_graph_explain returned an error: %v", err)
 	}
 	if !strings.HasPrefix(strings.TrimSpace(explainOut), "Node:") {
 		t.Errorf("explain output = %q, want graphify explain's own format", explainOut)
 	}
 
-	affectedOut, err := s.executeTool("sergeant_graph_affected", map[string]interface{}{
+	affectedOut, err := s.executeTool("sgt_graph_affected", map[string]interface{}{
 		"project": projPath,
 		"node":    "add()",
 	})
 	if err != nil {
-		t.Fatalf("sergeant_graph_affected returned an error: %v", err)
+		t.Fatalf("sgt_graph_affected returned an error: %v", err)
 	}
 	if !strings.Contains(affectedOut, "Affected nodes for add()") {
 		t.Errorf("affected output = %q, want graphify affected's own format", affectedOut)
@@ -131,9 +131,9 @@ func TestMCPGraphToolsWithNoGraphBuiltReturnClearError(t *testing.T) {
 		tool string
 		args map[string]interface{}
 	}{
-		{"sergeant_graph_query", map[string]interface{}{"project": projPath, "question": "x"}},
-		{"sergeant_graph_explain", map[string]interface{}{"project": projPath, "node": "x"}},
-		{"sergeant_graph_affected", map[string]interface{}{"project": projPath, "node": "x"}},
+		{"sgt_graph_query", map[string]interface{}{"project": projPath, "question": "x"}},
+		{"sgt_graph_explain", map[string]interface{}{"project": projPath, "node": "x"}},
+		{"sgt_graph_affected", map[string]interface{}{"project": projPath, "node": "x"}},
 	} {
 		_, err := s.executeTool(tc.tool, tc.args)
 		if err == nil {

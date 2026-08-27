@@ -9,7 +9,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Project represents a Sergeant multi-repo project definition.
+// Project represents a Sgt multi-repo project definition.
 type Project struct {
 	Name        string          `yaml:"name" json:"name"`
 	ProjectName string          `yaml:"project" json:"project"` // alternate key
@@ -128,17 +128,17 @@ type DAGStage struct {
 	TD     string   `yaml:"td,omitempty" json:"td"`
 }
 
-// LoadProject reads and parses a project YAML from ~/.config/sergeant/<name>.yaml or a custom path.
+// LoadProject reads and parses a project YAML from ~/.config/sgt/<name>.yaml or a custom path.
 func LoadProject(nameOrPath string) (*Project, error) {
 	path := nameOrPath
 	if !filepath.IsAbs(path) && !fileExists(path) {
-		configDir := os.Getenv("SERGEANT_CONFIG")
+		configDir := os.Getenv("SGT_CONFIG")
 		if configDir == "" {
 			home, err := os.UserHomeDir()
 			if err != nil {
 				return nil, fmt.Errorf("resolving home directory: %w", err)
 			}
-			configDir = filepath.Join(home, ".config", "sergeant")
+			configDir = filepath.Join(home, ".config", "sgt")
 		}
 		path = filepath.Join(configDir, nameOrPath)
 		if filepath.Ext(path) == "" {

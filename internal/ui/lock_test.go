@@ -9,8 +9,8 @@ import (
 // Scenario: a second process cannot acquire the UI lock while the first
 // holds it, and can once the first releases it.
 func TestAcquireUILockRefusesASecondHolderUntilReleased(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "sergeant-ui.lock")
-	t.Setenv("SERGEANT_UI_LOCK", path)
+	path := filepath.Join(t.TempDir(), "sgt-ui.lock")
+	t.Setenv("SGT_UI_LOCK", path)
 
 	first, err := acquireUILock()
 	if err != nil {
@@ -33,10 +33,10 @@ func TestAcquireUILockRefusesASecondHolderUntilReleased(t *testing.T) {
 }
 
 // Scenario: acquiring the lock creates its parent directory if absent, so a
-// fresh install with no ~/.local/share/sergeant-v2/ yet still starts.
+// fresh install with no ~/.local/share/sgt-v2/ yet still starts.
 func TestAcquireUILockCreatesItsParentDirectory(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "nested", "dir", "sergeant-ui.lock")
-	t.Setenv("SERGEANT_UI_LOCK", path)
+	path := filepath.Join(t.TempDir(), "nested", "dir", "sgt-ui.lock")
+	t.Setenv("SGT_UI_LOCK", path)
 
 	f, err := acquireUILock()
 	if err != nil {
@@ -55,8 +55,8 @@ func TestAcquireUILockCreatesItsParentDirectory(t *testing.T) {
 // file, so it cannot go stale the way a PID file can (e.g. after a PID
 // gets reused by an unrelated process).
 func TestReleasingTheLockIsWhatUnblocksReacquisitionNotProcessIdentity(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "sergeant-ui.lock")
-	t.Setenv("SERGEANT_UI_LOCK", path)
+	path := filepath.Join(t.TempDir(), "sgt-ui.lock")
+	t.Setenv("SGT_UI_LOCK", path)
 
 	f1, err := acquireUILock()
 	if err != nil {

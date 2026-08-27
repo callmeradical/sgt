@@ -9,12 +9,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/callmeradical/sergeant/internal/config"
-	"github.com/callmeradical/sergeant/internal/dag"
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/config"
+	"github.com/callmeradical/sgt/internal/dag"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
-// workflowFixture points SERGEANT_CONFIG at a temp dir holding one project file
+// workflowFixture points SGT_CONFIG at a temp dir holding one project file
 // and returns a handler. The config is written per-test so a test can prove the
 // graph follows the file rather than the code.
 func workflowFixture(t *testing.T, projectFile, projectYAML string) http.Handler {
@@ -25,7 +25,7 @@ func workflowFixture(t *testing.T, projectFile, projectYAML string) http.Handler
 	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("SERGEANT_CONFIG", cfgDir)
+	t.Setenv("SGT_CONFIG", cfgDir)
 
 	if err := os.WriteFile(filepath.Join(cfgDir, projectFile), []byte(projectYAML), 0o644); err != nil {
 		t.Fatal(err)
@@ -231,7 +231,7 @@ func TestWorkflowGraphFollowsProjectConfigWithNoCodeChange(t *testing.T) {
 	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("SERGEANT_CONFIG", cfgDir)
+	t.Setenv("SGT_CONFIG", cfgDir)
 	cfgPath := filepath.Join(cfgDir, "evolving.yaml")
 
 	st, err := store.Open(filepath.Join(base, "t.db"))

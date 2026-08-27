@@ -6,8 +6,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/callmeradical/sergeant/internal/redact"
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/redact"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // defaultInterval is the poll period used when Runner.Interval is zero.
@@ -19,8 +19,8 @@ const defaultInterval = 5 * time.Second
 //
 // It is a poll loop, not a subscription, even though Store.SubscribeChanges
 // exists: SubscribeChanges only sees writes made by this process, and a
-// second process writing the same database file (`sergeant mcp` while
-// `sergeant ui` runs this loop) is exactly the case its own doc comment warns
+// second process writing the same database file (`sgt mcp` while
+// `sgt ui` runs this loop) is exactly the case its own doc comment warns
 // about. Polling the durable log is correct for every writer, not only the
 // one that happens to host this loop.
 type Runner struct {
@@ -32,7 +32,7 @@ type Runner struct {
 // Run polls until ctx is cancelled. It never returns an error for a failed
 // delivery — that is logged and retried next tick with the cursor
 // unadvanced — because a Target being unreachable must never look like a
-// Sergeant failure to anything that started this loop.
+// Sgt failure to anything that started this loop.
 func (r *Runner) Run(ctx context.Context) error {
 	interval := r.Interval
 	if interval <= 0 {

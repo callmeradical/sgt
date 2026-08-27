@@ -46,7 +46,7 @@ const (
 	ChannelEnvelope = "envelope"
 	// ChannelProgress carries a sampled progress snapshot for one run. Each
 	// change holds the current complete/total counts and the per-item statuses
-	// read from .sergeant/plan.json in the run's worktree. A nil plan (absent
+	// read from .sgt/plan.json in the run's worktree. A nil plan (absent
 	// or malformed file) never produces a change on this channel.
 	ChannelProgress = "progress"
 )
@@ -212,7 +212,7 @@ func (s *Store) CanReplayFrom(from int64) (bool, error) {
 // therefore a hint that something moved, never the only copy of a change.
 //
 // It only sees writes from this process. A second process writing the same
-// database file — `sergeant mcp` while `sergeant ui` serves the stream — is why
+// database file — `sgt mcp` while `sgt ui` serves the stream — is why
 // every subscriber must also re-read on a slow fallback tick rather than trusting
 // this channel to be complete.
 func (s *Store) SubscribeChanges() (<-chan int64, func()) {

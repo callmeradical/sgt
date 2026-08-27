@@ -13,10 +13,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/callmeradical/sergeant/internal/handoff"
-	"github.com/callmeradical/sergeant/internal/naming"
-	"github.com/callmeradical/sergeant/internal/redact"
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/handoff"
+	"github.com/callmeradical/sgt/internal/naming"
+	"github.com/callmeradical/sgt/internal/redact"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // maxRawOutputBytes bounds captured agent/gate output before it is written to
@@ -29,22 +29,22 @@ const maxRawOutputBytes = 64 * 1024
 // which cannot interpret terminal escapes, so they are stripped at capture time.
 var ansiEscape = regexp.MustCompile(`\x1b\[[0-9;?]*[a-zA-Z]|\x1b\][^\x07]*\x07|\x1b[()][A-Za-z0-9]`)
 
-// planPromptExtension is appended to the agent prompt when .sergeant/plan.json
+// planPromptExtension is appended to the agent prompt when .sgt/plan.json
 // exists in the worktree. It instructs the agent how to report progress against
 // the seeded checklist.
 //
 // Rules reflected in the text:
 //   - Mark a single item "in_progress" when starting it; mark it "complete"
 //     when it is done. At most one item is in_progress at any time.
-//   - Never alter the "id" or "scenario" fields — sergeant uses them as stable
+//   - Never alter the "id" or "scenario" fields — sgt uses them as stable
 //     identifiers.
-//   - Sergeant seeds the file and thereafter only reads it. The agent is the
+//   - Sgt seeds the file and thereafter only reads it. The agent is the
 //     sole writer after seeding.
 const planPromptExtension = `
 
 ## Progress reporting
 
-A checklist has been seeded into .sergeant/plan.json in your working directory.
+A checklist has been seeded into .sgt/plan.json in your working directory.
 It contains one item per declared scenario for this change, each with:
   - "id":       a stable identifier — do not change it
   - "scenario": the scenario text — do not change it
@@ -126,7 +126,7 @@ func truthyEnv(key string) bool {
 // envelope payload without disturbing whatever else it carries. If payload is
 // not a JSON object (an agent-authored envelope could in principle write
 // something else), it is returned unchanged — provenance is additive
-// metadata, not a reason to reject a payload sergeant did not itself produce.
+// metadata, not a reason to reject a payload sgt did not itself produce.
 func annotatePayloadWithProvenance(payload json.RawMessage, model, provider string) json.RawMessage {
 	var m map[string]interface{}
 	if err := json.Unmarshal(payload, &m); err != nil {
@@ -206,14 +206,14 @@ func (pr *PhaseRunner) agentTimeout() time.Duration {
 	if pr.AgentTimeout > 0 {
 		return pr.AgentTimeout
 	}
-	return envDuration("SERGEANT_AGENT_TIMEOUT", DefaultAgentTimeout)
+	return envDuration("SGT_AGENT_TIMEOUT", DefaultAgentTimeout)
 }
 
 func (pr *PhaseRunner) gateTimeout() time.Duration {
 	if pr.GateTimeout > 0 {
 		return pr.GateTimeout
 	}
-	return envDuration("SERGEANT_GATE_TIMEOUT", DefaultGateTimeout)
+	return envDuration("SGT_GATE_TIMEOUT", DefaultGateTimeout)
 }
 
 // SupportedAgents are the harnesses this native engine knows how to invoke.
@@ -272,7 +272,7 @@ func (pr *PhaseRunner) RunCodeGate(ctx context.Context, name, command string) (*
 	// order), and spec.md requires each command be given an empty directory
 	// — a shared, never-cleared path would leak one gate's files into the
 	// next gate's capture and misattribute them to the wrong phase.
-	artifactDir := filepath.Join(pr.Worktree, ".sergeant", "artifacts")
+	artifactDir := filepath.Join(pr.Worktree, ".sgt", "artifacts")
 	_ = os.RemoveAll(artifactDir)
 	_ = os.MkdirAll(artifactDir, 0o755)
 
@@ -282,7 +282,7 @@ func (pr *PhaseRunner) RunCodeGate(ctx context.Context, name, command string) (*
 	// cmd.Env must default to os.Environ() plus this one addition: setting
 	// cmd.Env at all replaces the inherited environment entirely rather than
 	// extending it.
-	cmd.Env = append(os.Environ(), "SERGEANT_ARTIFACT_DIR="+artifactDir)
+	cmd.Env = append(os.Environ(), "SGT_ARTIFACT_DIR="+artifactDir)
 
 	var outBuf bytes.Buffer
 	cmd.Stdout = &outBuf
@@ -341,8 +341,8 @@ func (pr *PhaseRunner) RunCodeGate(ctx context.Context, name, command string) (*
 // bullets. Unlike RunCodeGate, it is not a *PhaseRunner method: a shipping
 // gate evaluates an intent as a whole, which may span several
 // repositories/worktrees, so there is no single pr.Worktree to run it in.
-// The command runs with cmd.Dir unset (the sergeant process's own working
-// directory) and SERGEANT_BULLET_WORKTREES set to the bullets' worktree
+// The command runs with cmd.Dir unset (the sgt process's own working
+// directory) and SGT_BULLET_WORKTREES set to the bullets' worktree
 // paths, comma-joined in merge order, in its environment — the substrate a
 // project's shipping-gate command needs to actually inspect more than one
 // repo.
@@ -365,7 +365,7 @@ func RunShippingGate(ctx context.Context, name, command string, worktrees []stri
 	cmd := exec.CommandContext(gateCtx, "bash", "-c", command)
 	superviseGroup(cmd)
 	joined := strings.Join(worktrees, ",")
-	cmd.Env = append(os.Environ(), "SERGEANT_BULLET_WORKTREES="+joined)
+	cmd.Env = append(os.Environ(), "SGT_BULLET_WORKTREES="+joined)
 
 	var outBuf bytes.Buffer
 	cmd.Stdout = &outBuf
@@ -509,8 +509,8 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 	}
 	_ = pr.Store.RecordPhase(initialPhase)
 
-	// Create .sergeant state dir in worktree
-	stateDir := filepath.Join(pr.Worktree, ".sergeant")
+	// Create .sgt state dir in worktree
+	stateDir := filepath.Join(pr.Worktree, ".sgt")
 	_ = os.MkdirAll(stateDir, 0755)
 
 	// Extend the prompt with progress-reporting instructions when a plan file
@@ -519,7 +519,7 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 	//
 	// The extension is added here — after the worktree is available but before
 	// any agent invocation — so every retry attempt receives the same complete
-	// prompt. The plan file itself is not modified here; sergeant only seeds it
+	// prompt. The plan file itself is not modified here; sgt only seeds it
 	// (in Engine.RunStage) and thereafter only reads it. The agent is the sole
 	// writer after seeding.
 	planPath := filepath.Join(stateDir, "plan.json")
@@ -542,7 +542,7 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 		artifactDir := filepath.Join(stateDir, "artifacts")
 		_ = os.RemoveAll(artifactDir)
 		_ = os.MkdirAll(artifactDir, 0o755)
-		extraEnv = append(extraEnv, "SERGEANT_ARTIFACT_DIR="+artifactDir)
+		extraEnv = append(extraEnv, "SGT_ARTIFACT_DIR="+artifactDir)
 
 		// A zero budget means unbounded: derive a cancellable child so operator
 		// cancellation still propagates, but attach no deadline. Passing 0 to
@@ -559,7 +559,7 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 		cmd := exec.CommandContext(phaseCtx, exe, args...)
 		superviseGroup(cmd)
 		cmd.Dir = pr.Worktree
-		// extraEnv always has at least SERGEANT_ARTIFACT_DIR now, so cmd.Env
+		// extraEnv always has at least SGT_ARTIFACT_DIR now, so cmd.Env
 		// is always set — and must be os.Environ() plus these additions,
 		// since setting cmd.Env at all replaces the inherited environment
 		// entirely rather than extending it.
@@ -612,7 +612,7 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 				Repo:      pr.RepoName,
 				Stage:     phaseName,
 				Summary:   summary,
-				Artifacts: []string{fmt.Sprintf(".sergeant/prompt_%s.txt", phaseName)},
+				Artifacts: []string{fmt.Sprintf(".sgt/prompt_%s.txt", phaseName)},
 				Payload: marshalPayload(map[string]string{
 					"raw_output": redact.Truncate(redact.Text(stripANSI(outBuf.String())), maxRawOutputBytes),
 					"agent":      exe,
@@ -624,7 +624,7 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 		}
 
 		// An agent can write its own envelope.json (the branch above), whose
-		// Summary/Payload/Artifacts sergeant never built field-by-field and so
+		// Summary/Payload/Artifacts sgt never built field-by-field and so
 		// never redacted at the point of construction — closing that gap here,
 		// unconditionally, covers both branches instead of trusting each new
 		// envelope-construction path to remember it.
@@ -683,7 +683,7 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 			Type:          "phase.completed",
 			SchemaVersion: "1",
 			OccurredAt:    now,
-			Producer:      "sergeant/runner",
+			Producer:      "sgt/runner",
 			CorrelationID: pr.RunID,
 			CausationID:   pr.Store.CausationFromLatest(pr.RunID, pr.RepoName),
 			PhaseID:       phaseID,
@@ -757,7 +757,7 @@ func (pr *PhaseRunner) DeliverPullRequest(ctx context.Context, branch, title, bo
 		title = fmt.Sprintf("feat(%s): verified automated patch [%s]", pr.RepoName, pr.RunID)
 	}
 	if body == "" {
-		body = fmt.Sprintf("### Automated Pull Request from Sergeant Factory Spine\n\n- **Task ID**: `%s`\n- **Target Repo**: `%s`\n- **Code Gate Verification**: 100%% Deterministic Zero-Token Gates Passed\n- **Envelope Hash**: Sealed in `.sergeant/review.json`\n", pr.RunID, pr.RepoName)
+		body = fmt.Sprintf("### Automated Pull Request from Sgt Factory Spine\n\n- **Task ID**: `%s`\n- **Target Repo**: `%s`\n- **Code Gate Verification**: 100%% Deterministic Zero-Token Gates Passed\n- **Envelope Hash**: Sealed in `.sgt/review.json`\n", pr.RunID, pr.RepoName)
 	}
 
 	// 1. Commit any uncommitted changes in worktree
@@ -773,7 +773,7 @@ func (pr *PhaseRunner) DeliverPullRequest(ctx context.Context, branch, title, bo
 
 	if err := cmd.Run(); err != nil {
 		// If gh not authenticated or no remote branch, produce local review bundle
-		reviewPath := filepath.Join(pr.Worktree, ".sergeant", "review.json")
+		reviewPath := filepath.Join(pr.Worktree, ".sgt", "review.json")
 		reviewData, _ := json.MarshalIndent(map[string]interface{}{
 			"task_id":      pr.RunID,
 			"repo":         pr.RepoName,

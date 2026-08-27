@@ -1,13 +1,13 @@
-# Skill: sergeant-help
+# Skill: sgt-help
 
-Answer Sergeant installation, setup, usage, skills, and troubleshooting questions
+Answer Sgt installation, setup, usage, skills, and troubleshooting questions
 from repository-owned documentation.
 
 ## When to use
 
-Load this skill when the user asks what Sergeant is, how to install/configure/use
+Load this skill when the user asks what Sgt is, how to install/configure/use
 it, where skills come from, how to run a command/workflow, or how to diagnose a
-Sergeant error.
+Sgt error.
 
 Do not load it as a substitute for `load-project`, `cross-repo-work`, `dispatch`,
 or `wiki` after the user has requested execution of those procedures.
@@ -25,8 +25,8 @@ or `wiki` after the user has requested execution of those procedures.
 | The v2 HTTP API and MCP tool reference | `skills/dispatch/SKILL.md` |
 | Agent execution policy | `AGENTS.md` |
 
-v1's docs describing the removed `bin/sgt-*` toolbelt (`what-is-sergeant.md`,
-`getting-started.md`, `skills.md`, `using-sergeant.md`) were archived to
+v1's docs describing the removed `bin/sgt-*` toolbelt (`what-is-sgt.md`,
+`getting-started.md`, `skills.md`, `using-sgt.md`) were archived to
 `docs/archive/v1/` — do not cite them as current guidance.
 
 v2's command reference is `POST /api/*` routes (`internal/ui/server.go`) and MCP
@@ -37,18 +37,18 @@ toolbelt to consult on this branch.
 
 1. Classify the question against the documentation map.
 2. Read the primary document before searching broadly.
-3. For terms not resolved there, search repository documentation and Sergeant
+3. For terms not resolved there, search repository documentation and Sgt
    skills:
 
    ```bash
    rg -n -i --glob '*.md' -- '<term>' README.md docs skills
    ```
 
-4. When the configured Sergeant graph exists and the question is architectural,
-   use the `sergeant_graph_query` MCP tool or `POST /api/build-graph` output and
+4. When the configured Sgt graph exists and the question is architectural,
+   use the `sgt_graph_query` MCP tool or `POST /api/build-graph` output and
    cite source locations.
-5. For flag or argument questions about the `sergeant` CLI, run `--help` only when the command supports it —
-   today none of `sergeant`'s subcommands do, so inspect its emitted usage/error contract and command tests
+5. For flag or argument questions about the `sgt` CLI, run `--help` only when the command supports it —
+   today none of `sgt`'s subcommands do, so inspect its emitted usage/error contract and command tests
    instead. For the HTTP API and MCP tools there is no `--help` at all — the reference is the route/body-field
    table in `skills/dispatch/SKILL.md`.
 6. Answer with the exact command, required preconditions, expected evidence, and

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // renderPhaseDetail executes phaseDetailHTML from the embedded UI against a

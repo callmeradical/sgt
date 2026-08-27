@@ -23,8 +23,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/callmeradical/sergeant/internal/plan"
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/plan"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // ---------------------------------------------------------------------------
@@ -61,9 +61,9 @@ func TestPlanSeedItemCountMatchesDeclaredScenarios(t *testing.T) {
 
 	waitForTerminalRun(t, st, resp.TaskID)
 
-	fleetDir := os.Getenv("SERGEANT_FLEET_DIR")
+	fleetDir := os.Getenv("SGT_FLEET_DIR")
 	if fleetDir == "" {
-		t.Skip("SERGEANT_FLEET_DIR not set by agentDispatchFixture")
+		t.Skip("SGT_FLEET_DIR not set by agentDispatchFixture")
 	}
 
 	worktree := filepath.Join(fleetDir, resp.TaskID, "svc")
@@ -107,14 +107,14 @@ func TestPlanSeedZeroScenariosWritesEmptyPlanNotMissingFile(t *testing.T) {
 
 	waitForTerminalRun(t, st, resp.TaskID)
 
-	fleetDir := os.Getenv("SERGEANT_FLEET_DIR")
+	fleetDir := os.Getenv("SGT_FLEET_DIR")
 	if fleetDir == "" {
-		t.Skip("SERGEANT_FLEET_DIR not set")
+		t.Skip("SGT_FLEET_DIR not set")
 	}
 	worktree := filepath.Join(fleetDir, resp.TaskID, "svc")
 
 	// File must exist (zero-scenario is a fact, not a missing seed).
-	planPath := filepath.Join(worktree, ".sergeant", "plan.json")
+	planPath := filepath.Join(worktree, ".sgt", "plan.json")
 	if _, err := os.Stat(planPath); os.IsNotExist(err) {
 		t.Fatal("plan.json is absent; a zero-scenario change must produce an empty plan, not a missing file")
 	}
@@ -138,7 +138,7 @@ func TestPlanSeedZeroScenariosWritesEmptyPlanNotMissingFile(t *testing.T) {
 // return nil for an unreadable file.
 func TestSamplePlanProgressMalformedPlanReturnsNil(t *testing.T) {
 	worktree := t.TempDir()
-	planPath := filepath.Join(worktree, ".sergeant", "plan.json")
+	planPath := filepath.Join(worktree, ".sgt", "plan.json")
 	if err := os.MkdirAll(filepath.Dir(planPath), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -196,12 +196,12 @@ func TestFullyReportedPlanDoesNotPassFailedRun(t *testing.T) {
 	// where every item is "complete" into the worktree directory (the engine
 	// already refuses the repo before creating the worktree, so we create it here
 	// to test the sampling path directly).
-	fleetDir := os.Getenv("SERGEANT_FLEET_DIR")
+	fleetDir := os.Getenv("SGT_FLEET_DIR")
 	if fleetDir == "" {
-		t.Skip("SERGEANT_FLEET_DIR not set")
+		t.Skip("SGT_FLEET_DIR not set")
 	}
 	worktree := filepath.Join(fleetDir, resp.TaskID, "svc")
-	if err := os.MkdirAll(filepath.Join(worktree, ".sergeant"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(worktree, ".sgt"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	fullPlan := plan.Plan{Items: []plan.PlanItem{
@@ -210,7 +210,7 @@ func TestFullyReportedPlanDoesNotPassFailedRun(t *testing.T) {
 		{ID: "s-3", Scenario: "Third", Status: plan.StatusComplete},
 	}}
 	planData, _ := json.MarshalIndent(fullPlan, "", "  ")
-	if err := os.WriteFile(filepath.Join(worktree, ".sergeant", "plan.json"), planData, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(worktree, ".sgt", "plan.json"), planData, 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -292,7 +292,7 @@ func TestPlanSeedIsCalledDuringDispatch(t *testing.T) {
 func TestProgressChangeIsAppendedToStream(t *testing.T) {
 	// Build a minimal server with a stored run.
 	base := t.TempDir()
-	t.Setenv("SERGEANT_FLEET_DIR", filepath.Join(base, "fleet"))
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(base, "fleet"))
 
 	st, err := store.Open(filepath.Join(base, "t.db"))
 	if err != nil {
@@ -308,7 +308,7 @@ func TestProgressChangeIsAppendedToStream(t *testing.T) {
 
 	// Write a plan.json with one in-progress item into the worktree.
 	worktree := filepath.Join(base, "fleet", "run-prog", "repo1")
-	if err := os.MkdirAll(filepath.Join(worktree, ".sergeant"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(worktree, ".sgt"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	p := plan.Plan{Items: []plan.PlanItem{
@@ -317,7 +317,7 @@ func TestProgressChangeIsAppendedToStream(t *testing.T) {
 		{ID: "s-3", Scenario: "Third", Status: plan.StatusPending},
 	}}
 	planData, _ := json.MarshalIndent(p, "", "  ")
-	if err := os.WriteFile(filepath.Join(worktree, ".sergeant", "plan.json"), planData, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(worktree, ".sgt", "plan.json"), planData, 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -376,7 +376,7 @@ func TestProgressChangeIsAppendedToStream(t *testing.T) {
 	}
 }
 
-// plan.json's Scenario text is sergeant-seeded from the spec and the agent is
+// plan.json's Scenario text is sgt-seeded from the spec and the agent is
 // instructed not to alter it, but the file is one the agent has raw write
 // access to and nothing enforces that instruction in code. AppendChange
 // writes straight to the changes table via raw SQL, bypassing the
@@ -385,7 +385,7 @@ func TestProgressChangeIsAppendedToStream(t *testing.T) {
 // with filesystem access) would put on the SSE-fed progress stream.
 func TestProgressChangeRedactsScenarioText(t *testing.T) {
 	base := t.TempDir()
-	t.Setenv("SERGEANT_FLEET_DIR", filepath.Join(base, "fleet"))
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(base, "fleet"))
 
 	st, err := store.Open(filepath.Join(base, "t.db"))
 	if err != nil {
@@ -401,14 +401,14 @@ func TestProgressChangeRedactsScenarioText(t *testing.T) {
 
 	secret := "sk-abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP"
 	worktree := filepath.Join(base, "fleet", "run-secret", "repo1")
-	if err := os.MkdirAll(filepath.Join(worktree, ".sergeant"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(worktree, ".sgt"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	p := plan.Plan{Items: []plan.PlanItem{
 		{ID: "s-1", Scenario: "API_KEY=" + secret, Status: plan.StatusInProgress},
 	}}
 	planData, _ := json.MarshalIndent(p, "", "  ")
-	if err := os.WriteFile(filepath.Join(worktree, ".sergeant", "plan.json"), planData, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(worktree, ".sgt", "plan.json"), planData, 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -437,7 +437,7 @@ func TestProgressChangeRedactsScenarioText(t *testing.T) {
 // "No progress reported" and "zero progress" are different statements.
 func TestProgressAbsentPlanAppendsNoChange(t *testing.T) {
 	base := t.TempDir()
-	t.Setenv("SERGEANT_FLEET_DIR", filepath.Join(base, "fleet"))
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(base, "fleet"))
 
 	st, err := store.Open(filepath.Join(base, "t.db"))
 	if err != nil {
@@ -493,8 +493,8 @@ func agentDispatchFixture(t *testing.T) (mux http.Handler, st *store.Store, repo
 	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("SERGEANT_CONFIG", cfgDir)
-	t.Setenv("SERGEANT_FLEET_DIR", filepath.Join(base, "fleet"))
+	t.Setenv("SGT_CONFIG", cfgDir)
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(base, "fleet"))
 
 	repoPath = filepath.Join(base, "svc")
 	initGitRepo(t, repoPath)

@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/callmeradical/sergeant/internal/store"
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // writeBriefProject writes a minimal project YAML at an absolute path
-// declaring one repo with a configured gate, so sergeant_get_brief's gate
+// declaring one repo with a configured gate, so sgt_get_brief's gate
 // resolution (dag.SortedGateNames) has something to sort.
 func writeBriefProject(t *testing.T, name, repo string) string {
 	t.Helper()
@@ -29,33 +29,33 @@ func writeBriefProject(t *testing.T, name, repo string) string {
 	return path
 }
 
-// sergeant_get_brief's InputSchema advertises intent_id and repo, not the
+// sgt_get_brief's InputSchema advertises intent_id and repo, not the
 // project-config dump it used to promise but never delivered.
 func TestGetBriefToolAdvertisesIntentIDAndRepo(t *testing.T) {
 	for _, tool := range Tools() {
-		if tool.Name != "sergeant_get_brief" {
+		if tool.Name != "sgt_get_brief" {
 			continue
 		}
 		schema, ok := tool.InputSchema.(map[string]interface{})
 		if !ok {
-			t.Fatalf("sergeant_get_brief InputSchema is not an object: %#v", tool.InputSchema)
+			t.Fatalf("sgt_get_brief InputSchema is not an object: %#v", tool.InputSchema)
 		}
 		props, _ := schema["properties"].(map[string]interface{})
 		if _, ok := props["intent_id"]; !ok {
-			t.Errorf("sergeant_get_brief InputSchema has no intent_id property: %#v", props)
+			t.Errorf("sgt_get_brief InputSchema has no intent_id property: %#v", props)
 		}
 		if _, ok := props["repo"]; !ok {
-			t.Errorf("sergeant_get_brief InputSchema has no repo property: %#v", props)
+			t.Errorf("sgt_get_brief InputSchema has no repo property: %#v", props)
 		}
 		if _, ok := props["project"]; ok {
-			t.Errorf("sergeant_get_brief InputSchema still advertises project; it should require intent_id/repo instead")
+			t.Errorf("sgt_get_brief InputSchema still advertises project; it should require intent_id/repo instead")
 		}
 		return
 	}
-	t.Fatal("sergeant_get_brief not found in Tools()")
+	t.Fatal("sgt_get_brief not found in Tools()")
 }
 
-// sergeant_get_brief renders the same brief RunStage would for the same
+// sgt_get_brief renders the same brief RunStage would for the same
 // intent, repo and gate names — the two call sites named in D1 must never
 // describe the same work differently.
 func TestGetBriefRendersTheSharedBrief(t *testing.T) {
@@ -74,12 +74,12 @@ func TestGetBriefRendersTheSharedBrief(t *testing.T) {
 		t.Fatalf("creating bullet: %v", err)
 	}
 
-	text, err := s.executeTool("sergeant_get_brief", map[string]interface{}{
+	text, err := s.executeTool("sgt_get_brief", map[string]interface{}{
 		"intent_id": "intent-mcp-1",
 		"repo":      "svc",
 	})
 	if err != nil {
-		t.Fatalf("sergeant_get_brief returned an error: %v", err)
+		t.Fatalf("sgt_get_brief returned an error: %v", err)
 	}
 
 	want, err := st.RenderIntentBrief("intent-mcp-1", "svc", []string{"lint", "unit"})
@@ -87,16 +87,16 @@ func TestGetBriefRendersTheSharedBrief(t *testing.T) {
 		t.Fatalf("RenderIntentBrief: %v", err)
 	}
 	if text != want {
-		t.Errorf("sergeant_get_brief output = %q, want it to equal the shared rendering %q", text, want)
+		t.Errorf("sgt_get_brief output = %q, want it to equal the shared rendering %q", text, want)
 	}
 	for _, wantSubstr := range []string{"add retry logic", "svc", "pending"} {
 		if !strings.Contains(text, wantSubstr) {
-			t.Errorf("sergeant_get_brief output = %q, want it to contain %q", text, wantSubstr)
+			t.Errorf("sgt_get_brief output = %q, want it to contain %q", text, wantSubstr)
 		}
 	}
 }
 
-// sergeant_get_brief refuses a repo with no matching bullet on the intent.
+// sgt_get_brief refuses a repo with no matching bullet on the intent.
 func TestGetBriefRefusesRepoWithNoMatchingBullet(t *testing.T) {
 	s, st := mcpFixture(t)
 
@@ -113,7 +113,7 @@ func TestGetBriefRefusesRepoWithNoMatchingBullet(t *testing.T) {
 		t.Fatalf("creating bullet: %v", err)
 	}
 
-	_, err := s.executeTool("sergeant_get_brief", map[string]interface{}{
+	_, err := s.executeTool("sgt_get_brief", map[string]interface{}{
 		"intent_id": "intent-mcp-2",
 		"repo":      "web",
 	})

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/callmeradical/sergeant/internal/config"
+	"github.com/callmeradical/sgt/internal/config"
 )
 
 func buildFixtureGraph(t *testing.T) *config.Graphify {

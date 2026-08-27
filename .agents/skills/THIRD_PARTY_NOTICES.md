@@ -38,6 +38,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-`no-mistakes`, `to-tickets`, and `sergeant-setup` are Sergeant project-authored
-material. They are distributed under Sergeant's project MIT License:
+`no-mistakes`, `to-tickets`, and `sgt-setup` are Sgt project-authored
+material. They are distributed under Sgt's project MIT License:
 Copyright (c) 2026 Lars Cromley.

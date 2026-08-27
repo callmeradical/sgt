@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/callmeradical/sergeant/internal/plan"
+	"github.com/callmeradical/sgt/internal/plan"
 )
 
 // ---------------------------------------------------------------------------
@@ -286,7 +286,7 @@ func TestSeedPlanZeroScenariosWritesEmptyPlanNotMissingOne(t *testing.T) {
 	}
 
 	// File must exist.
-	planPath := filepath.Join(worktree, ".sergeant", "plan.json")
+	planPath := filepath.Join(worktree, ".sgt", "plan.json")
 	if _, err := os.Stat(planPath); os.IsNotExist(err) {
 		t.Fatal("plan.json does not exist; a zero-scenario change must produce an empty plan, not a missing one")
 	}
@@ -308,7 +308,7 @@ func TestSeedPlanZeroScenariosWritesEmptyPlanNotMissingOne(t *testing.T) {
 // Scenario: A malformed plan does not fail the run
 func TestReadPlanMalformedReturnsNilNotError(t *testing.T) {
 	worktree := t.TempDir()
-	planPath := filepath.Join(worktree, ".sergeant", "plan.json")
+	planPath := filepath.Join(worktree, ".sgt", "plan.json")
 	if err := os.MkdirAll(filepath.Dir(planPath), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -325,7 +325,7 @@ func TestReadPlanMalformedReturnsNilNotError(t *testing.T) {
 // Scenario: An unwritten plan reports nothing, not zero
 func TestReadPlanAbsentReturnsNilNotEmpty(t *testing.T) {
 	worktree := t.TempDir()
-	// No .sergeant/plan.json exists.
+	// No .sgt/plan.json exists.
 	p := plan.ReadPlan(worktree)
 	if p != nil {
 		t.Errorf("ReadPlan returned non-nil for absent file; want nil (no progress reported)")
@@ -342,7 +342,7 @@ func TestReadPlanWellFormedReturnsItems(t *testing.T) {
 			{"id":"s-3","scenario":"Third","status":"pending"}
 		]
 	}`
-	planPath := filepath.Join(worktree, ".sergeant", "plan.json")
+	planPath := filepath.Join(worktree, ".sgt", "plan.json")
 	if err := os.MkdirAll(filepath.Dir(planPath), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -422,7 +422,7 @@ func TestInProgressItemNoneReturnsNil(t *testing.T) {
 
 func readPlanFrom(t *testing.T, worktree string) *plan.Plan {
 	t.Helper()
-	planPath := filepath.Join(worktree, ".sergeant", "plan.json")
+	planPath := filepath.Join(worktree, ".sgt", "plan.json")
 	data, err := os.ReadFile(planPath)
 	if err != nil {
 		t.Fatalf("reading plan.json: %v", err)
