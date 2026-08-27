@@ -9,6 +9,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// GlobalConfigFileName is the reserved filename for the machine-wide config
+// (dev_root, default_identity, etc.) inside the config directory. It lives
+// alongside per-project YAMLs but is not itself a project, so anything that
+// enumerates project files must skip it.
+const GlobalConfigFileName = "config.yaml"
+
 // Project represents a Sgt multi-repo project definition.
 type Project struct {
 	Name        string          `yaml:"name" json:"name"`

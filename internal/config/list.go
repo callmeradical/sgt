@@ -32,6 +32,9 @@ func ListProjects() ([]*Project, error) {
 			continue
 		}
 		name := entry.Name()
+		if name == GlobalConfigFileName {
+			continue
+		}
 		if strings.HasSuffix(name, ".yaml") || strings.HasSuffix(name, ".yml") {
 			fullPath := filepath.Join(configDir, name)
 			p, err := LoadProject(fullPath)
