@@ -36,6 +36,14 @@ type Engine struct {
 	// An empty string disables seeding silently — older callers and resume paths
 	// that do not carry the change dir are unaffected.
 	ChangeDir string
+
+	// ChangeRepo is the name of the repository that owns ChangeDir (decision
+	// O1 scopes a change to a single repository). RunStage copies ChangeDir
+	// into the worktree only for this repo, so the audit artifact decision O3
+	// requires lands in the same commit and pull request as the
+	// implementation it describes, and does not get duplicated into other
+	// repos' worktrees in a multi-repo stage.
+	ChangeRepo string
 }
 
 // phasePassed reports whether this run already earned a pass for a phase.
@@ -181,6 +189,34 @@ func (e *Engine) prepareWorktree(ctx context.Context, repoPath, runID, repoName 
 		return "", false, fmt.Errorf("creating worktree for %s: %v: %s", repoName, err, strings.TrimSpace(string(out)))
 	}
 	return wt, true, nil
+}
+
+// copyChangeDir copies an OpenSpec change directory into a worktree.
+//
+// It overwrites rather than refusing when the destination already has files:
+// prepareWorktree returns the same worktree on every stage of a multi-stage
+// run and again on resume, so RunStage may call this more than once for the
+// same worktree, and re-seeding the change dir it already seeded must not be
+// an error.
+func copyChangeDir(src, dst string) error {
+	return filepath.WalkDir(src, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(dst, rel)
+		if d.IsDir() {
+			return os.MkdirAll(target, 0755)
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(target, data, 0644)
+	})
 }
 
 // branchExists reports whether a local branch is already present. It is the
@@ -335,6 +371,22 @@ func (e *Engine) RunStage(ctx context.Context, runID string, stage *config.DAGSt
 				return e.Router.InjectHandoffToWorktree(upstream, worktreePath)
 			}); deliverErr != nil {
 				return fmt.Errorf("delivering handoff from upstream %s to worktree %s: %w", upstream, worktreePath, deliverErr)
+			}
+		}
+
+		// Land the OpenSpec change directory itself in this repo's worktree,
+		// before the first agent phase starts, so CommitRunOutput's `git add -A`
+		// picks it up and it travels in the same commit and pull request as the
+		// implementation (decision O3). Only the repo that owns the change gets
+		// a copy — ChangeRepo names it — because O1 scopes a change to one
+		// repository and copying it into every repo of a multi-repo stage would
+		// duplicate the audit record where it does not belong. Unlike plan.json
+		// seeding below, a failure here is fatal: it is the one step this whole
+		// mechanism exists to guarantee.
+		if e.ChangeDir != "" && repoName == e.ChangeRepo {
+			dest := filepath.Join(worktreePath, "openspec", "changes", filepath.Base(e.ChangeDir))
+			if err := copyChangeDir(e.ChangeDir, dest); err != nil {
+				return fmt.Errorf("copying OpenSpec change %s into worktree for %s: %w", e.ChangeDir, repoName, err)
 			}
 		}
 

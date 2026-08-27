@@ -286,6 +286,115 @@ func TestCommitRunOutputMakesWorkRecoverable(t *testing.T) {
 	}
 }
 
+// Decision O3 requires the OpenSpec change directory to travel in the same
+// pull request as the implementation it accounts for. resolveChange scaffolds
+// or verifies that directory in the source repository (changeRepoPath), not
+// in the isolated worktree agents actually commit — so RunStage must copy it
+// into the worktree itself, or CommitRunOutput's `git add -A` never sees it
+// and the resulting commit (and PR) is missing its audit link.
+func TestRunStageCopiesOpenSpecChangeDirIntoWorktree(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
+
+	src := filepath.Join(tempDir, "svc")
+	newGitRepo(t, src)
+
+	// Scaffolded on disk in the source repo, exactly as resolveChange leaves
+	// it: outside any worktree, and never committed there.
+	changeDir := filepath.Join(src, "openspec", "changes", "add-thing")
+	if err := os.MkdirAll(changeDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(changeDir, "proposal.md"), []byte("# Add Thing\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	proj := &config.Project{
+		Name: "p",
+		Repos: map[string]config.Repo{
+			"svc": {Path: src, Factory: &config.FactoryConfig{
+				Pipeline: []string{"test"},
+				Gates:    map[string]string{"unit": "true"},
+			}},
+		},
+	}
+	eng := newEngine(t, proj)
+	eng.ChangeDir = changeDir
+	eng.ChangeRepo = "svc"
+	runID := "run-openspec-1"
+	createTestRun(t, eng, proj.Name, runID, "running")
+
+	if err := eng.RunStage(context.Background(), runID, &config.DAGStage{Name: "s", Repos: []string{"svc"}}); err != nil {
+		t.Fatalf("RunStage: %v", err)
+	}
+
+	wt := FleetDir(runID, "svc")
+	gotProposal, err := os.ReadFile(filepath.Join(wt, "openspec", "changes", "add-thing", "proposal.md"))
+	if err != nil {
+		t.Fatalf("expected the OpenSpec change to be copied into the worktree: %v", err)
+	}
+	if string(gotProposal) != "# Add Thing\n" {
+		t.Errorf("proposal.md content = %q, want %q", gotProposal, "# Add Thing\n")
+	}
+
+	// The decisive property: it must end up in the commit CommitRunOutput
+	// makes, or it never reaches the pull request.
+	committed, _, err := CommitRunOutput(context.Background(), runID, "svc", "add thing")
+	if err != nil {
+		t.Fatalf("CommitRunOutput: %v", err)
+	}
+	if !committed {
+		t.Fatal("expected a commit")
+	}
+	branch := testBranch(runID)
+	if body := gitOutput(context.Background(), src, "show", branch+":openspec/changes/add-thing/proposal.md"); body != "# Add Thing" {
+		t.Errorf("openspec change dir not in the committed branch, got %q", body)
+	}
+}
+
+// A change belongs to exactly one repository (decision O1). In a multi-repo
+// stage, only the repo named by ChangeRepo should receive a copy — copying it
+// into every repo's worktree would duplicate the audit record in a repo it
+// does not describe.
+func TestRunStageDoesNotCopyOpenSpecChangeIntoOtherRepos(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
+
+	svcDir := filepath.Join(tempDir, "svc")
+	newGitRepo(t, svcDir)
+	otherDir := filepath.Join(tempDir, "other")
+	newGitRepo(t, otherDir)
+
+	changeDir := filepath.Join(svcDir, "openspec", "changes", "add-thing")
+	if err := os.MkdirAll(changeDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(changeDir, "proposal.md"), []byte("# Add Thing\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	proj := &config.Project{
+		Name: "p",
+		Repos: map[string]config.Repo{
+			"svc":   {Path: svcDir, Factory: &config.FactoryConfig{Pipeline: []string{"test"}, Gates: map[string]string{"unit": "true"}}},
+			"other": {Path: otherDir, Factory: &config.FactoryConfig{Pipeline: []string{"test"}, Gates: map[string]string{"unit": "true"}}},
+		},
+	}
+	eng := newEngine(t, proj)
+	eng.ChangeDir = changeDir
+	eng.ChangeRepo = "svc"
+	runID := "run-openspec-2"
+	createTestRun(t, eng, proj.Name, runID, "running")
+
+	if err := eng.RunStage(context.Background(), runID, &config.DAGStage{Name: "s", Repos: []string{"svc", "other"}}); err != nil {
+		t.Fatalf("RunStage: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(FleetDir(runID, "other"), "openspec")); !os.IsNotExist(err) {
+		t.Errorf("expected no openspec dir copied into the non-owning repo's worktree, stat err = %v", err)
+	}
+}
+
 // Gates must run in a stable order. Ranging over the gates map directly made
 // execution order random, so identical runs could report different failing gates.
 func TestGatesRunInDeterministicOrder(t *testing.T) {
