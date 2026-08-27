@@ -308,12 +308,15 @@ func (srv *Server) createRunAndDispatch(
 	handoffBase := filepath.Join(dag.FleetRoot(), taskID, "handoff")
 	router := handoff.NewRouter(handoffBase)
 	engine := dag.NewEngine(proj, srv.Store, router)
-	// Thread the change directory into the engine so RunStage can seed
-	// .sgt/plan.json into each worktree after prepareWorktree succeeds
-	// but before the first agent phase starts. Set here, on the concrete
-	// engine, rather than inside executeRun: executeRun's engine parameter is
-	// stageRunner (a 1-method interface), which does not expose ChangeDir.
+	// Thread the change directory and its owning repo into the engine so
+	// RunStage can copy the OpenSpec change directory into that repo's
+	// worktree (decision O3's audit link) and seed .sgt/plan.json into each
+	// worktree, both after prepareWorktree succeeds but before the first
+	// agent phase starts. Set here, on the concrete engine, rather than
+	// inside executeRun: executeRun's engine parameter is stageRunner (a
+	// 1-method interface), which does not expose ChangeDir or ChangeRepo.
 	engine.ChangeDir = change.Dir
+	engine.ChangeRepo = changeRepoName
 
 	// Async run dispatch. The context is cancellable so that handleRunCancel can
 	// actually stop in-flight agent work rather than just relabelling the row.
