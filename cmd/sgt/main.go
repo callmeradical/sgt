@@ -39,6 +39,8 @@ func main() {
 		startMCP()
 	case "version":
 		fmt.Println("sgt v0.2.1 (Go Native Multi-Repo Software Factory Engine + Goose MCP Extension)")
+	case "--help", "-h", "help":
+		printUsage()
 	default:
 		printUsage()
 		os.Exit(1)
