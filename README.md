@@ -71,6 +71,52 @@ Then talk to it:
 > add feature X across all repos
 ```
 
+## Upgrading from a pre-rename ("Sergeant") install
+
+This project was renamed from `Sergeant`/`sergeant` to `Sgt`/`sgt`. If
+you already had the old build running, three default paths changed and
+there is no automatic migration yet (tracked in
+`openspec/changes/sergeant-to-sgt-path-migration/` — a future `sgt
+migrate` subcommand). Until that exists, migrate by hand:
+
+| Path | Old | New |
+|---|---|---|
+| Config dir | `~/.config/sergeant` | `~/.config/sgt` |
+| Database | `~/.local/share/sergeant/sergeant.db` (+ `-shm`/`-wal`) | `~/.local/share/sgt/sgt.db` |
+| Fleet root | `~/.local/share/sergeant-v2/fleet` | `~/.local/share/sgt-v2/fleet` |
+
+```bash
+# 1. Stop the running sergeant/sgt daemon first — confirm nothing is
+#    mid-run (GET /api/runs) before killing it.
+
+# 2. Config dir
+mv ~/.config/sergeant ~/.config/sgt
+
+# 3. Database — if ~/.local/share/sgt/sgt.db already exists (e.g. from
+#    an earlier trial run of the new binary), back it up rather than
+#    overwrite it; this rename is the one that matters, it holds your
+#    real history.
+mkdir -p ~/.local/share/sgt
+mv ~/.local/share/sergeant/sergeant.db*   ~/.local/share/sgt/    # sgt.db, -shm, -wal
+
+# 4. Fleet root
+mkdir -p ~/.local/share/sgt-v2
+mv ~/.local/share/sergeant-v2/fleet ~/.local/share/sgt-v2/fleet
+
+# 5. Rebuild and relaunch
+mise run build
+bin/sgt ui
+```
+
+**Do not touch `~/.local/share/sergeant/fleet`** — that's v1's own
+fleet layout (the bash toolbelt), unrelated to the database file that
+happens to live in the same parent directory. v1 is not a dependency
+of `sgt` and none of its paths are part of this migration.
+
+If you're coming from v1 with no prior v2/"Sergeant" install, none of
+this applies to you — you have none of the old paths above, so you're
+just doing a fresh install via Quick start.
+
 ## Documentation
 
 Start with the [documentation index](docs/README.md), which is the
