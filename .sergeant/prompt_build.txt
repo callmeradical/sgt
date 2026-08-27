@@ -6,7 +6,8 @@ go test ./internal/repopolicy/... fails: TestCanonicalSkillInventoryMatchesExpec
 
 Repo: sgt
 Position: 1 of 1
-Status: pending
+Status: blocked
+Blocked reason: gates did not pass; no further automatic attempt available
 
 # Gates
 
