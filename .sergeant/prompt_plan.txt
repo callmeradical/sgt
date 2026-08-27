@@ -1,0 +1,33 @@
+# Intent
+
+go test ./internal/repopolicy/... fails: TestCanonicalSkillInventoryMatchesExpected and TestClaudeSkillsAreSymlinksIntoCanonicalTree. The test got skills [code-review codebase-design diagnosing-bugs domain-modeling grill-with-docs grilling implement no-mistakes progress prototype research resolving-merge-conflicts tdd to-spec to-tickets triage wayfinder] but wanted [code-review codebase-design diagnosing-bugs domain-modeling grill-with-docs grilling implement no-mistakes prototype research resolving-merge-conflicts sgt-setup tdd to-spec to-tickets triage wayfinder]. In short: the checked-in skills tree is missing an sgt-setup skill directory that the test expects, and has a progress skill directory that the test does not expect. Investigate which side is actually stale: check git history/openspec/changes for whether sgt-setup was supposed to exist and was accidentally removed or renamed (note: this repo went through a sergeant->sgt rename recently, so check whether sgt-setup was previously named sergeant-setup and got dropped rather than renamed), and whether progress is a legitimately new skill that the test list simply never got updated for. Fix whichever side is actually wrong: either restore/add the missing skill directory (with a real SKILL.md, following the pattern of sibling skill directories) and its Claude-skill symlink, or update the tests canonical expected list to match reality, or both if that is what the evidence supports. Do not just delete the failing assertions.
+
+# Bullet
+
+Repo: sgt
+Position: 1 of 1
+Status: pending
+
+# Gates
+
+build, test, vet
+
+
+## Progress reporting
+
+A checklist has been seeded into .sergeant/plan.json in your working directory.
+It contains one item per declared scenario for this change, each with:
+  - "id":       a stable identifier — do not change it
+  - "scenario": the scenario text — do not change it
+  - "status":   one of "pending", "in_progress", or "complete"
+
+As you work, update the file to reflect your progress:
+1. Before starting an item, set its "status" to "in_progress".
+2. When the item is done (test written and passing), set it to "complete".
+3. Only one item should be "in_progress" at a time.
+
+Example update for a single item:
+  {"id": "s-1", "scenario": "The checklist has one item per scenario", "status": "complete"}
+
+Read the file first, update the relevant item, and write the whole file back.
+Do not change any other field. Do not add or remove items.

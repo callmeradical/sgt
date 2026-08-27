@@ -12,12 +12,7 @@ import (
 )
 
 // expectedCanonicalSkills is the inventory .agents/skills/ is expected to
-// hold. Ported verbatim from tests/repo-skills-test.sh, including its
-// pre-existing drift against the real directory (sgt-setup is listed
-// here but does not exist on disk; "progress" and "to-tickets" exist on
-// disk but one of them is not listed here) -- TestCanonicalSkillInventoryMatchesExpected
-// already fails on main for this exact reason before this port, and
-// continues to fail identically after it.
+// hold.
 var expectedCanonicalSkills = []string{
 	"code-review",
 	"codebase-design",
@@ -27,6 +22,7 @@ var expectedCanonicalSkills = []string{
 	"grilling",
 	"implement",
 	"no-mistakes",
+	"progress",
 	"prototype",
 	"research",
 	"resolving-merge-conflicts",
