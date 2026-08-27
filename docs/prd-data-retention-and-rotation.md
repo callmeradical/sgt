@@ -2,7 +2,7 @@
 
 Status: Draft, awaiting explicit human PRD approval
 
-Extends: `docs/prd-sergeant-v2.md` §8's open question "What evidence
+Extends: `docs/prd-sgt.md` §8's open question "What evidence
 retention, export, and operator deletion controls are required?" — this
 PRD answers it. It also governs `docs/prd-pipeline-artifacts.md`'s
 long-term lifecycle, which that PRD explicitly defers here.
@@ -10,8 +10,8 @@ long-term lifecycle, which that PRD explicitly defers here.
 ## Summary
 
 Every run, phase, envelope, delivery, and (once `prd-pipeline-artifacts.md`
-ships) artifact sergeant records is currently kept forever in
-`sergeant.db` and, for artifacts, on disk. `automated-fleet-cleanup`
+ships) artifact sgt records is currently kept forever in
+`sgt.db` and, for artifacts, on disk. `automated-fleet-cleanup`
 already reclaims worktree disk space on a schedule, but nothing rotates,
 aggregates, or bounds the growth of the durable *record* — the database
 rows and artifact files themselves. Left unaddressed, a long-running
@@ -75,7 +75,7 @@ question.
 - **A general-purpose backup/restore feature.** This PRD is about bounding
   ongoing growth, not disaster recovery.
 - **Per-row operator-triggered deletion** ("delete this one run's
-  evidence") — that is a distinct, smaller feature `docs/prd-sergeant-v2.md`
+  evidence") — that is a distinct, smaller feature `docs/prd-sgt.md`
   §8 also gestures at ("operator deletion controls") but this PRD scopes
   itself to scheduled, policy-driven rotation, not ad hoc manual deletion.
 - **Cross-project or cross-factory data aggregation/reporting.** Rotation

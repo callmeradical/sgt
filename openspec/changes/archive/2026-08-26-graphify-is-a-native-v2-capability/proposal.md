@@ -2,7 +2,7 @@
 
 ## Repository
 
-One repository: `sergeant-v2`.
+One repository: `sgt-v2`.
 
 ## Requirement served
 
@@ -21,7 +21,7 @@ D7 forbids shelling out to `sgt-graphify` (v1's bash orchestrator) and v1's
 fleet layout — it does not forbid calling an external binary at all, any more
 than v2 running `goose` or `git` as a subprocess makes those parts of v2 "not
 native." Research this session confirmed `sgt-graphify`
-(`/Users/lars/Dev/sergeant/bin/sgt-graphify`) is itself a thin bash wrapper
+(`/Users/lars/Dev/sgt/bin/sgt-graphify`) is itself a thin bash wrapper
 around a separate, general-purpose, already-installed CLI tool (`graphify`,
 at `/Users/lars/.local/bin/graphify` on this machine) that does the actual
 parsing, LLM-assisted extraction, and graph algorithms. That tool is real
@@ -65,8 +65,8 @@ stage-verify-then-rename shape `sgt-graphify` already uses, reimplemented in
 Go rather than bash.
 
 Add three MCP tools to `internal/mcp/server.go`, following the existing
-`[]Tool{...}`/`executeTool` pattern: `sergeant_graph_query`,
-`sergeant_graph_explain`, `sergeant_graph_affected` — each a thin subprocess
+`[]Tool{...}`/`executeTool` pattern: `sgt_graph_query`,
+`sgt_graph_explain`, `sgt_graph_affected` — each a thin subprocess
 wrapper around the matching `graphify` subcommand, pointed at the project's
 published `graph.json`.
 
@@ -79,7 +79,7 @@ published `graph.json`.
   extracted in full. Disclosed here, not silently dropped.
 - **LLM backend selection, `--code-only`/AST-only fallback behavior, and any
   other `graphify extract` flag beyond `--out`.** This dispatch environment
-  (the launchd-run sergeant UI server) sets no LLM API key in its
+  (the launchd-run sgt UI server) sets no LLM API key in its
   environment; `graphify extract`'s actual behavior with none configured is
   something the implementing task must observe empirically (run it, see what
   happens) rather than something this proposal predicts. Whatever

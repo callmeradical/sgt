@@ -1,6 +1,6 @@
 # Repo-Scoped Worker Skills
 
-Sergeant vendors the workflow skills required by generated worker briefs in
+Sgt vendors the workflow skills required by generated worker briefs in
 `.agents/skills/`. This is the canonical Agent Skills tree discovered directly
 by Codex.
 
@@ -28,12 +28,12 @@ The worker-brief inventory is:
 - `triage` — issue and external PR triage state machine
 - `wayfinder` — large-chunk work planning as a shared decision map
 
-Two additional Sergeant-authored skills are also vendored here but are not
+Two additional Sgt-authored skills are also vendored here but are not
 required by generated worker briefs:
 
-- `sergeant-setup` — interactive, idempotent Sergeant bootstrap and repair
+- `sgt-setup` — interactive, idempotent Sgt bootstrap and repair
 
-(`to-tickets` and `no-mistakes` above are also Sergeant-authored.)
+(`to-tickets` and `no-mistakes` above are also Sgt-authored.)
 
 Note on `no-mistakes`: workers are instructed never to invoke no-mistakes
 directly. The skill is vendored so workers can load and understand the

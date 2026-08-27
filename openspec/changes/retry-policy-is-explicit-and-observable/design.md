@@ -2,7 +2,7 @@
 
 ## Ownership and merge order
 
-One repository, `sergeant-v2`. One bullet, no merge order.
+One repository, `sgt-v2`. One bullet, no merge order.
 
 ## Where the number comes from
 
@@ -37,7 +37,7 @@ the observability R2.4 asks for.
 **A global retry count in an environment variable.** Not per project, and not
 visible in the configuration an operator reads.
 
-**Retrying inside the agent harness.** Not observable to sergeant, and each
+**Retrying inside the agent harness.** Not observable to sgt, and each
 harness would do it differently.
 
 **Defaulting to a non-zero retry count.** Changes the behaviour of every existing

@@ -1,6 +1,6 @@
 ## Why
 
-Sergeant's coordinator-driven dispatch path (`internal/runner/runner.go`)
+Sgt's coordinator-driven dispatch path (`internal/runner/runner.go`)
 only recognizes a fixed allowlist of headless agent CLIs — `opencode`, `oc`,
 `claude`, `goose`, `codex`, `pi`. An operator whose day-to-day agent is
 GitHub's `copilot` CLI cannot dispatch through it today: `ValidateAgent`
@@ -29,7 +29,7 @@ there is no technical blocker to adding it — only the missing registration.
 ## Capabilities
 
 ### New Capabilities
-- `agent-harnesses`: the set of agent CLIs Sergeant's coordinator-driven
+- `agent-harnesses`: the set of agent CLIs Sgt's coordinator-driven
   dispatch path can validate and invoke headlessly, and the non-interactive
   invocation contract each one must satisfy — a recognized name in the
   allowlist, a headless/non-interactive entry point, a tool-approval bypass

@@ -2,7 +2,7 @@
 
 Status: Draft, awaiting explicit human PRD approval
 
-Extends: `docs/prd-sergeant-v2.md`, D3 ("TDD is enforced, not assumed"), D5
+Extends: `docs/prd-sgt.md`, D3 ("TDD is enforced, not assumed"), D5
 ("Three interruptions only"), D6 ("Sequenced submission, human merge"), and
 AGENTS.md's listed v2 gap "the shipping gate."
 
@@ -51,14 +51,14 @@ intent as a whole rather than any single bullet:
   today that notification is implicitly "a bullet reached sealed"; this
   PRD makes it "the intent's bullets are sealed **and** the shipping gate
   passed," which is the evidence D5(c)'s interruption is supposed to carry.
-- This does not change D6: Sergeant still never merges, and still only
+- This does not change D6: Sgt still never merges, and still only
   advances the chain by observing real PR state. The shipping gate is
   additional evidence generated before the human is asked to act, not a
   new actor in the merge sequence.
 
 ## Out of scope
 
-- **Sergeant merging anything itself.** D6 is unchanged — human merge only.
+- **Sgt merging anything itself.** D6 is unchanged — human merge only.
 - **Per-bullet gate changes.** D3's existing per-bullet TDD evidence is
   untouched; this is a new, separate, intent-scoped check layered above it.
 - **Replacing the independent review phase.** If both are implemented, a
@@ -68,7 +68,7 @@ intent as a whole rather than any single bullet:
   configured can still have a shipping gate).
 - **Blocking human approval outright.** A shipping-gate failure records a
   reason and withholds the "ready" notification; it does not prevent an
-  operator who disagrees from proceeding manually — Sergeant surfaces
+  operator who disagrees from proceeding manually — Sgt surfaces
   evidence, per its own truthfulness rule, it does not become a second
   authority over what ships.
 

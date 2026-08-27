@@ -5,14 +5,14 @@
 ### Requirement: A gate or phase command can capture files as durable evidence
 
 A gate or agent phase command SHALL be given a scoped, empty directory via
-`SERGEANT_ARTIFACT_DIR`; any file it writes there before exiting SHALL be
+`SGT_ARTIFACT_DIR`; any file it writes there before exiting SHALL be
 copied to a durable location outside the run's worktree and recorded
 against that run and phase, surviving that worktree's later reclaim by
 `automated-fleet-cleanup`.
 
 #### Scenario: A file written to the artifact directory is captured durably
 
-- **WHEN** a gate command writes a file to `$SERGEANT_ARTIFACT_DIR` and
+- **WHEN** a gate command writes a file to `$SGT_ARTIFACT_DIR` and
   exits
 - **THEN** a durable copy of that file exists outside the run's worktree,
   and a record naming its run, phase, filename, content type, and size is
@@ -21,7 +21,7 @@ against that run and phase, surviving that worktree's later reclaim by
 #### Scenario: A command that writes nothing produces no artifacts
 
 - **WHEN** a gate command exits without writing to
-  `$SERGEANT_ARTIFACT_DIR`
+  `$SGT_ARTIFACT_DIR`
 - **THEN** no artifact record is created for that phase
 
 #### Scenario: A captured artifact outlives its worktree
@@ -47,7 +47,7 @@ change the outcome of the gate or phase that produced the artifacts.
 
 #### Scenario: A failing gate's artifacts are still captured
 
-- **WHEN** a gate command writes a file to `$SERGEANT_ARTIFACT_DIR` and
+- **WHEN** a gate command writes a file to `$SGT_ARTIFACT_DIR` and
   then exits with a failing status
 - **THEN** the file is still captured as a durable artifact
 
@@ -55,7 +55,7 @@ change the outcome of the gate or phase that produced the artifacts.
 
 - **WHEN** the durable artifact destination is unwritable and a gate
   command that would otherwise pass writes a file to
-  `$SERGEANT_ARTIFACT_DIR`
+  `$SGT_ARTIFACT_DIR`
 - **THEN** the gate's own recorded status is unaffected by the capture
   failure
 

@@ -1,10 +1,10 @@
 # Tasks — A green bullet awaits independent review
 
-One repository, `sergeant-v2`, so one task.
+One repository, `sgt-v2`, so one task.
 
 ## Task 1 — special-case a review phase, route blocking findings through the existing blocked path
 
-Repository: `sergeant-v2`. Depends on: nothing (reuses
+Repository: `sgt-v2`. Depends on: nothing (reuses
 `a-stuck-bullet-is-blocked-not-failed`'s already-merged mechanism as-is,
 does not modify it). Read first: `internal/dag/engine.go`'s `RunStage`
 (the `"test"` case, lines ~332-365, is the pattern to mirror),

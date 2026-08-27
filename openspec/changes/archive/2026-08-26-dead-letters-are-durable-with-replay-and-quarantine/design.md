@@ -2,7 +2,7 @@
 
 ## Ownership and merge order
 
-One repository, `sergeant-v2`. Third of four bullets against R5. Depends on
+One repository, `sgt-v2`. Third of four bullets against R5. Depends on
 `delivery-is-durable-with-retry-and-idempotency` (merged), which built
 `internal/store/delivery.go`: the `deliveries` table, `insertDeliveryRow`
 (insert-only, one row per state transition), `DeliverEnvelope`,

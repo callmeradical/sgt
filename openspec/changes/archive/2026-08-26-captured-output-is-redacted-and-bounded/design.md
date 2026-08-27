@@ -2,7 +2,7 @@
 
 ## Ownership
 
-One repository, `sergeant-v2`. Standalone — no dependency on R5/D9/R4.6.
+One repository, `sgt-v2`. Standalone — no dependency on R5/D9/R4.6.
 Touches the same two call sites in `internal/runner/runner.go`
 (`RunAgentPhase` line ~456, `RunCodeGate` line ~245) that already call
 `stripANSI(outBuf.String())`.

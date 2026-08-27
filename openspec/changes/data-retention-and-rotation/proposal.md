@@ -2,12 +2,12 @@
 
 ## Repository
 
-One repository: `sergeant-v2`. Standalone.
+One repository: `sgt-v2`. Standalone.
 
 ## Requirements served
 
 `docs/prd-data-retention-and-rotation.md` (full text), answering
-`docs/prd-sergeant-v2.md` §8's open question "What evidence retention,
+`docs/prd-sgt.md` §8's open question "What evidence retention,
 export, and operator deletion controls are required?" Also governs the
 long-term lifecycle `docs/prd-pipeline-artifacts.md` explicitly defers to
 this change.
@@ -21,7 +21,7 @@ state transition by design (R5.3), with no described end. Once
 `pipeline-artifacts` ships, captured screenshots/traces become the
 fastest-growing storage class by bytes. Nothing today rotates, aggregates,
 or bounds any of this — a long-running self-hosted factory (the product's
-actual target use, per `docs/prd-sergeant-v2.md`'s vision) accumulates
+actual target use, per `docs/prd-sgt.md`'s vision) accumulates
 history indefinitely.
 
 ## Proposal

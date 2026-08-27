@@ -1,14 +1,14 @@
 ---
 name: no-mistakes
-description: "Coordinator-only reference for the no-mistakes shipping gate contract. Load to understand the pipeline, gate semantics, and findings policy. Do NOT invoke no-mistakes from a worker pane or remediation loop — the Sergeant coordinator owns every no-mistakes gate."
+description: "Coordinator-only reference for the no-mistakes shipping gate contract. Load to understand the pipeline, gate semantics, and findings policy. Do NOT invoke no-mistakes from a worker pane or remediation loop — the Sgt coordinator owns every no-mistakes gate."
 ---
 
 # no-mistakes
 
 > **Worker restriction:** This skill is vendored for reference only. Workers and
-> remediation loops must never invoke `no-mistakes axi run`. The Sergeant
+> remediation loops must never invoke `no-mistakes axi run`. The Sgt
 > coordinator owns every no-mistakes gate. If you are running inside a
-> `.sergeant-brief.md`-guided worktree, read this skill to understand the
+> `.sgt-brief.md`-guided worktree, read this skill to understand the
 > contract but do not execute it. Violation of this restriction is a hard error
 > per `AGENTS.md`: "Workers and remediation loops never run no-mistakes."
 

@@ -2,7 +2,7 @@
 
 ## Ownership
 
-One repository, `sergeant-v2`. Touches `internal/store/store.go` (new
+One repository, `sgt-v2`. Touches `internal/store/store.go` (new
 `Type` field on `RunRecord` and `IntentRecord`), `internal/naming` (the new
 single-sourced branch-name function), `internal/dag/engine.go`,
 `internal/ui/server.go`, `internal/mcp/server.go`, and
@@ -56,9 +56,9 @@ one; missing even one silently drops the field on read or write.
 ## The branch-name function moves to `internal/naming`
 
 `dag.BranchName` cannot simply change its output format in place: the same
-`"sergeant/<run-id>"` string is independently hand-constructed in
+`"sgt/<run-id>"` string is independently hand-constructed in
 `internal/ui/server.go` (`handleCreatePR`) and `internal/mcp/server.go`
-(`sergeant_seal_pr`), and `internal/runner/runner.go`'s `DeliverPullRequest`
+(`sgt_seal_pr`), and `internal/runner/runner.go`'s `DeliverPullRequest`
 has a third, dead-in-practice fallback construction. All four must agree,
 or `gh pr create --head <branch>` targets a branch that does not exist.
 
@@ -83,17 +83,17 @@ today) specifically so it can reach `e.Store` without a new parameter
 threaded through every caller.
 
 `internal/ui/server.go`'s `handleCreatePR` (currently
-`branch := fmt.Sprintf("sergeant/%s", req.RunID)`) and
+`branch := fmt.Sprintf("sgt/%s", req.RunID)`) and
 `describeDelivery` (currently `dag.BranchName(runID)`) both already have or
 can cheaply obtain the run record via `srv.Store.GetRun(...)`; both call
 `naming.BranchName(run.Type, run.ChangeID)` instead.
 
-`internal/mcp/server.go`'s `sergeant_seal_pr` (currently
-`fmt.Sprintf("sergeant/%s", runID)`) does the same: look up the run via
+`internal/mcp/server.go`'s `sgt_seal_pr` (currently
+`fmt.Sprintf("sgt/%s", runID)`) does the same: look up the run via
 `s.Store.GetRun(runID)`, call `naming.BranchName(run.Type, run.ChangeID)`.
 
 `internal/runner/runner.go`'s `DeliverPullRequest` fallback
-(`fmt.Sprintf("sergeant/%s-%s", pr.RunID, pr.RepoName)`, reached only when
+(`fmt.Sprintf("sgt/%s-%s", pr.RunID, pr.RepoName)`, reached only when
 its caller passes an empty `branch`) is replaced with
 `naming.BranchName(run.Type, run.ChangeID)` via `pr.Store.GetRun(pr.RunID)`
 — `internal/runner` already imports `internal/store`, so this needs no new

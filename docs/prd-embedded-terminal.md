@@ -2,14 +2,14 @@
 
 Status: Draft, awaiting explicit human PRD approval
 
-Extends: `docs/prd-sergeant-v2.md` D8 ("The dashboard is a view of intents,
+Extends: `docs/prd-sgt.md` D8 ("The dashboard is a view of intents,
 and it renders the workflow from a definition") — this PRD adds a
 complementary, direct-control surface alongside that view; it does not
 change what D8 governs (how intent/bullet/run state is displayed).
 
 ## Summary
 
-Sergeant's dashboard today only shows state — an operator who needs to act
+Sgt's dashboard today only shows state — an operator who needs to act
 directly (inspect a blocked bullet's worktree, run a command by hand,
 resolve a merge conflict) has to leave the browser and open their own
 terminal. `skills/dispatch/SKILL.md`'s own Step 4 ("Resolve a blocked
@@ -18,7 +18,7 @@ in the bullet's worktree." This PRD adds a terminal embedded in the
 dashboard itself, modeled on a working reference implementation
 (`launchpad`'s Electron-based terminal drawer: `node-pty` bridged to
 `xterm.js` over IPC, with a slide-up drawer and multiple named session
-tabs), adapted to Sergeant's browser-based architecture — a PTY bridged
+tabs), adapted to Sgt's browser-based architecture — a PTY bridged
 over WebSocket instead of Electron IPC. The goal stated by the requester:
 make the dashboard the primary control surface, not just an observation
 one.
@@ -39,7 +39,7 @@ that gap for anything those specific endpoints don't cover.
 Add a terminal to the dashboard:
 
 - **A shell session, opened from the browser, running on the same machine
-  as the `sergeant ui` process.** Consistent with Sergeant's existing
+  as the `sgt ui` process.** Consistent with Sgt's existing
   posture (single-operator, local-first, binds to `127.0.0.1` only) — this
   is not a remote-access or multi-tenant feature.
 - **Multiple concurrent named sessions**, presented as tabs, matching the
@@ -57,21 +57,21 @@ Add a terminal to the dashboard:
 ## Out of scope
 
 - **Multi-user or remote access.** A terminal opened through the dashboard
-  runs as the same local operator who is already running `sergeant ui`; no
-  new authentication or authorization model is introduced. If Sergeant
+  runs as the same local operator who is already running `sgt ui`; no
+  new authentication or authorization model is introduced. If Sgt
   itself is ever exposed beyond `127.0.0.1`, that is a separate decision
   this PRD does not make.
 - **Replacing or wrapping the existing dispatch/gate/review pipeline.**
   Nothing a human types into this terminal becomes a recorded phase,
   bullet, or intent — this is manual, out-of-band operator action, visible
-  to Sergeant's truthfulness rule as exactly that (unrecorded), not
+  to Sgt's truthfulness rule as exactly that (unrecorded), not
   something the dashboard should attribute to a bullet's evidence trail.
 - **A file editor, browser, or any other IDE-like surface.** Terminal only.
-- **Persisting terminal history or output as durable Sergeant state.** A
+- **Persisting terminal history or output as durable Sgt state.** A
   closed session's scrollback is gone, the same as closing a normal
   terminal window.
 - **Windows PTY support**, unless a maintainer specifically needs it —
-  Sergeant's current development and deployment surface is macOS/Linux.
+  Sgt's current development and deployment surface is macOS/Linux.
 
 ## Open questions
 
@@ -80,4 +80,4 @@ Add a terminal to the dashboard:
   `design.md`, not product requirements.
 - Whether opening a terminal should be gated behind any confirmation (given
   it grants full shell access, more than any existing dashboard action) or
-  is unrestricted like every other local-only Sergeant capability today.
+  is unrestricted like every other local-only Sgt capability today.

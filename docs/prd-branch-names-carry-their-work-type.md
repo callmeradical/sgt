@@ -2,14 +2,14 @@
 
 Status: Draft, awaiting explicit human PRD approval
 
-Extends: `docs/prd-sergeant-v2.md`, decision O2
+Extends: `docs/prd-sgt.md`, decision O2
 
 ## Summary
 
 O2 already specifies that a dispatch's branch should be named `<type>/<change-id>`,
 preserving the conventional-commit prefix (`feat/`, `fix/`, ...) this project's
 own commit messages already use. This was never implemented: every dispatched
-branch today is named `sergeant/<run-id>`, carrying no information about what
+branch today is named `sgt/<run-id>`, carrying no information about what
 kind of change it is and not even naming the change it belongs to. This PRD
 closes that gap.
 
@@ -22,7 +22,7 @@ reporting built on top of this data — e.g. "what kind of work got shipped this
 week, by which agent") has no honest signal to read this from. The only place
 this information exists at all today is inside individual commit messages,
 authored inconsistently by whichever agent happened to write them, not
-recorded as a structured fact anywhere sergeant itself tracks.
+recorded as a structured fact anywhere sgt itself tracks.
 
 This also leaves O2's own "convenience" audit leg (the branch name) unbuilt:
 today it names neither the change nor the type, so an operator scanning

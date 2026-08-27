@@ -7,7 +7,7 @@
 A project with an `Export` block configured SHALL have every intent and
 bullet transition recorded in the store's change log delivered to that
 target exactly once, in the order the transitions occurred. Requirement D4
-requires Sergeant to remain the sole authority over this state; this
+requires Sgt to remain the sole authority over this state; this
 requirement is what makes an external copy possible without that authority
 moving.
 
@@ -37,7 +37,7 @@ moving.
   transition and restarted
 - **THEN** that transition is not delivered to `Target.Export` again
 
-### Requirement: An unreachable or failing export target never affects the underlying Sergeant operation
+### Requirement: An unreachable or failing export target never affects the underlying Sgt operation
 
 Exporting SHALL run fully out of band from the write path that produced the
 transition. A `Target` that errors or is unreachable SHALL NOT block,
@@ -58,7 +58,7 @@ NOT be retried by re-attempting the original write.
 - **THEN** that transition is eventually delivered to `Target.Export`
   without the original store write happening again
 
-### Requirement: Exported records exclude content Sergeant does not already treat as safe to expose
+### Requirement: Exported records exclude content Sgt does not already treat as safe to expose
 
 An exported record SHALL NOT include raw secrets, credentials, or
 unredacted free-text content beyond what this project's existing

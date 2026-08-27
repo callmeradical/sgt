@@ -2,7 +2,7 @@
 
 ## Ownership and merge order
 
-One repository, `sergeant-v2`. One bullet, so no merge order.
+One repository, `sgt-v2`. One bullet, so no merge order.
 
 ## Where the transition belongs
 

@@ -2,7 +2,7 @@
 
 ## Repository
 
-One repository: `sergeant-v2`.
+One repository: `sgt-v2`.
 
 ## Requirements served
 
@@ -23,7 +23,7 @@ requirement was genuinely ambiguous and a gate that failed on an ordinary,
 fixable bug land in the same `failed` bucket, with no recorded reason a
 human can act on beyond whatever text happens to be in a phase's raw error.
 
-Sergeant today dispatches a bullet's work exactly once per run — there is
+Sgt today dispatches a bullet's work exactly once per run — there is
 no bullet-level automatic re-dispatch, and a run's own internal retry
 budget (`RunAgentPhase`'s `retries` parameter) is already exhausted by the
 time a run concludes `"failed"` at all. So a bullet reaching `"failed"`

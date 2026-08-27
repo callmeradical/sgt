@@ -1,19 +1,19 @@
 # Tasks — Export runner starts when a backend is registered
 
-One repository, `sergeant`, so one task.
+One repository, `sgt`, so one task.
 
 ## Task 1 — registry, wiring, and a test-only backend proving the path works
 
-Repository: `sergeant`. Depends on: nothing (task-tracking-is-a-readonly-export
+Repository: `sgt`. Depends on: nothing (task-tracking-is-a-readonly-export
 is already merged). Read `internal/export/{export.go,runner.go}` and
-`cmd/sergeant/main.go`'s current `startExportRunners`
+`cmd/sgt/main.go`'s current `startExportRunners`
 (lines 171-189) first, so the new code matches existing conventions and
 changes only what design.md specifies.
 
 - Add `internal/export/registry.go`: the `Constructor` type and the
   `Backends` package-level map, exactly as specified in design.md. Starts
   empty — do not register anything in production code.
-- Change `startExportRunners` in `cmd/sergeant/main.go` to accept
+- Change `startExportRunners` in `cmd/sgt/main.go` to accept
   `backends map[string]export.Constructor` as a second parameter. For each
   configured project with a non-nil `Export`, look up `proj.Export.Backend`
   in `backends`; on a hit, call the constructor, build an `export.Runner`,
@@ -34,12 +34,12 @@ to this change).
 
 Tests must cover every scenario in `specs/export-wiring/spec.md`, and must
 exercise `startExportRunners` directly (package `main`, so the new test
-file lives in `cmd/sergeant/`) — not only through `main()` itself, since
+file lives in `cmd/sgt/`) — not only through `main()` itself, since
 `main()` is not otherwise under test:
 
 - **Registered backend starts exporting**: call `startExportRunners` with a
   `backends` map containing one test-registered `Constructor` returning a
-  recording fake `Target`, against a `SERGEANT_CONFIG` temp directory
+  recording fake `Target`, against a `SGT_CONFIG` temp directory
   holding one project YAML with `export.backend: test-backend`. Poll
   (bounded wait, not a fixed `time.Sleep`) for the fake `Target`'s call
   count to become nonzero — `export.Runner.Run` calls `Tick` immediately on

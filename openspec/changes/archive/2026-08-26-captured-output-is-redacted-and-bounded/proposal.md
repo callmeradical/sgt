@@ -2,7 +2,7 @@
 
 ## Repository
 
-One repository: `sergeant-v2`.
+One repository: `sgt-v2`.
 
 ## Requirements served
 
@@ -64,7 +64,7 @@ not restructuring the payload schema.
   closes the vector at its source rather than scrubbing its output and is
   the more complete fix for R4.4, but it is a materially larger, riskier
   change — an agent could legitimately need `PATH`, `HOME`, `LANG`, or other
-  inherited variables sergeant does not currently enumerate, and getting the
+  inherited variables sgt does not currently enumerate, and getting the
   allowlist wrong silently breaks agent dispatch rather than merely under-
   redacting. Deserves its own design pass, not a rider on this bullet.
 - **A full operational-metadata-vs-content schema split for R4.5.** The

@@ -2,15 +2,15 @@
 
 ## Repository
 
-One repository: `sergeant-v2`.
+One repository: `sgt-v2`.
 
 ## Requirements served
 
-**D4** — "Sergeant stores intents and bullets itself... Exporting a
+**D4** — "Sgt stores intents and bullets itself... Exporting a
 read-only copy to a task tracker is optional." This change is that optional
 export; it is not a second write path for intent/bullet state.
 
-**`docs/prd-sergeant-v2.md` section 8**, open product question: "What
+**`docs/prd-sgt.md` section 8**, open product question: "What
 task-tracking integration is required in the Go-native model?" This change
 answers it: a read-only export, not an integration a caller writes back
 through.
@@ -23,11 +23,11 @@ PRD: `docs/prd-task-tracking-export.md`.
 project YAML and never read anywhere in `internal/` — confirmed by grepping
 every reference to `.TD`; the only hit is the struct field itself. There is
 no code path today, partial or otherwise, from an `IntentRecord` or
-`BulletRecord` to anything outside Sergeant's own SQLite store. An operator
-who wants Sergeant's work items visible alongside other task tracking has
+`BulletRecord` to anything outside Sgt's own SQLite store. An operator
+who wants Sgt's work items visible alongside other task tracking has
 only the dashboard.
 
-Sergeant already has exactly the mechanism this needs, unused for this
+Sgt already has exactly the mechanism this needs, unused for this
 purpose: `internal/store/changes.go`'s durable, ordered `changes` table.
 Every intent/bullet write already appends a transition there
 (`CreateIntent`, `UpdateIntentStatus`, `CreateBullet`, `UpdateBulletStatus`,
@@ -57,7 +57,7 @@ write hook, and not a change to `recordTransition` or any of its callers:
   convention) so a restart resumes rather than re-exporting or silently
   skipping. A failed `Target.Export` call is logged and retried on the next
   tick with the same cursor — it never advances past a record it could not
-  deliver, and it never blocks, delays, or fails the Sergeant operation
+  deliver, and it never blocks, delays, or fails the Sgt operation
   that produced the original transition, because this reader runs
   entirely out of band from the write path that already returned before
   the export loop even wakes up.
@@ -73,7 +73,7 @@ write hook, and not a change to `recordTransition` or any of its callers:
   for whoever builds against this interface, informed by whatever tracker
   is actually in use — not a product requirement (PRD, "Out of scope").
 - **Any inbound path.** `Target` has no method that returns tracker state
-  into Sergeant. D4 is not revisited.
+  into Sgt. D4 is not revisited.
 - **Modifying `recordTransition` or any of its callers.** The export
   `Runner` is a new consumer of the existing log, not a change to how or
   when transitions are written.

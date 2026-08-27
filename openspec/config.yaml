@@ -1,7 +1,7 @@
 schema: spec-driven
 
 context: |
-  Sergeant v2 is a Go-native software factory. Read docs/prd-sergeant-v2.md; its
+  Sgt v2 is a Go-native software factory. Read docs/prd-sgt.md; its
   numbered requirements (R2.x, R3.x, R4.x) and settled decisions (D1-D7, O1-O3) are
   binding. Read AGENTS.md before changing behaviour.
 
@@ -49,7 +49,7 @@ rules:
     - One task touches exactly one repository. Work in a second repository is a
       separate task, never a sub-bullet of the first.
     - Order tasks by dependency and state the required merge order explicitly, since
-      sergeant releases a bullet's PR only after its upstream bullets are merged.
+      sgt releases a bullet's PR only after its upstream bullets are merged.
     - Each task states how completion is verified with a command whose exit status
       decides the outcome.
 

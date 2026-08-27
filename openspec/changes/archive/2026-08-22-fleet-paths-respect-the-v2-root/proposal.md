@@ -2,7 +2,7 @@
 
 ## Repository
 
-One repository: `sergeant-v2`. It owns `internal/dag` (where the fleet root is
+One repository: `sgt-v2`. It owns `internal/dag` (where the fleet root is
 already resolved correctly) and `internal/ui` (where three copies get it wrong).
 
 ## Requirements and decisions served
@@ -16,8 +16,8 @@ already resolved correctly) and `internal/ui` (where three copies get it wrong).
 
 ## Problem
 
-`internal/dag.FleetDir` resolves the fleet root correctly: `SERGEANT_FLEET_DIR`
-when set, otherwise `~/.local/share/sergeant-v2/fleet`. `engine_test.go` even
+`internal/dag.FleetDir` resolves the fleet root correctly: `SGT_FLEET_DIR`
+when set, otherwise `~/.local/share/sgt-v2/fleet`. `engine_test.go` even
 asserts the v1 root is never used.
 
 Four other places build the same path by hand, and three build it wrongly:
@@ -27,7 +27,7 @@ Four other places build the same path by hand, and three build it wrongly:
 | `internal/ui/server.go:611` | `~/.local/share/sergeant/fleet` | no — v1 root, ignores the env var |
 | `internal/ui/server.go:680` | `~/.local/share/sergeant/fleet` | no — v1 root, ignores the env var |
 | `internal/ui/server.go:1104` | `~/.local/share/sergeant/fleet/<task>/handoff` | no — v1 root, ignores the env var |
-| `internal/ui/server.go:1507` | `~/.local/share/sergeant-v2/fleet/<run>/handoff` | root is right, still a hand-built duplicate |
+| `internal/ui/server.go:1507` | `~/.local/share/sgt-v2/fleet/<run>/handoff` | root is right, still a hand-built duplicate |
 
 Two consequences, and they cut in opposite directions:
 
@@ -53,7 +53,7 @@ to it. Assert that no path outside the helper mentions the v1 root.
 ## Out of scope
 
 - The store's database path (`internal/store/store.go`), which also sits under
-  `~/.local/share/sergeant/`. Moving a database is a migration with its own
+  `~/.local/share/sgt/`. Moving a database is a migration with its own
   failure modes and does not belong in a path-deduplication change.
 - Deleting anything already written under v1's root. This change stops writing
   there; reclaiming what is there is a separate operator decision.

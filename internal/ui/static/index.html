@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sergeant — Software Factory Spine</title>
+  <title>Sgt — Software Factory Spine</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="/static/xterm.css">
@@ -30,7 +30,7 @@
   <div id="connection-error-banner" class="hidden bg-rose-950 text-rose-300 px-3 py-1.5 text-[11px] font-bold border-b border-rose-800 flex items-center justify-between">
     <div class="flex items-center gap-2">
       <i class="fa-solid fa-circle-exclamation text-rose-400" aria-hidden="true"></i>
-      <span>Connection to Sergeant daemon lost. Retrying...</span>
+      <span>Connection to Sgt daemon lost. Retrying...</span>
     </div>
     <button onclick="fetchRuns(); fetchFleet();" class="px-2 py-0.5 rounded bg-rose-900 hover:bg-rose-800 text-white text-[10px]">Retry Now</button>
   </div>
@@ -38,7 +38,7 @@
   <!-- Top Bar: Clean Unified Header -->
   <header class="h-11 border-b border-[#21262d] bg-[#0b0e14] px-3 flex items-center justify-between sticky top-0 z-50">
     <div class="flex items-center space-x-4">
-      <span class="font-extrabold text-xs tracking-wider text-white">Sergeant</span>
+      <span class="font-extrabold text-xs tracking-wider text-white">Sgt</span>
       
       <div class="h-3.5 w-px bg-[#21262d]"></div>
 
@@ -146,7 +146,7 @@
           </div>
         </div>
 
-        <!-- Reported checklist progress. Populated from .sergeant/plan.json via
+        <!-- Reported checklist progress. Populated from .sgt/plan.json via
              the ChannelProgress change stream. Shows one marker per item:
              solid circle = complete, open circle = pending, spinner = in-progress.
              "No progress reported" (not zero) when the plan is absent. Never
@@ -1592,13 +1592,13 @@
 
     // LIFECYCLE_MEANING explains each Delivery stage on hover \u2014 an operator
     // reading "sealed" or "merged" for the first time has no other way to
-    // learn what sergeant means by them without reading the source.
+    // learn what sgt means by them without reading the source.
     const LIFECYCLE_MEANING = {
       pending: 'Bullet created; no gate evidence recorded yet.',
       red:     'A failing gate result has been recorded \u2014 proof the test was written before the fix (decision D3).',
       green:   'All gates passed.',
       sealed:  'A human explicitly approved this bullet\u2019s delivery by creating its pull request (only possible once green). Records that the approval happened, not that a PR necessarily exists on the host.',
-      merged:  'Sergeant observed this bullet\u2019s pull request as merged on the host. Sergeant never merges anything itself (decision D6) \u2014 this only reflects what actually happened.',
+      merged:  'Sgt observed this bullet\u2019s pull request as merged on the host. Sgt never merges anything itself (decision D6) \u2014 this only reflects what actually happened.',
     };
 
     function nodeCardHTML(node, phase, absolute) {

@@ -2,7 +2,7 @@
 
 Status: Draft, awaiting explicit human PRD approval
 
-Extends: `docs/prd-sergeant-v2.md`'s operating model (§2: single-user,
+Extends: `docs/prd-sgt.md`'s operating model (§2: single-user,
 local-first, each developer runs an independent installation) and the
 existing decision that the dashboard server binds to `127.0.0.1` only
 (`internal/ui/server.go:217`). This PRD does not change that trust
@@ -11,9 +11,9 @@ presented, not what it's allowed to talk to.
 
 ## Summary
 
-Sergeant v2 today is a single Go binary (`sergeant`, built by the existing
+Sgt v2 today is a single Go binary (`sgt`, built by the existing
 `.goreleaser.yaml` for darwin/linux, amd64/arm64) that a user runs from a
-terminal (`sergeant ui`), which starts an HTTP server bound to
+terminal (`sgt ui`), which starts an HTTP server bound to
 `127.0.0.1:8484` and serves an embedded dashboard the user then opens
 manually in a browser tab. This PRD packages that same binary and
 dashboard as a native desktop app, using Tauri: one installable app per
@@ -26,7 +26,7 @@ manual "open this URL" step.
 have to know to run from a terminal and then separately remember a port
 number to open in a browser. Today's install/first-run story is three
 manual, terminal-literate steps (download or build the binary, run
-`sergeant ui`, open `127.0.0.1:8484`) with no dock/app-icon presence and
+`sgt ui`, open `127.0.0.1:8484`) with no dock/app-icon presence and
 no clean way to stop it short of finding and killing the process. That is
 a real adoption barrier for anyone not already comfortable at a terminal,
 and it does not match how every other desktop tool a non-technical
@@ -36,14 +36,14 @@ operator already uses behaves.
 
 - **Tauri wraps the existing binary and dashboard unchanged, via its
   sidecar mechanism** (`tauri.conf.json`'s `bundle.externalBin`) — the
-  compiled `sergeant` Go binary ships *inside* the Tauri app bundle as an
+  compiled `sgt` Go binary ships *inside* the Tauri app bundle as an
   external binary resource, not reimplemented in Rust or Node. The
   dashboard's HTML/JS (`internal/ui/static/index.html`) renders unchanged
   inside Tauri's native OS WebView.
 - **The existing `.goreleaser.yaml` build matrix (darwin/linux ×
   amd64/arm64) is what produces the per-platform binaries Tauri's sidecar
   needs**, renamed to Tauri's expected target-triple convention (e.g.
-  `sergeant-aarch64-apple-darwin`) as a packaging step — no new Go build
+  `sgt-aarch64-apple-darwin`) as a packaging step — no new Go build
   configuration, no change to what `CGO_ENABLED=0` cross-compilation
   already produces.
 - **Launching the app spawns the sidecar and opens a native window

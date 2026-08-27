@@ -1,6 +1,6 @@
 # Skill: wiki
 
-Maintain Sergeant's automatic activity captures and curated daily session digest.
+Maintain Sgt's automatic activity captures and curated daily session digest.
 
 ## When to use
 
@@ -9,7 +9,7 @@ those commands write automatic captures without coordinator action.
 
 ## Storage ownership
 
-- `~/wiki/.captures/` contains automatic activity records written by Sergeant
+- `~/wiki/.captures/` contains automatic activity records written by Sgt
   commands.
 - `~/wiki/` contains curated pages governed by `~/wiki/SCHEMA.md`.
 - `wiki-daily-digest` reads session history and captures, then writes curated

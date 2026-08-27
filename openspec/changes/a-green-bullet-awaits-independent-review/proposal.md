@@ -2,7 +2,7 @@
 
 ## Repository
 
-One repository: `sergeant-v2`.
+One repository: `sgt-v2`.
 
 ## Requirements served
 
@@ -91,7 +91,7 @@ Special-case `"review"` in `RunStage`'s phase switch, the same shape as
 ## Out of scope
 
 - **Routing findings to an external task tracker as their record of
-  truth.** D4: Sergeant owns this data. See `prd-task-tracking-export.md`
+  truth.** D4: Sgt owns this data. See `prd-task-tracking-export.md`
   for the read-only export path, which this proposal does not depend on or
   implement.
 - **A default/mandatory review phase.** `PipelineFor` and `DefaultPipeline`

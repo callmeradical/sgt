@@ -1,10 +1,10 @@
 # Tasks — A proposed plan awaits explicit approval
 
-One repository, `sergeant-v2`, so one task.
+One repository, `sgt-v2`, so one task.
 
 ## Task 1 — propose, list, approve, reject
 
-Repository: `sergeant-v2`. Depends on: nothing. Read `internal/ui/server.go`'s
+Repository: `sgt-v2`. Depends on: nothing. Read `internal/ui/server.go`'s
 `handleDispatch`, `internal/store/store.go`'s `IntentRecord`/`BulletRecord`/
 `ListBulletsForIntent`/`CreateIntent`/`CreateBullet`/`UpdateIntentStatus`
 first — read them before writing new code so naming and error-handling

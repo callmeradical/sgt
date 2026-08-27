@@ -2,7 +2,7 @@
 
 ## Repository
 
-One repository: `sergeant-v2`.
+One repository: `sgt-v2`.
 
 ## Requirements served
 
@@ -10,7 +10,7 @@ One repository: `sergeant-v2`.
 coordinator-driven (UI dispatch) both create the same intents, bullets and
 evidence.
 
-**D4** — "Sergeant stores intents and bullets itself": intents and bullets
+**D4** — "Sgt stores intents and bullets itself": intents and bullets
 are first-class rows with referential integrity; a second durable copy
 elsewhere is not needed for a fact already recorded here.
 
@@ -31,7 +31,7 @@ evidence" do not describe the same work identically:
   fields on the `IntentRecord`/`BulletRecord` rows created earlier in the
   same request (`internal/ui/server.go`'s `handleDispatch`/
   `createRunAndDispatch`).
-- `sergeant_get_brief`, the MCP tool D1 names as the agent-driven path's way
+- `sgt_get_brief`, the MCP tool D1 names as the agent-driven path's way
   to get context, is registered with the description "Get the intent
   brief, acceptance criteria, and worktree paths for a project stage"
   (`internal/mcp/server.go:101-109`) but its implementation
@@ -42,7 +42,7 @@ evidence" do not describe the same work identically:
 
 This also leaves no durable, human-readable artifact answering "what was
 this bullet actually asked to do" outside a direct database query or the
-dashboard — the role v1's `.sergeant-intent.md` played, now unfilled.
+dashboard — the role v1's `.sgt-intent.md` played, now unfilled.
 
 ## Proposal
 
@@ -64,11 +64,11 @@ Change both call sites to use it instead of constructing their own text:
   fallback exactly when a run has no intent id (pre-existing runs, or a
   caller that predates this change) so this proposal introduces no new
   failure mode for that case.
-- `internal/mcp/server.go`'s `sergeant_get_brief` case: change its
+- `internal/mcp/server.go`'s `sgt_get_brief` case: change its
   `InputSchema` from `project` (required) to `intent_id` (required) and
   `repo` (required) (`server.go:101-109`); the implementation
   (`server.go:298-305`) calls `s.Store.GetIntent(intentID)` to learn the
-  project, loads that project's config the same way `sergeant_run_gates`
+  project, loads that project's config the same way `sgt_run_gates`
   already does (`server.go:307+`) to compute the repo's configured gate
   names, and calls the same `RenderIntentBrief`.
 
@@ -81,5 +81,5 @@ Change both call sites to use it instead of constructing their own text:
   exists on `IntentRecord`/`BulletRecord`.
 - **A second durable copy of the rendered brief on disk or in the store.**
   Rejected below.
-- **Changing `sergeant_get_brief`'s tool name or removing it.** Only its
+- **Changing `sgt_get_brief`'s tool name or removing it.** Only its
   input schema and implementation change.

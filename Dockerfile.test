@@ -1,4 +1,4 @@
-# Dockerfile.test — Minimal image for running the Sergeant drain test suite.
+# Dockerfile.test — Minimal image for running the Sgt drain test suite.
 #
 # Provides a clean, reproducible environment with system Bash (5.x on Debian
 # bookworm-slim).  The Bash 3.2 regression pass runs in a separate Alpine-based
@@ -6,13 +6,13 @@
 # for the two-stage orchestration.
 #
 # Build:
-#   docker build -f Dockerfile.test -t sergeant-test .
+#   docker build -f Dockerfile.test -t sgt-test .
 #
 # Run drain suite (system-Bash pass only):
-#   docker run --rm -v "$PWD:/repo:ro" sergeant-test
+#   docker run --rm -v "$PWD:/repo:ro" sgt-test
 #
 # Run a single test file:
-#   docker run --rm -v "$PWD:/repo:ro" sergeant-test bash /repo/tests/sgt-drain-test.sh
+#   docker run --rm -v "$PWD:/repo:ro" sgt-test bash /repo/tests/sgt-drain-test.sh
 
 FROM debian:bookworm-slim
 

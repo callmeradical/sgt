@@ -1,6 +1,6 @@
 ---
 name: to-tickets
-description: Use when the user says "to tickets", "create issues", "create td tasks", "make epics", or asks to break a plan, spec, investigation, findings register, PR, or conversation into dependency-aware tracer-bullet work for Sergeant and td.
+description: Use when the user says "to tickets", "create issues", "create td tasks", "make epics", or asks to break a plan, spec, investigation, findings register, PR, or conversation into dependency-aware tracer-bullet work for Sgt and td.
 ---
 
 # To Tickets
@@ -8,12 +8,12 @@ description: Use when the user says "to tickets", "create issues", "create td ta
 Turn a plan, specification, investigation, findings register, PR, or current
 conversation into implementation-ready epics and tracer-bullet tickets. Tickets
 are narrow, complete tracer bullets with explicit ownership, acceptance criteria,
-and blocking edges. Sergeant project configuration is the source of truth for
+and blocking edges. Sgt project configuration is the source of truth for
 repository scope.
 
-v2's task-tracking is a read-only export (decision D4): Sergeant has no inbound
+v2's task-tracking is a read-only export (decision D4): Sgt has no inbound
 integration that creates or mutates tasks in an external tracker. This skill
-produces the ticket breakdown and dispatches it through Sergeant's own Intent/
+produces the ticket breakdown and dispatches it through Sgt's own Intent/
 Bullet records; it does not publish to, or otherwise write into, an external
 task tracker.
 
@@ -27,24 +27,24 @@ task tracker.
 - Use expand-migrate-contract for mechanical changes that cannot remain green as a
   vertical slice.
 - Create epics for coherent programs, not as substitutes for executable tickets.
-- Never duplicate an existing open Sergeant intent or GitHub issue.
+- Never duplicate an existing open Sgt intent or GitHub issue.
 - Preserve stable finding IDs such as `RBAC-P1-004` or `DATA-P0-002` in titles.
 - A ticket is not ready unless its acceptance criteria are observable and its
   blockers are accurate.
 
 ## 1. Load Project Context
 
-When operating through Sergeant:
+When operating through Sgt:
 
-1. Run `GET /api/projects` or list `~/.config/sergeant/*.yaml` if the project
+1. Run `GET /api/projects` or list `~/.config/sgt/*.yaml` if the project
    name is not already established.
 2. Run `GET /api/project-details?name=<project>`, or read the project YAML
    directly.
 3. Run `GET /api/runs?project=<name>` and check for an existing open intent
    targeting the same outcome — v2 has no external task list to deduplicate
-   against beyond Sergeant's own Intent/Bullet store.
+   against beyond Sgt's own Intent/Bullet store.
 4. For architecture or codebase questions, use the existing Graphify graph
-   (`sergeant_graph_query` MCP tool) before reading files individually.
+   (`sgt_graph_query` MCP tool) before reading files individually.
 5. Read any referenced issue, PR, specification, ADR, or findings register in full.
 
 ## 2. Extract Decisions and Unknowns
@@ -116,11 +116,11 @@ the user to reconfirm decisions already made.
 v2's task-tracking is a read-only export (decision D4). This skill does not
 create, update, or close tasks in an external tracker — there is no v2 command
 that does. Once the breakdown is confirmed, its durable record is the Intent and
-Bullet rows a dispatch creates in Sergeant's own store (see step 7 below), not an
+Bullet rows a dispatch creates in Sgt's own store (see step 7 below), not an
 external ticket.
 
 If the user wants the breakdown recorded in an external tracker as well, that is
-a separate, manual step outside this skill and outside Sergeant's current v2
+a separate, manual step outside this skill and outside Sgt's current v2
 scope. Do not invent a command to do it.
 
 ## 6. Validate the Breakdown

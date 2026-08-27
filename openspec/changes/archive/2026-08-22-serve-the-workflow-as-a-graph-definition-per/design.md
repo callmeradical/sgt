@@ -2,7 +2,7 @@
 
 ## Ownership
 
-One repository, `sergeant-v2`, `internal/ui`. One bullet, no merge order.
+One repository, `sgt-v2`, `internal/ui`. One bullet, no merge order.
 
 ## Where the values come from
 

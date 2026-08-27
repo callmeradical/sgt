@@ -2,27 +2,27 @@
 
 ## Ownership and merge order
 
-One repository, `sergeant-v2`. One bullet, no merge order.
+One repository, `sgt-v2`. One bullet, no merge order.
 
 ## The checklist lives in the worktree
 
-At dispatch, after the change is resolved and the worktree prepared, sergeant
-writes `.sergeant/plan.json` into the worktree: one item per `#### Scenario:`
+At dispatch, after the change is resolved and the worktree prepared, sgt
+writes `.sgt/plan.json` into the worktree: one item per `#### Scenario:`
 declared in the resolved change, each with a stable id, its text, and
 `status: "pending"`.
 
 A file in the worktree rather than an MCP call, because it works with every
 harness. `SupportedAgents` lists six, and only some are configured against
-sergeant's MCP server; a plan only some agents can report against is a plan the
+sgt's MCP server; a plan only some agents can report against is a plan the
 dashboard cannot trust to mean the same thing twice. The agent already has the
 worktree open, and writing a file needs no capability negotiation.
 
-`.sergeant/` is already used for prompt files, so nothing new appears in the
+`.sgt/` is already used for prompt files, so nothing new appears in the
 repository, and the directory is already excluded from the commit path.
 
-## Sergeant reads, never writes after seeding
+## Sgt reads, never writes after seeding
 
-Sergeant seeds the file and then only reads it. If sergeant also updated it there
+Sgt seeds the file and then only reads it. If sgt also updated it there
 would be two writers and no way to tell a stale read from a concurrent one.
 
 Reads happen when the run is sampled — the same tick that already serves the

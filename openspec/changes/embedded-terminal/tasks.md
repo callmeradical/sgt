@@ -1,10 +1,10 @@
 # Tasks — Embedded terminal
 
-One repository, `sergeant-v2`, so one task list, no cross-repo merge order.
+One repository, `sgt-v2`, so one task list, no cross-repo merge order.
 
 ## Task 1 — PTY/WebSocket bridge and routes
 
-Repository: `sergeant-v2`. Depends on: nothing.
+Repository: `sgt-v2`. Depends on: nothing.
 
 Read first: this change's `design.md` in full; the current route
 registration block in `internal/ui/server.go` (the `mux.HandleFunc(...)`
@@ -62,7 +62,7 @@ tests is both cheap and the stronger proof here):
 
 ## Task 2 — Frontend drawer, tabs, and vendored assets
 
-Repository: `sergeant-v2`. Depends on: Task 1 (the routes it calls must
+Repository: `sgt-v2`. Depends on: Task 1 (the routes it calls must
 exist).
 
 Read first: `internal/ui/static/index.html`'s current structure (how
@@ -83,6 +83,6 @@ Verification: same command as Task 1 (a rebuild is required for the
 embedded dashboard to reflect the change, per `AGENTS.md`'s "changing
 `internal/ui/static/index.html` requires a rebuild before it is served").
 There is no scripted UI test in this repository's suite today; verify
-manually by starting `sergeant ui`, opening a terminal, and confirming
+manually by starting `sgt ui`, opening a terminal, and confirming
 input/output/resize/close all work, and note in the PR description that
 this was checked manually.

@@ -11,7 +11,7 @@ whose independent critic review (`progress.html`, Review 026) found this gap.
 loop that delivers intent/bullet transitions to a configured `Target` —
 fully implemented and fully tested. It also correctly deferred choosing a
 concrete `Target` backend, since no external tracker was specified. But
-`cmd/sergeant/main.go`'s `startExportRunners` never constructs or starts a
+`cmd/sgt/main.go`'s `startExportRunners` never constructs or starts a
 `Runner` at all; it only logs a warning for a project that configures an
 export backend. This PRD closes that gap: when a backend a future change
 registers exists, the process must actually start exporting for it, with no
@@ -20,7 +20,7 @@ further wiring work required at that point.
 ## Problem
 
 Today, even if a future change added a working `Target` implementation
-tomorrow, nothing in `cmd/sergeant/main.go` would ever construct one or call
+tomorrow, nothing in `cmd/sgt/main.go` would ever construct one or call
 `Runner.Run`. The wiring gap is independent of which backend eventually
 exists — it's a missing registration/dispatch mechanism, not a missing
 backend. Left as-is, the first change to implement a real `Target` would

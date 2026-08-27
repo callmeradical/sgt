@@ -2,7 +2,7 @@
 
 Status: Draft, awaiting explicit human PRD approval
 
-Extends: `docs/prd-sergeant-v2.md` D6 ("Sergeant never merges anything
+Extends: `docs/prd-sgt.md` D6 ("Sgt never merges anything
 itself") and D8/R7.5 (the dashboard's Delivery lane renders a bullet's real
 lifecycle position). `BulletProgression`'s own ordering
 (`pending -> red -> green -> sealed -> merged`) has named `merged` since v2's
@@ -30,7 +30,7 @@ surfaced three concrete, connected gaps, not one:
    intent has ever reached `satisfied` through this mechanism, for any
    project, ever.
 4. **Every one of the above is hardcoded to GitHub via the `gh` CLI.**
-   `Server.GHPRCreate` is named and typed for GitHub specifically. Sergeant's
+   `Server.GHPRCreate` is named and typed for GitHub specifically. Sgt's
    domain model (intent/bullet/PR/merge) has nothing GitHub-specific about
    it — a bullet is "sealed" by opening a change request and "merged" by
    observing it land, regardless of which host the repository's remote
@@ -38,7 +38,7 @@ surfaced three concrete, connected gaps, not one:
 
 ## Problem
 
-Decision D6 makes `merged` observable-only, by design — sergeant must never
+Decision D6 makes `merged` observable-only, by design — sgt must never
 merge anything itself. But "observable" requires something that actually
 looks, and today nothing does. Separately, `defaultBase()`
 (`internal/ui/gitutil.go`) — used by delivery's commit-count reporting — has
@@ -116,15 +116,15 @@ a rewrite instead of a second implementation of an existing seam.
   report `satisfied`. No standing background loop polls change requests
   nobody is currently looking at.
 - **A change request observed merged into a base other than the one
-  sergeant recorded is not treated as a normal merge.** It is flagged as a
+  sgt recorded is not treated as a normal merge.** It is flagged as a
   failure — the bullet moves to `blocked` (matching this codebase's
   existing "a stuck bullet is blocked, not failed" precedent) with a
   `BlockedReason` naming both the expected and the actual base — never
   silently advanced to `merged`, and never left sitting at `sealed` as if
   nothing happened. This is a real anomaly (a human merged it somewhere
-  sergeant did not expect) that needs a human to look at, not evidence the
+  sgt did not expect) that needs a human to look at, not evidence the
   delivery succeeded as planned.
-- Sergeant still never merges anything itself — this mechanism only reads
+- Sgt still never merges anything itself — this mechanism only reads
   state that already happened on the host.
 
 ## Out of scope
@@ -134,7 +134,7 @@ a rewrite instead of a second implementation of an existing seam.
   it (GitHub via `gh`, matching what this repository and every project
   configured so far actually uses). Adding another host is future work the
   seam is deliberately shaped to make possible, not something this PRD
-  builds. Detecting that a remote is, say, GitLab is in scope (so sergeant
+  builds. Detecting that a remote is, say, GitLab is in scope (so sgt
   can refuse correctly by name instead of guessing); actually talking to
   GitLab's API/CLI is not.
 - **A PR/change-request closed without merging.** This PRD only adds an
@@ -148,7 +148,7 @@ a rewrite instead of a second implementation of an existing seam.
   is a possible future addition, not required here — no design considered
   in this PRD depends on one existing.
 - **Changing GitHub's own configured default branch for this or any repo.**
-  Not sergeant's concern; this PRD makes sergeant stop depending on it.
+  Not sgt's concern; this PRD makes sgt stop depending on it.
 
 ## Open questions
 

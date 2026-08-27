@@ -1,10 +1,10 @@
-# Sergeant v2 — Architecture Overview
+# Sgt v2 — Architecture Overview
 
-This document explains how sergeant-v2 is put together, why it is shaped
-the way it is, and how it differs from sergeant v1 (the bash/tmux tool it
+This document explains how sgt-v2 is put together, why it is shaped
+the way it is, and how it differs from sgt v1 (the bash/tmux tool it
 replaces). It is written for someone who has never read this codebase but
 wants a working mental model of the whole system before diving into code.
-It is a companion to `docs/prd-sergeant-v2.md` (the binding product
+It is a companion to `docs/prd-sgt.md` (the binding product
 requirements and settled decisions this document explains and cross-links)
 rather than a replacement for it — where a design choice traces back to a
 specific PRD decision (`D1`, `R3.5`, `O3`, etc.), that decision is named so
@@ -17,7 +17,7 @@ v1.
 
 ## Data Model and Store
 
-Sergeant-v2's entire domain model lives in `internal/store/store.go`, a
+Sgt-v2's entire domain model lives in `internal/store/store.go`, a
 single ~1,500-line file wrapping SQLite (`modernc.org/sqlite`). There is no
 ORM and no separate migration tool: `Store.migrate()` runs
 `CREATE TABLE IF NOT EXISTS` for the full schema, then two idempotent
@@ -26,7 +26,7 @@ queries actually exists) and `migrateAddColumns` (a literal list of every
 column ever added, each with an `ALTER TABLE ... ADD COLUMN` and a comment
 explaining why it exists and what its default means for pre-existing rows).
 This is deliberate: a reopened database from an earlier version of
-sergeant must come up schema-complete without a separate migration step to
+sgt must come up schema-complete without a separate migration step to
 remember to run.
 
 **The domain hierarchy is `Project → Intent → Bullet`.** A *Project* is a
@@ -52,7 +52,7 @@ time). A `PhaseRecord` is one step of a run (an agent invocation or a
 deterministic gate). An `EnvelopeRecord` is a typed handoff/notification
 message. None of these three is the dashboard's primary object — that's
 Intent (decision D8) — because a run can fail and be redispatched, but the
-intent persists as "the thing sergeant is trying to satisfy" across
+intent persists as "the thing sgt is trying to satisfy" across
 however many run attempts it takes.
 
 **Bullet lifecycle** (`BulletStatuses()`): `proposed → pending → red →
@@ -72,9 +72,9 @@ reason — they're not a seventh step, they're an exit ramp). Concretely:
   anything past here without a human.
 - **`sealed`** — a human explicitly approved delivery (opened a PR);
   requires green.
-- **`merged`** — sergeant *observed* the PR as merged. Sergeant itself
+- **`merged`** — sgt *observed* the PR as merged. Sgt itself
   never merges (decision D6), so this status is only ever set by watching
-  real PR state, never by sergeant's own action.
+  real PR state, never by sgt's own action.
 - **`blocked`** — carries a `BlockedReason`; replaces `failed` as of a
   recent change, though `failed` remains a valid value on historical rows
   the migration doesn't rewrite.
@@ -115,10 +115,10 @@ direction.
 
 ## Dispatch and Execution
 
-Sergeant's execution engine is reachable two ways — decision **D1, "two
+Sgt's execution engine is reachable two ways — decision **D1, "two
 ways in, one set of records"**: an operator's own agent CLI can talk to
-sergeant over MCP (`sergeant_get_brief`, `sergeant_run_gates`,
-`sergeant_emit_envelope`), or the embedded dashboard can `POST
+sgt over MCP (`sgt_get_brief`, `sgt_run_gates`,
+`sgt_emit_envelope`), or the embedded dashboard can `POST
 /api/dispatch` directly. Both converge on the exact same intents, bullets,
 and evidence records — there is no separate "agent-driven" data model. An
 agent following its own plan and an operator clicking dispatch produce
@@ -132,19 +132,19 @@ is written. The rationale is blunt: "a failure here would leave behind
 dispatched work with no planning record — exactly what O3 forbids." If
 change resolution fails, nothing else has happened yet to clean up.
 
-Once a change is resolved, sergeant decides *how* the work gets
+Once a change is resolved, sgt decides *how* the work gets
 decomposed into repository-scoped bullets — and here **D2** ("trust the
 workflow, review the inference") draws a hard line. If the caller names
 its own target repositories explicitly, that decomposition is
 *workflow-defined*: someone already decided which repos are in scope, so
-sergeant treats it as pre-trusted and executes immediately. If the caller
-names none, sergeant would otherwise have to guess (historically, it
+sgt treats it as pre-trusted and executes immediately. If the caller
+names none, sgt would otherwise have to guess (historically, it
 silently defaulted to "every repo in the project"), and D2 refuses to let
 that guess run unsupervised. Instead it's recorded as a `proposed` intent
 with `proposed` bullets — no run, no worktree, no branch — and a human
 must explicitly approve or reject it via a separate endpoint before any of
 it executes. This is **D5(a)**, the first of D5's three legitimate human
-interruptions: sergeant will notify and wait rather than act on a
+interruptions: sgt will notify and wait rather than act on a
 decomposition nobody looked at. Critically, the change resolved at
 proposal time (its id and owning repo) is persisted on the intent itself
 and reused verbatim on approval — approval does not re-derive the change,
@@ -156,7 +156,7 @@ Whichever path a bullet takes, execution always lands in an isolated git
 worktree. `prepareWorktree` refuses outright if the target isn't a real
 git repository — "we cannot isolate. Refuse rather than silently mutating
 the configured directory" — and otherwise creates a dedicated worktree and
-branch (`sergeant/<run-id>`) under a per-run fleet directory, never the
+branch (`sgt/<run-id>`) under a per-run fleet directory, never the
 operator's live checkout. Resuming an interrupted run reattaches to an
 existing worktree/branch rather than recreating it: `git worktree add` is
 called without `-B`, deliberately, because resetting the branch on resume
@@ -194,10 +194,10 @@ calls `SealBulletForRun` *before* it ever invokes `gh` — a bullet that
 isn't `green` is refused outright, so approval is a real precondition on
 the action, "not a status update tacked on after the fact." A successful
 call durably seals the bullet, recording that a human took the explicit
-delivery action. Sergeant stops there: **decision D6** says sergeant never
+delivery action. Sgt stops there: **decision D6** says sgt never
 merges anything itself, ever — it only observes real PR state to know when
 a bullet's upstream dependencies have actually landed before releasing the
-next one in sequence. Sergeant can be the thing that opens a PR; it is
+next one in sequence. Sgt can be the thing that opens a PR; it is
 never the thing that makes the irreversible cross-repo change stick.
 
 ## Observability, Integration, and Redaction
@@ -245,36 +245,36 @@ borrows this "subscribe / snapshot / replay from last sequence" shape from
 the Agent Host Protocol's already-settled design (AHP `runAutomation` +
 sequence-numbered subscribe), without adopting AHP as an actual wire
 protocol — the reasoning given is that AHP is five months old with a
-pre-1.0 client and still reserves the right to break, so sergeant borrows
+pre-1.0 client and still reserves the right to break, so sgt borrows
 the *pattern* it got right rather than taking on that dependency.
 
 **MCP is the agent-facing half of "two ways in, one set of records" (D1).**
-Agent-driven work (an operator's own CLI agent talking to sergeant
+Agent-driven work (an operator's own CLI agent talking to sgt
 directly) and coordinator-driven work (dispatch through the HTTP API) must
 produce identical intents, bullets, and evidence — MCP is not a second,
 parallel execution path. Its tool surface (`internal/mcp/server.go`):
-`sergeant_status` and `sergeant_get_brief` for situational awareness;
-`sergeant_run_gates`, which executes a repo's configured deterministic
+`sgt_status` and `sgt_get_brief` for situational awareness;
+`sgt_run_gates`, which executes a repo's configured deterministic
 checks and is explicitly the *zero-token* half of the factory model — no
 model judgment, just pass/fail evidence a bullet's red→green history
-depends on (D3); `sergeant_emit_envelope`, the durable, typed, versioned
-handoff record between phases (R5); `sergeant_seal_pr`, the
-human-approval-gated delivery action (R3.5); `sergeant_run_status`/
-`sergeant_run_wait` for an agent to follow a run it dispatched without
-polling the dashboard; and `sergeant_graph_query`/`sergeant_graph_explain`/
-`sergeant_graph_affected` (D9), which let an agent navigate a codebase's
+depends on (D3); `sgt_emit_envelope`, the durable, typed, versioned
+handoff record between phases (R5); `sgt_seal_pr`, the
+human-approval-gated delivery action (R3.5); `sgt_run_status`/
+`sgt_run_wait` for an agent to follow a run it dispatched without
+polling the dashboard; and `sgt_graph_query`/`sgt_graph_explain`/
+`sgt_graph_affected` (D9), which let an agent navigate a codebase's
 actual structure instead of grepping blind.
 
 **graphify is orchestrated, not reimplemented.** D9's cross-repository
 code graph is built by shelling out to a separately-installed `graphify`
 CLI binary — extracting per-repo graphs, merging them, and answering
-queries against the merged result — never by sergeant's own graph
+queries against the merged result — never by sgt's own graph
 algorithms. This boundary was tested directly when `exclude_patterns`
 needed implementing: the real binary's `extract` subcommand has no exclude
-flag at all, so filtering had to become a sergeant-side post-processing
+flag at all, so filtering had to become a sgt-side post-processing
 pass over the binary's already-produced `graph.json` (dropping matching
 nodes/edges, then anything left dangling) rather than a flag threaded
-through to the tool. The binary does the extraction; sergeant only curates
+through to the tool. The binary does the extraction; sgt only curates
 what crosses the boundary.
 
 **Redaction lives at chokepoints, not at every call site — the hard way.**
@@ -296,11 +296,11 @@ architecture.
 
 ## v1 vs v2
 
-**v1** (branch `main` of `sergeant`) is a bash toolbelt: roughly 30
+**v1** (branch `main` of `sgt`) is a bash toolbelt: roughly 30
 `bin/sgt-*` scripts (`sgt-dispatch`, `sgt-watch`, `sgt-respond`,
 `sgt-cleanup`, `sgt-validate`, `sgt-review-findings`, `sgt-recover`, etc.)
 sharing a 55KB common library, `bin/_sgt-lib.sh`. `sgt-dispatch` reads a
-project YAML from `~/.config/sergeant/`, creates one Git worktree per
+project YAML from `~/.config/sgt/`, creates one Git worktree per
 owning repository, and launches an agent by opening a **tmux window** in a
 shared `sgt` session (`tmux new-session -d -s "$TMUX_SESSION"`, then `tmux
 new-window` per repo). Per-task state lives in flat files under
@@ -318,7 +318,7 @@ i.e., v1 itself documents that a tmux pane existing tells you almost
 nothing.
 
 **v2** (branch `v2`) replaces the entire toolbelt with a single Go binary
-(`cmd/sergeant`, plus an MCP server at `cmd/sergeant-mcp`) built from a
+(`cmd/sgt`, plus an MCP server at `cmd/sgt-mcp`) built from a
 real internal package tree: `internal/store` (SQLite via the pure-Go
 `modernc.org/sqlite` driver, opened with WAL journaling and a
 busy-timeout pragma), `internal/dag` (the run engine), `internal/ui` (an
@@ -339,9 +339,9 @@ happening" is reconstructed at read time from tmux pane state plus
 scattered fleet files plus live Git status — there is no row anywhere that
 says "this piece of work exists, here is its state." v2 makes this
 explicit via the `Project → Intent → Bullet` domain model. Decision **D4**
-states this plainly: "Sergeant stores intents and bullets itself. Intents
-and bullets are first-class rows in Sergeant's own store with referential
-integrity to worktree, branch, commit and PR. Sergeant cannot enforce
+states this plainly: "Sgt stores intents and bullets itself. Intents
+and bullets are first-class rows in Sgt's own store with referential
+integrity to worktree, branch, commit and PR. Sgt cannot enforce
 rules about data it does not own." Decision **D8** extends this to the
 dashboard itself: "The dashboard is a view of intents... The primary list
 is intents, not runs... Runs and phases are drill-down evidence beneath a
@@ -351,12 +351,12 @@ store, the dashboard, and the gates all read and write against the same
 rows.
 
 v2's `AGENTS.md` states decision **D7** verbatim: "**v1 is not a
-dependency.** Sergeant must not shell out to `sgt-*`, adopt v1's fleet
+dependency.** Sgt must not shell out to `sgt-*`, adopt v1's fleet
 file layout, or reuse its supervision plumbing. Where a v1 capability is
 absent, that is unimplemented v2 scope." Concretely, `AGENTS.md` forbids
 calling `sgt-dispatch`, `sgt-watch`, `sgt-respond`, `sgt-validate`,
 `sgt-context`, or any other `bin/sgt-*` script; forbids using tmux to run
-or supervise work; and forbids writing into `~/.local/share/sergeant/
+or supervise work; and forbids writing into `~/.local/share/sgt/
 fleet`. Where v2 is missing something v1 could do, the document is
 explicit that this is a scope gap in v2, not a defect to be patched by
 falling back to v1: "Where v1 has a capability v2 lacks (td tasks,

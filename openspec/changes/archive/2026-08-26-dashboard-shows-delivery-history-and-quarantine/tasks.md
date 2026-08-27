@@ -1,10 +1,10 @@
 # Tasks — Dashboard shows delivery history and quarantine
 
-One repository, `sergeant-v2`, so one task.
+One repository, `sgt-v2`, so one task.
 
 ## Task 1 — run-scoped delivery history, API, and dashboard surface
 
-Repository: `sergeant-v2`. Depends on: bullets 1-3 of R5 (all merged) —
+Repository: `sgt-v2`. Depends on: bullets 1-3 of R5 (all merged) —
 `internal/store/delivery.go`'s `deliveries` table, `ListDeliveryHistory`,
 `QuarantineDelivery`, and `EnvelopeRecord.RunID`.
 

@@ -1,10 +1,10 @@
 # Tasks — Resume is reachable from the dashboard
 
-One repository, `sergeant-v2`, so one task and no cross-repo merge order.
+One repository, `sgt-v2`, so one task and no cross-repo merge order.
 
 ## Task 1 — offer resume in the run detail drawer
 
-Repository: `sergeant-v2`. Depends on: nothing.
+Repository: `sgt-v2`. Depends on: nothing.
 
 - Add a server-computed boolean to the run payload stating whether the run may be
   resumed, derived from the same `ResumableStatuses` the endpoint enforces. Do not

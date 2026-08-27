@@ -2,7 +2,7 @@
 
 Status: Draft, awaiting explicit human PRD approval
 
-Extends: `docs/prd-sergeant-v2.md` §3.1's agent-driven model, which already
+Extends: `docs/prd-sgt.md` §3.1's agent-driven model, which already
 names opencode, codex, goose, pi, and claude as CLI harnesses an operator may
 run. This PRD adds GitHub's `copilot` CLI as a sixth harness the
 coordinator-driven path (`internal/runner/runner.go`) can dispatch headlessly,
@@ -87,7 +87,7 @@ itself failing.
   permission bypass for a first working integration. Adding them is a later,
   separate improvement, not required to make `copilot` dispatchable.
 - **Choosing between the `copilot` binary and the `gh copilot --` wrapper.**
-  Sergeant will invoke whatever binary name the operator configures as the
+  Sgt will invoke whatever binary name the operator configures as the
   agent (resolved via `PATH`, exactly like every other harness today) — it
   does not special-case `gh` as a wrapper.
 - **The README's "measured harness" model/variant-transport table** (a
@@ -116,5 +116,5 @@ itself failing.
   for a first version?
 - **What is the minimum required `copilot` CLI version?** The flags in this
   PRD were observed against the locally installed v1.0.80. Whether that is a
-  hard floor, and how/whether Sergeant should detect or document a version
+  hard floor, and how/whether Sgt should detect or document a version
   mismatch, is not decided here.

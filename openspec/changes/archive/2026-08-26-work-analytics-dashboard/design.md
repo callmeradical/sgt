@@ -2,7 +2,7 @@
 
 ## Ownership
 
-One repository, `sergeant-v2`. Touches `internal/store/store.go` (new
+One repository, `sgt-v2`. Touches `internal/store/store.go` (new
 unbounded, project-scoped queries and the aggregation itself),
 `internal/ui/server.go` (a new `GET /api/analytics` handler), and
 `internal/ui/static/index.html` (a new header button and drawer, following

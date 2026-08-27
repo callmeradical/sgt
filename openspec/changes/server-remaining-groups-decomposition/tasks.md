@@ -1,6 +1,6 @@
 # Tasks — Server remaining-groups decomposition
 
-One repository, `sergeant-v2`, three tasks. All three are independent of
+One repository, `sgt-v2`, three tasks. All three are independent of
 each other and of `server-dispatch-execution-decomposition` — no shared
 type, no ordering dependency. Any may merge in any order.
 

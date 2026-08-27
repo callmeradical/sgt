@@ -1,17 +1,17 @@
 ---
 name: progress
-description: Turn an approved PRD into an OpenSpec change, dispatch it through sergeant-v2's own /api/dispatch, and drive it to a merged, independently critic-verified state — sergeant-v2's standing builder/critic loop.
+description: Turn an approved PRD into an OpenSpec change, dispatch it through sgt-v2's own /api/dispatch, and drive it to a merged, independently critic-verified state — sgt-v2's standing builder/critic loop.
 disable-model-invocation: true
 ---
 
-This skill is sergeant-v2's own implementation loop: PRD → OpenSpec change → dispatch → review → mutation-test → merge → independent critic → `progress.html`. It exists so every change lands with the same rigor regardless of who (or which session) is driving. It assumes the repo at hand is sergeant-v2 (or a project following the same conventions) and that `openspec` (the CLI) is installed.
+This skill is sgt-v2's own implementation loop: PRD → OpenSpec change → dispatch → review → mutation-test → merge → independent critic → `progress.html`. It exists so every change lands with the same rigor regardless of who (or which session) is driving. It assumes the repo at hand is sgt-v2 (or a project following the same conventions) and that `openspec` (the CLI) is installed.
 
 Do not skip steps to move faster. The mutation-testing and independent-critic steps exist because this loop has repeatedly caught real gaps that build/test-passing alone missed (a background loop wired but never started, a shared guard with zero test coverage, a stale-looking edge case that turned out to have live rows in the database). Treat their findings as real work, not formality.
 
 ## 0. Preconditions
 
 - A PRD exists at `docs/prd-<slug>.md`, states **what and why only** (no API routes, function/field names, or algorithms — that is OpenSpec's job), and has explicit human approval to proceed (the user said "implement it," "feed it into openspec," or equivalent — a PRD sitting in draft is not itself authorization).
-- If no PRD exists yet, write one first: `Status: Draft, awaiting explicit human PRD approval`, a `Summary`, `Problem`, `Proposal`, explicit `Out of scope`, and `Open questions`. Reference the project's existing decision ledger (`docs/prd-sergeant-v2.md`'s "Settled decisions" section, D-numbers/R-numbers/O-numbers) where the PRD extends or is served by an existing decision — most PRDs are `Extends: docs/prd-sergeant-v2.md, <decision or requirement>`.
+- If no PRD exists yet, write one first: `Status: Draft, awaiting explicit human PRD approval`, a `Summary`, `Problem`, `Proposal`, explicit `Out of scope`, and `Open questions`. Reference the project's existing decision ledger (`docs/prd-sgt.md`'s "Settled decisions" section, D-numbers/R-numbers/O-numbers) where the PRD extends or is served by an existing decision — most PRDs are `Extends: docs/prd-sgt.md, <decision or requirement>`.
 - Confirm nothing is mid-flight that this change would conflict with: `curl -s http://localhost:8484/api/runs` and check for other active dispatches touching the same files.
 
 ## 1. Draft the OpenSpec change
@@ -47,7 +47,7 @@ Arm a Monitor (or an equivalent poll loop) on `/api/runs` for that run id, watch
 
 ## 3. On terminal status
 
-**If `failed`:** do not assume the diff is at fault. Inspect the actual phase output (the run's `test`/`build` phase records in the store — query the real database, e.g. `sqlite3 ~/.local/share/sergeant-v2/sergeant.db` or wherever the project's DB actually lives; do not guess the path, confirm it via the running process's open files if unsure). A failure can be:
+**If `failed`:** do not assume the diff is at fault. Inspect the actual phase output (the run's `test`/`build` phase records in the store — query the real database, e.g. `sqlite3 ~/.local/share/sgt-v2/sgt.db` or wherever the project's DB actually lives; do not guess the path, confirm it via the running process's open files if unsure). A failure can be:
 - A real defect in the dispatched diff — fix forward in the dispatched worktree, or note the gap for a redispatch.
 - An unrelated pre-existing flake the dispatch's own gate happened to trip over. Confirm this by re-running the specific failing test several times in isolation in that same worktree; if it fails intermittently and the failing test's file was not touched by this change's diff, it is not this change's problem — but it is now a **known real bug** (a flaky test is a bug) and should be fixed forward on the target branch directly, separately from this change, before proceeding.
 - A genuine gap in the PRD/design itself, not an implementation slip — stop and escalate to the user rather than guessing past it.
@@ -66,12 +66,12 @@ Arm a Monitor (or an equivalent poll loop) on `/api/runs` for that run id, watch
 
 Merge into the target branch with a commit message that states what was implemented and what was verified (diff reviewed against which spec, which guarantees were mutation-tested, any flake or gap found and how it was resolved). Clean up the dispatch's worktree/branch (`git status --short` first). Confirm **zero** runs show `status: "running"` in `/api/runs` before any binary rebuild — rebuilding while a dispatch is mid-flight orphans it.
 
-If the project has a standing rebuild/restart sequence (check `AGENTS.md` or recent commit history for one), run it now. For sergeant-v2 specifically:
+If the project has a standing rebuild/restart sequence (check `AGENTS.md` or recent commit history for one), run it now. For sgt-v2 specifically:
 
 ```
-go build -o ~/.local/share/sergeant-v2/bin/sgt-p ./cmd/sergeant \
-  && codesign --force --sign - --identifier "dev.sergeant.ui" ~/.local/share/sergeant-v2/bin/sgt-p \
-  && launchctl kickstart -k gui/$(id -u)/dev.sergeant.ui
+go build -o ~/.local/share/sgt-v2/bin/sgt-p ./cmd/sgt \
+  && codesign --force --sign - --identifier "dev.sgt.ui" ~/.local/share/sgt-v2/bin/sgt-p \
+  && launchctl kickstart -k gui/$(id -u)/dev.sgt.ui
 ```
 
 ## 6. Independent critic

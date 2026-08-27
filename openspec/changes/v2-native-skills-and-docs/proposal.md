@@ -2,7 +2,7 @@
 
 ## Repository
 
-One repository: `sergeant-v2`.
+One repository: `sgt-v2`.
 
 ## Requirements served
 
@@ -23,11 +23,11 @@ inventing a v2 command that doesn't exist.
 
 ## Problem
 
-`bin/sgt-*`, `_sgt-*.sh`, and the legacy `sergeant-mcp` proxy were deleted
+`bin/sgt-*`, `_sgt-*.sh`, and the legacy `sgt-mcp` proxy were deleted
 from `v2` (v1 shell-toolbelt removal, this session). Five of the eight files
 this change touches (`skills/dispatch/SKILL.md`, `skills/cross-repo-work/
 SKILL.md`, `skills/load-project/SKILL.md`, `skills/wiki/SKILL.md`,
-`skills/sergeant-help/SKILL.md`) already carry a "V1 ONLY — DO NOT FOLLOW ON
+`skills/sgt-help/SKILL.md`) already carry a "V1 ONLY — DO NOT FOLLOW ON
 THE `v2` BRANCH" banner redirecting a v2 reader to `AGENTS.md` — so the
 original PRD's framing ("anyone who follows the current text is told to run
 commands that do not exist") is not quite accurate for these five: a v2
@@ -103,8 +103,8 @@ does not claim to.
 - **Historical/dated documents** (`docs/audit-2026-07.md`,
   `docs/adr-oc-inject-deletion.md`, `docs/dead-code-2026-07.md`, PRDs,
   openspec archives, research docs).
-- **`docs/using-sergeant.md`, `docs/skills.md`, `docs/getting-started.md`,
-  `docs/what-is-sergeant.md`, `README.md`, `docs/README.md`.** Not named by
+- **`docs/using-sgt.md`, `docs/skills.md`, `docs/getting-started.md`,
+  `docs/what-is-sgt.md`, `README.md`, `docs/README.md`.** Not named by
   the originating PRD; several are already part of `instruction-policy-
   test.sh`'s pre-existing (unrelated) failure set and rewriting them is a
   separate scope decision.

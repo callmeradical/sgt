@@ -1,13 +1,13 @@
 # Tasks — Automated fleet cleanup
 
-One repository, `sergeant-v2`, so one task.
+One repository, `sgt-v2`, so one task.
 
 ## Task 1 — eligibility query, shared reclaim logic, background loop
 
-Repository: `sergeant-v2`. Depends on: nothing. Read
+Repository: `sgt-v2`. Depends on: nothing. Read
 `internal/ui/server.go`'s `handleCleanWorktrees` and `dirtyWorktreesUnder`,
 `internal/store/store.go`'s `RunRecord`/`ListRecentRuns`/`runColumns`, and
-`cmd/sergeant/main.go`'s startup sequence (where `ui.NewServer` and any
+`cmd/sgt/main.go`'s startup sequence (where `ui.NewServer` and any
 existing startup reconciliation already run) first — design.md names the
 exact functions and their intended shapes.
 

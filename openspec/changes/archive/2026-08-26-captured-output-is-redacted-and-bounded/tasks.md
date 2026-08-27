@@ -1,10 +1,10 @@
 # Tasks — Captured output is redacted and bounded
 
-One repository, `sergeant-v2`, so one task.
+One repository, `sgt-v2`, so one task.
 
 ## Task 1 — redact and bound raw_output at capture
 
-Repository: `sergeant-v2`. Depends on: nothing.
+Repository: `sgt-v2`. Depends on: nothing.
 
 - Add a new package `internal/redact` with `Text(s string) string` and
   `Truncate(s string, maxBytes int) string` as specified in design.md.

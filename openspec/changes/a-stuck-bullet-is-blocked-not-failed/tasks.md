@@ -1,10 +1,10 @@
 # Tasks — A stuck bullet is blocked, not failed
 
-One repository, `sergeant-v2`, so one task.
+One repository, `sgt-v2`, so one task.
 
 ## Task 1 — blocked status, reason capture, redaction
 
-Repository: `sergeant-v2`. Depends on: nothing. Read
+Repository: `sgt-v2`. Depends on: nothing. Read
 `internal/ui/server.go`'s `bulletStatusForRunOutcome`/`recordTerminalRun`,
 `internal/store/store.go`'s `BulletStatuses`/`AdvanceBulletsForRun`, and
 `internal/runner/runner.go`'s agent-authored-envelope branch and its

@@ -2,7 +2,7 @@
 
 ## Ownership
 
-One repository, `sergeant-v2`. Standalone within itself; independent of
+One repository, `sgt-v2`. Standalone within itself; independent of
 `server-remaining-groups-decomposition` (disjoint functions, no shared new
 type).
 

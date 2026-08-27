@@ -2,14 +2,14 @@
 
 ## Repository
 
-One repository: `sergeant` (v2).
+One repository: `sgt` (v2).
 
 ## Requirements served
 
 `docs/prd-export-runner-wiring.md` — closes the gap the independent critic
 review of `task-tracking-is-a-readonly-export` found (`progress.html`,
 Review 026): "`export.Runner` is fully built and fully tested but never
-actually constructed/started in `cmd/sergeant/main.go` — it just logs a
+actually constructed/started in `cmd/sgt/main.go` — it just logs a
 warning."
 
 This is not new product scope. `docs/prd-task-tracking-export.md` already
@@ -19,7 +19,7 @@ the wiring stopped at "recognize a configured project" and never reached
 
 ## Problem
 
-`cmd/sergeant/main.go:177-189`, `startExportRunners`, reads every configured
+`cmd/sgt/main.go:177-189`, `startExportRunners`, reads every configured
 project via `config.ListProjects()` and, for each one with a non-nil
 `Export` block, does exactly one thing: prints
 `"export: project %q configures backend %q, but no export target

@@ -2,7 +2,7 @@
 
 ## Ownership
 
-One repository, `sergeant-v2`. Touches only `internal/graphify/graphify.go`
+One repository, `sgt-v2`. Touches only `internal/graphify/graphify.go`
 (a new filtering step) and a new small helper for pattern matching in the
 same package.
 

@@ -1,10 +1,10 @@
 # Tasks — Retry policy is explicit and observable
 
-One repository, `sergeant-v2`, so one task and no cross-repo merge order.
+One repository, `sgt-v2`, so one task and no cross-repo merge order.
 
 ## Task 1 — configure, apply and record agent phase retry
 
-Repository: `sergeant-v2`. Depends on: nothing.
+Repository: `sgt-v2`. Depends on: nothing.
 
 - Add `retries` to `config.Defaults` and `config.Repo`, resolved repository-first
   then project default then zero, matching how the agent name resolves today.

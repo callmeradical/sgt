@@ -2,7 +2,7 @@
 
 ## Repository
 
-One repository: `sergeant-v2`.
+One repository: `sgt-v2`.
 
 ## Requirements served
 
@@ -15,11 +15,11 @@ PRD: `docs/prd-branch-names-carry-their-work-type.md`.
 ## Problem
 
 O2 already specifies dispatched branches should be named `<type>/<change-id>`.
-Today every dispatched branch is named `sergeant/<run-id>` — no type, no
+Today every dispatched branch is named `sgt/<run-id>` — no type, no
 change id, an identifier that carries no information about what kind of work
 it is or which OpenSpec change it belongs to.
 
-Worse, this literal format string (`"sergeant/" + runID`) is independently
+Worse, this literal format string (`"sgt/" + runID`) is independently
 hand-duplicated in four places across three packages, not called from one
 shared function everywhere it matters:
 
@@ -27,7 +27,7 @@ shared function everywhere it matters:
   worktree/branch is actually created.
 - `internal/ui/server.go`'s `handleCreatePR` — recomputes the same string by
   hand to pass as `gh pr create --head <branch>`.
-- `internal/mcp/server.go`'s `sergeant_seal_pr` tool — recomputes it again,
+- `internal/mcp/server.go`'s `sgt_seal_pr` tool — recomputes it again,
   independently, to call `DeliverPullRequest`.
 - `internal/runner/runner.go`'s `DeliverPullRequest` — a fallback branch
   construction for when its caller passes an empty string (currently dead in
@@ -57,7 +57,7 @@ drift out of sync with itself again.
 
 - **An analytics/reporting page.** This proposal makes the work type an
   honest, recorded fact; a view built on top of it is separate, later scope.
-- **Reclassifying historical runs/branches.** Existing `sergeant/<run-id>`
+- **Reclassifying historical runs/branches.** Existing `sgt/<run-id>`
   branches and already-recorded runs are untouched; this changes what gets
   recorded and named going forward only.
 - **Enforcing the type vocabulary in commit messages.** Agents already tend

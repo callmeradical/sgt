@@ -1,11 +1,11 @@
 # Tasks — Delivery is durable, with retry and idempotency
 
-One repository, `sergeant-v2`, so one task. This is bullet 2 of 4 against R5;
+One repository, `sgt-v2`, so one task. This is bullet 2 of 4 against R5;
 bullets 3 and 4 merge after it.
 
 ## Task 1 — a delivery is a durable, retried, idempotent row
 
-Repository: `sergeant-v2`. Depends on: `envelopes-are-typed-versioned-and-correlated`
+Repository: `sgt-v2`. Depends on: `envelopes-are-typed-versioned-and-correlated`
 (merged — gives envelopes the `ID` this bullet's `deliveries.envelope_id`
 references).
 

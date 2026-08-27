@@ -2,9 +2,9 @@
 
 ## Ownership
 
-One repository, `sergeant` (v2). Standalone. Adds
+One repository, `sgt` (v2). Standalone. Adds
 `internal/export/registry.go` (new file) and changes
-`cmd/sergeant/main.go`'s `startExportRunners` and its one call site.
+`cmd/sgt/main.go`'s `startExportRunners` and its one call site.
 
 ## `internal/export.Backends`: a package-level registry, not a threaded parameter
 
@@ -12,7 +12,7 @@ One repository, `sergeant` (v2). Standalone. Adds
 // internal/export/registry.go
 package export
 
-import "github.com/callmeradical/sergeant/internal/config"
+import "github.com/callmeradical/sgt/internal/config"
 
 // Constructor builds a Target for one project's export configuration.
 type Constructor func(cfg config.Export) (Target, error)
@@ -22,7 +22,7 @@ type Constructor func(cfg config.Export) (Target, error)
 // Target implementation exists yet, which docs/prd-task-tracking-export.md
 // already decided is correctly out of scope until a concrete external
 // tracker is chosen. A future backend registers into this map from its own
-// package (an init(), or an explicit call before cmd/sergeant/main.go's
+// package (an init(), or an explicit call before cmd/sgt/main.go's
 // startExportRunners runs), so adding a backend never requires editing
 // startExportRunners again.
 var Backends = map[string]Constructor{}
@@ -45,7 +45,7 @@ parameter — see below — so a test never has to touch the shared global.
 ## `startExportRunners` takes the registry as a parameter
 
 ```go
-// cmd/sergeant/main.go
+// cmd/sgt/main.go
 func startExportRunners(st *store.Store, backends map[string]export.Constructor) {
 	projects, err := config.ListProjects()
 	if err != nil {

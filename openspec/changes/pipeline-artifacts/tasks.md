@@ -1,16 +1,16 @@
 # Tasks — Pipeline artifacts
 
-One repository, `sergeant-v2`, one task list.
+One repository, `sgt-v2`, one task list.
 
 ## Task 1 — Durable storage and capture
 
-Repository: `sergeant-v2`. Depends on: nothing.
+Repository: `sgt-v2`. Depends on: nothing.
 
 Read first: this change's `design.md` in full; `internal/store/delivery.go`
 for the metadata-row pattern this change's `artifact.go` follows;
 `internal/runner/runner.go`'s `RunCodeGate` (line 264) and `RunAgentPhase`
 (line 461); `internal/ui/lock.go` for the env-override pattern
-(`SERGEANT_ARTIFACTS_ROOT` mirrors `SERGEANT_UI_LOCK`).
+(`SGT_ARTIFACTS_ROOT` mirrors `SGT_UI_LOCK`).
 
 Build:
 - Add the `artifacts` table to `migrateAddTables`'s `wanted` list in
@@ -19,7 +19,7 @@ Build:
   `RecordArtifact`/`ListArtifactsForRun`/`GetArtifact`.
 - Add `captureArtifacts` to `internal/runner` (design.md's exact contract:
   bounded, best-effort, never returns an error to its caller).
-- Wire `SERGEANT_ARTIFACT_DIR` and the post-command `captureArtifacts` call
+- Wire `SGT_ARTIFACT_DIR` and the post-command `captureArtifacts` call
   into both `RunCodeGate` and `RunAgentPhase`, exactly as design.md
   specifies.
 
@@ -29,10 +29,10 @@ Verification: `go build ./... && go vet ./internal/... && go test
 
 Scenarios needing real, test-first coverage (write each as a failing test
 before the code that satisfies it, per decision D3):
-- A gate command that writes a file to `$SERGEANT_ARTIFACT_DIR` produces
+- A gate command that writes a file to `$SGT_ARTIFACT_DIR` produces
   one durable `ArtifactRecord`, readable via `ListArtifactsForRun`, whose
   file content on disk matches what the command wrote.
-- A gate command that writes nothing to `$SERGEANT_ARTIFACT_DIR` produces
+- A gate command that writes nothing to `$SGT_ARTIFACT_DIR` produces
   no artifact rows, and the gate's own pass/fail result is unaffected.
 - A gate that writes more than the configured max file count (or total
   bytes) produces exactly the allowed artifacts plus one row whose
@@ -50,7 +50,7 @@ before the code that satisfies it, per decision D3):
 
 ## Task 2 — API and dashboard rendering
 
-Repository: `sergeant-v2`. Depends on: Task 1 (the store methods and table
+Repository: `sgt-v2`. Depends on: Task 1 (the store methods and table
 it reads must exist).
 
 Read first: `internal/ui/delivery.go`'s `handleDeliveryHistory` for the
@@ -68,6 +68,6 @@ Build:
 Verification: same command as Task 1, plus a manual check (no scripted
 frontend test suite exists in this repo today, per the embedded-terminal
 change's own precedent): dispatch a gate that writes a PNG to
-`$SERGEANT_ARTIFACT_DIR`, confirm it renders as a thumbnail beneath the
+`$SGT_ARTIFACT_DIR`, confirm it renders as a thumbnail beneath the
 workflow graph for that run, and note the manual check in the PR
 description.

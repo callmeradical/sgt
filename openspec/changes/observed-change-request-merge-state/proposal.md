@@ -2,12 +2,12 @@
 
 ## Repository
 
-One repository: `sergeant-v2`. Standalone.
+One repository: `sgt-v2`. Standalone.
 
 ## Requirements served
 
 `docs/prd-observed-change-request-merge-state.md` (full text). Extends D6
-("Sergeant never merges anything itself") and D8/R7.5 (the dashboard
+("Sgt never merges anything itself") and D8/R7.5 (the dashboard
 renders a bullet's real lifecycle position).
 
 ## Problem
@@ -54,7 +54,7 @@ seam for a different host.
   failure instead — the bullet moves to `blocked` with a reason naming both
   branches, never silently treated as a successful delivery and never left
   at `sealed` as if nothing happened.
-- Sergeant still never merges anything itself — this is read-only
+- Sgt still never merges anything itself — this is read-only
   observation of what already happened on the host.
 
 ## Out of scope

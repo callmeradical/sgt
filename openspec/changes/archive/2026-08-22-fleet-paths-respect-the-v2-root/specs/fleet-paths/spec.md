@@ -5,19 +5,19 @@
 ### Requirement: One helper owns the fleet root
 
 Every path under a run's fleet directory SHALL be derived from a single helper that
-honours `SERGEANT_FLEET_DIR`. Decision D7 forbids v2 writing into v1's
+honours `SGT_FLEET_DIR`. Decision D7 forbids v2 writing into v1's
 `~/.local/share/sergeant/fleet`, and four hand-built copies of the path are how
 three of them came to point there.
 
 #### Scenario: The helper honours the environment override
 
-- **WHEN** `SERGEANT_FLEET_DIR` is set to a directory
+- **WHEN** `SGT_FLEET_DIR` is set to a directory
 - **THEN** the fleet root helper returns that directory
 
 #### Scenario: The helper defaults to the v2 root, never v1's
 
-- **WHEN** `SERGEANT_FLEET_DIR` is unset
-- **THEN** the fleet root helper returns a path ending `share/sergeant-v2/fleet`
+- **WHEN** `SGT_FLEET_DIR` is unset
+- **THEN** the fleet root helper returns a path ending `share/sgt-v2/fleet`
   and containing no `share/sergeant/fleet` segment
 
 #### Scenario: FleetDir agrees with the helper
@@ -39,7 +39,7 @@ holds the invariant — a test pinning the known call sites would pass again the
 moment a fifth was added.
 
 Scoped to `internal/` in the first version of this spec, which was a defect: the
-scan passed while `cmd/sergeant/main.go` went on building v1's root for every CLI
+scan passed while `cmd/sgt/main.go` went on building v1's root for every CLI
 run. An invariant restricted to one subtree only moves where it can be broken.
 
 ### Requirement: The worktree pane and prune operate on this engine's own runs

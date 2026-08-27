@@ -2,7 +2,7 @@
 
 ## Repository
 
-One repository: `sergeant-v2`, in `internal/config`, `internal/dag` and
+One repository: `sgt-v2`, in `internal/config`, `internal/dag` and
 `internal/runner`.
 
 ## Requirements and decisions served

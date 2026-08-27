@@ -5,7 +5,7 @@
 ### Requirement: A run's terminal outcome advances its bullets
 
 A run reaching a terminal status SHALL advance the bullets it carries. Decision D4
-places intents and bullets in sergeant's own store, and a record that is written
+places intents and bullets in sgt's own store, and a record that is written
 once and never updated states something false for the whole life of the row.
 
 #### Scenario: A passed run moves its bullets to green
@@ -21,7 +21,7 @@ Fails today: `UpdateBulletStatus` has no production caller, so the bullets stay
 - **WHEN** a run reaches `passed`
 - **THEN** no bullet of that run becomes `sealed` or `merged`
 
-Decision D6: sergeant never merges. Passing gates means the work exists, not that
+Decision D6: sgt never merges. Passing gates means the work exists, not that
 it was reviewed, submitted or delivered.
 
 #### Scenario: A failed run records failure on its bullets
@@ -64,7 +64,7 @@ one run knows whether the intent is complete.
 - **WHEN** a run reaches `passed` and its bullets become `green`
 - **THEN** its intent's status is `in_progress`
 
-This is the D6 guarantee expressed as a test. Sergeant is never the thing that
+This is the D6 guarantee expressed as a test. Sgt is never the thing that
 merged, so it must never be the thing that declares the work delivered.
 
 #### Scenario: An intent with no bullets is not satisfied

@@ -2,7 +2,7 @@
 
 ## Repository
 
-One repository: `sergeant-v2`.
+One repository: `sgt-v2`.
 
 ## Requirement served
 
@@ -10,7 +10,7 @@ One repository: `sergeant-v2`.
 identifies the agent CLI, the model, and the model's provider that actually
 executed it, derived from real evidence of that execution rather than only
 from requested configuration. Raised directly by the project owner during
-this session: sergeant currently has no record of which model or provider
+this session: sgt currently has no record of which model or provider
 touched a given piece of code, which matters for audit and attribution the
 same way `R4.2`'s existing identifier list (project, run, stage, repo, phase,
 attempt, ...) already matters.
@@ -25,7 +25,7 @@ actually produced this result":
 
 - `pr.AgentCLI`/`pr.Model` describe the *request*, not the *execution*. If
   goose's own configuration changes its default model between two runs that
-  both leave `pr.Model` empty, sergeant's records cannot tell the difference.
+  both leave `pr.Model` empty, sgt's records cannot tell the difference.
 - The actual model and provider **are** present in the captured output today
   — goose's startup banner reads `● new session · anthropic
   claude-sonnet-4-6` — but they sit unparsed inside `raw_output`, a single

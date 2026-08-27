@@ -1,10 +1,10 @@
 # Tasks — An intent ships through a shipping gate
 
-One repository, `sergeant-v2`, so one task.
+One repository, `sgt-v2`, so one task.
 
 ## Task 1 — intent-scoped shipping gate: config, store, runner, trigger
 
-Repository: `sergeant-v2`. Depends on: nothing already merged is changed
+Repository: `sgt-v2`. Depends on: nothing already merged is changed
 by this task, but read the actual current code of
 `a-sealed-bullet-awaits-explicit-approval` (`Store.SealBulletForRun`,
 `internal/ui/server.go`'s `handleCreatePR`) and

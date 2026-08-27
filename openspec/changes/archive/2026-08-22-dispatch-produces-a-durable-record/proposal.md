@@ -2,20 +2,20 @@
 
 ## Repository
 
-One repository: `sergeant-v2`. It owns every part of this change — the store
+One repository: `sgt-v2`. It owns every part of this change — the store
 schema, the dispatch handler, and the embedded dashboard. No second repository is
 involved, so this change is a single bullet chain rather than a cross-repo intent.
 
 ## Requirements and decisions served
 
-- **D4 — Sergeant stores intents and bullets itself.** Currently unimplemented.
+- **D4 — Sgt stores intents and bullets itself.** Currently unimplemented.
   `store.CreateIntent` and `store.CreateBullet` exist, are tested, and are called
   from nothing but `internal/store/store_test.go`. `handleDispatch` writes a
   `RunRecord` and stops. The `intents` and `bullets` tables are therefore empty in
   every real deployment.
 - **D8 — The dashboard is a view of intents.** Blocked by the above. The primary
   list cannot be intents while no intent is ever written.
-- **D10 — Sergeant follows AHP where AHP has settled the question.** Two of its
+- **D10 — Sgt follows AHP where AHP has settled the question.** Two of its
   settled designs are missing here: an idempotency key on run creation, and an
   ordered sequence that clients replay from instead of polling.
 
@@ -61,7 +61,7 @@ clients follow it by sequence.
 
 - Adopting AHP as the wire protocol. D10 borrows the designs and explicitly
   declines the dependency.
-- Triggers and schedules. AHP's automation channel has them; sergeant's dispatch
+- Triggers and schedules. AHP's automation channel has them; sgt's dispatch
   is manual-only and stays that way until a decision says otherwise.
 - The three hardcoded v1 fleet paths in `internal/ui/server.go` (lines 600, 669,
   1035). They are a v1-prohibition violation and a separate, more urgent bug.

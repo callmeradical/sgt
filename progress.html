@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="refresh" content="60">
-<title>Sergeant v2 — Review</title>
+<title>Sgt v2 — Review</title>
 <style>
 :root{--bg:#f5f4ed;--ink:#351e1c;--muted:#733635;--line:#a0c9cb;--accent:#ff6037;--ok:#2d6a4f;--warn:#9a6700;--bad:#a4133c}
 *{box-sizing:border-box}
@@ -45,7 +45,7 @@ a{color:var(--muted)}
 <body><main>
 
 <header>
-  <h1>Sergeant v2</h1>
+  <h1>Sgt v2</h1>
   <p>Independent review. Written by the critic, not the builder.</p>
   <p class="meta">
     Review 023 · 2026-08-24 · branch <code>v2</code> · merge commit <code>fb9a87d</code> reviewed
@@ -63,8 +63,8 @@ a{color:var(--muted)}
     <div class="card"><div class="label">Build</div><div class="value"><span class="status">clean</span></div><div class="small"><code>go build ./...</code> at HEAD <code>cc486c8</code></div></div>
     <div class="card"><div class="label">Vet</div><div class="value"><span class="status">clean</span></div><div class="small"><code>go vet ./...</code>, whole module, no output</div></div>
     <div class="card"><div class="label">Tests</div><div class="value"><span class="status">11/11 packages pass</span></div><div class="small"><code>go test ./internal/... -count=1</code></div></div>
-    <div class="card"><div class="label">Duplicated branch-string construction</div><div class="value"><span class="status">genuinely eliminated</span></div><div class="small">Repo-wide grep for <code>"sergeant/</code> and <code>Sprintf("sergeant</code> finds zero remaining branch-name constructions; every remaining hit is an unrelated envelope <code>Producer</code> label (<code>"sergeant/ui"</code>, <code>"sergeant/runner"</code>, <code>"sergeant/mcp"</code>)</div></div>
-    <div class="card"><div class="label"><code>naming.BranchName</code> call sites</div><div class="value"><span class="status">5 of 5, all converged</span></div><div class="small"><code>dag/engine.go:148</code> (<code>prepareWorktree</code>), <code>ui/server.go:658</code> (<code>handleCreatePR</code>), <code>ui/server.go:1702</code> (<code>describeDelivery</code>), <code>mcp/server.go:429</code> (<code>sergeant_seal_pr</code>), <code>runner/runner.go:604</code> (<code>DeliverPullRequest</code> fallback) — all five load a real <code>RunRecord</code> via <code>Store.GetRun</code> first, none pass a literal</div></div>
+    <div class="card"><div class="label">Duplicated branch-string construction</div><div class="value"><span class="status">genuinely eliminated</span></div><div class="small">Repo-wide grep for <code>"sgt/</code> and <code>Sprintf("sgt</code> finds zero remaining branch-name constructions; every remaining hit is an unrelated envelope <code>Producer</code> label (<code>"sgt/ui"</code>, <code>"sgt/runner"</code>, <code>"sgt/mcp"</code>)</div></div>
+    <div class="card"><div class="label"><code>naming.BranchName</code> call sites</div><div class="value"><span class="status">5 of 5, all converged</span></div><div class="small"><code>dag/engine.go:148</code> (<code>prepareWorktree</code>), <code>ui/server.go:658</code> (<code>handleCreatePR</code>), <code>ui/server.go:1702</code> (<code>describeDelivery</code>), <code>mcp/server.go:429</code> (<code>sgt_seal_pr</code>), <code>runner/runner.go:604</code> (<code>DeliverPullRequest</code> fallback) — all five load a real <code>RunRecord</code> via <code>Store.GetRun</code> first, none pass a literal</div></div>
     <div class="card"><div class="label">Import cycle avoidance</div><div class="value"><span class="status">verified, real</span></div><div class="small"><code>internal/runner/runner.go</code> imports <code>handoff</code>, <code>naming</code>, <code>redact</code>, <code>store</code> — no <code>dag</code>. <code>internal/dag/engine.go</code> imports <code>runner</code>. The cycle the design doc describes is real and correctly avoided by putting <code>BranchName</code> in the dependency-free <code>naming</code> package.</div></div>
     <div class="card"><div class="label">Validation placement &amp; vocabulary</div><div class="value"><span class="status">verified, exact</span></div><div class="small"><code>validateWorkType</code> runs immediately after body-decode/brief-check, before <code>config.LoadProject</code>, <code>ValidateAgent</code>, change resolution, and both the no-repos and explicit-repos branches. <code>validWorkTypes</code> is exactly <code>feat</code>/<code>fix</code>/<code>refactor</code>/<code>docs</code>/<code>chore</code>/<code>test</code> — matches proposal.md verbatim</div></div>
     <div class="card"><div class="label">Column-list consolidation</div><div class="value"><span class="status">verified, complete</span></div><div class="small">Every <code>SELECT</code> against <code>runs</code>/<code>intents</code> (<code>GetRunByRequestID</code>, <code>ListRecentRuns</code>, <code>GetRun</code>, <code>ListRunsForProject</code>, <code>ReconcileOrphanedRuns</code>, <code>GetIntent</code>, <code>ListIntentsForProject</code>, <code>ListIntentsByStatus</code>) uses <code>runColumns</code>/<code>scanRun</code> or <code>intentColumns</code>/<code>scanIntent</code>; no hand-copied column list remains</div></div>
@@ -91,16 +91,16 @@ a{color:var(--muted)}
     <tr><th>Area</th><th>Method</th></tr>
     <tr><td>Binding spec</td><td>Read <code>openspec/changes/branch-names-carry-their-work-type/{proposal,design,tasks}.md</code> and <code>specs/work-type/spec.md</code> in full before reading any code</td></tr>
     <tr><td>The merge commit's actual diff</td><td><code>git merge-base fb9a87d^1 fb9a87d^2</code> → <code>8dfeb49</code>; read <code>git diff 901b099 cf29d66</code> per touched file (<code>internal/naming/branch.go</code>+test, <code>internal/dag/engine.go</code>, <code>internal/ui/server.go</code>, <code>internal/mcp/server.go</code>, <code>internal/runner/runner.go</code>, <code>internal/store/store.go</code>) rather than trusting the commit message's own account</td></tr>
-    <tr><td>Repo-wide search for remaining hand-built branch strings</td><td><code>grep -rn '"sergeant/'</code> and <code>grep -rn 'Sprintf("sergeant'</code> across all <code>*.go</code> files (test and non-test); every hit is an envelope <code>Producer</code> label (<code>"sergeant/ui"</code>/<code>"sergeant/runner"</code>/<code>"sergeant/mcp"</code>), unrelated to branch naming; <code>grep -rn 'dag\.BranchName'</code> finds zero remaining references (the function was deleted, not left dead)</td></tr>
+    <tr><td>Repo-wide search for remaining hand-built branch strings</td><td><code>grep -rn '"sgt/'</code> and <code>grep -rn 'Sprintf("sgt'</code> across all <code>*.go</code> files (test and non-test); every hit is an envelope <code>Producer</code> label (<code>"sgt/ui"</code>/<code>"sgt/runner"</code>/<code>"sgt/mcp"</code>), unrelated to branch naming; <code>grep -rn 'dag\.BranchName'</code> finds zero remaining references (the function was deleted, not left dead)</td></tr>
     <tr><td>Every <code>naming.BranchName(</code> call site</td><td><code>grep -rn 'naming\.BranchName('</code> across the repo: 5 real call sites (<code>dag/engine.go:148</code>, <code>ui/server.go:658</code> and <code>:1702</code>, <code>mcp/server.go:429</code>, <code>runner/runner.go:604</code>), all reached via a <code>Store.GetRun</code> lookup first, plus test call sites (<code>naming/branch_test.go</code>, <code>ui/work_type_test.go</code>, <code>ui/dispatch_idempotency_test.go</code>, <code>dag/engine_test.go</code>, <code>runner/deliver_pr_test.go</code>, <code>mcp/seal_pr_branch_test.go</code>) that all pass literal, non-empty types (<code>"feat"</code>/<code>"fix"</code>/<code>"refactor"</code>)</td></tr>
-    <tr><td>Import cycle claim</td><td><code>grep -n '"github.com/callmeradical/sergeant/internal' internal/runner/runner.go</code>: imports <code>handoff</code>, <code>naming</code>, <code>redact</code>, <code>store</code>, no <code>dag</code>; confirmed <code>internal/dag/engine.go</code> imports <code>runner</code> (so the reverse import would cycle, matching design.md's stated reasoning); <code>go build ./...</code> succeeds, which is necessary but was not treated as sufficient — the import list itself was read</td></tr>
+    <tr><td>Import cycle claim</td><td><code>grep -n '"github.com/callmeradical/sgt/internal' internal/runner/runner.go</code>: imports <code>handoff</code>, <code>naming</code>, <code>redact</code>, <code>store</code>, no <code>dag</code>; confirmed <code>internal/dag/engine.go</code> imports <code>runner</code> (so the reverse import would cycle, matching design.md's stated reasoning); <code>go build ./...</code> succeeds, which is necessary but was not treated as sufficient — the import list itself was read</td></tr>
     <tr><td><code>handleDispatch</code> validation ordering</td><td>Read <code>internal/ui/server.go</code> lines 1360–1487 in full: <code>validateWorkType(req.Type)</code> (line ~1391) runs after JSON decode and the brief-emptiness check, but strictly before <code>config.LoadProject</code>, <code>runner.ValidateAgent</code>, <code>changeRepo</code>/<code>resolveChange</code> (O3's change resolution), and both the no-repos (proposed-plan) and explicit-repos (<code>createRunAndDispatch</code>) branches</td></tr>
     <tr><td>Fixed vocabulary</td><td>Read <code>validWorkTypes</code> (<code>internal/ui/server.go</code>): exactly <code>feat</code>, <code>fix</code>, <code>refactor</code>, <code>docs</code>, <code>chore</code>, <code>test</code> — 6 entries, matching proposal.md's stated set exactly, no more, no fewer</td></tr>
     <tr><td>Column-list consolidation</td><td><code>grep -n 'FROM runs\|INTO runs\|FROM intents\|INTO intents\|runColumns\|intentColumns' internal/store/*.go</code>: every full-row <code>SELECT</code> (<code>GetRunByRequestID</code>, <code>ListRecentRuns</code>, <code>GetRun</code>, <code>ListRunsForProject</code>, <code>ReconcileOrphanedRuns</code> in <code>reconcile.go</code>, <code>GetIntent</code>, <code>ListIntentsForProject</code>, <code>ListIntentsByStatus</code>) uses the shared constant and <code>scanRun</code>/<code>scanIntent</code>; the two narrow queries that remain (<code>SELECT id FROM runs WHERE slug...</code>, <code>SELECT slug, status FROM runs WHERE slug != ''</code>) intentionally select a strict subset unrelated to <code>type</code>, not a missed column list</td></tr>
     <tr><td>Plan-approval type reuse (own throwaway test)</td><td>Wrote <code>internal/ui/independent_review_throwaway_test.go</code>: proposed a plan with <code>type: "refactor"</code> (not the type the shipped <code>TestApprovingAPlanReusesItsRecordedType</code> uses, <code>"chore"</code>), approved it, asserted <code>run.Type == "refactor"</code> and non-empty. Ran, passed. Then reverted <code>handleApprovePlan</code>'s call to pass <code>""</code> instead of <code>intent.Type</code>, reran both my test and the shipped one: both failed with <code>run.Type == ""</code>, exactly the predicted symptom. Restored the file (<code>git diff --stat</code> confirmed empty), deleted my throwaway test, reran <code>go build ./... &amp;&amp; go test ./internal/ui/... -count=1</code> clean</td></tr>
     <tr><td>Real git branch name</td><td><code>go test ./internal/ui/... -run TestDispatchedBranchIsNamedByItsTypeAndChange -v</code>: passed. Read the test itself (<code>internal/ui/work_type_test.go:282-323</code>): asserts <code>git rev-parse --abbrev-ref HEAD</code> in the real worktree equals <code>naming.BranchName("fix", changeID)</code>, and separately confirms the branch exists in the source repo via <code>git show-ref --verify --quiet refs/heads/&lt;branch&gt;</code> — real git state, not a computed string compared to itself</td></tr>
-    <tr><td>Full suite</td><td><code>cd /Users/lars/Dev/sergeant-v2 &amp;&amp; go build ./... &amp;&amp; go vet ./... &amp;&amp; go test ./internal/... -count=1</code> at current HEAD <code>cc486c8</code> (1 commit ahead of the reviewed merge, confirmed docs-only via <code>git show --stat cc486c8</code>)</td></tr>
-    <tr><td><strong>Mutation test: legacy row with empty <code>Type</code></strong></td><td>Read <code>internal/store/work_type_test.go</code>'s <code>TestOpenAddsTypeColumnsToAnOlderDatabase</code>: explicitly seeds a run row that predates the <code>type</code> column, reopens the store, and asserts <code>oldRun.Type == ""</code> ("nothing to backfill") — this is shipped, intentional behavior, not a bug in the migration. But <code>describeDelivery</code> (<code>internal/ui/server.go:1701-1702</code>) and <code>handleCreatePR</code> (<code>:652-658</code>) both call <code>naming.BranchName(run.Type, run.ChangeID)</code> unconditionally once <code>GetRun</code> succeeds, with no check for an empty <code>Type</code>; for such a row this produces <code>"/&lt;change-id&gt;"</code>, not the row's real historical branch (<code>"sergeant/&lt;run-id&gt;"</code>, the pre-this-change format). No test in the shipped diff exercises either of these two call sites against a <code>Type == ""</code> row</td></tr>
+    <tr><td>Full suite</td><td><code>cd /Users/lars/Dev/sgt-v2 &amp;&amp; go build ./... &amp;&amp; go vet ./... &amp;&amp; go test ./internal/... -count=1</code> at current HEAD <code>cc486c8</code> (1 commit ahead of the reviewed merge, confirmed docs-only via <code>git show --stat cc486c8</code>)</td></tr>
+    <tr><td><strong>Mutation test: legacy row with empty <code>Type</code></strong></td><td>Read <code>internal/store/work_type_test.go</code>'s <code>TestOpenAddsTypeColumnsToAnOlderDatabase</code>: explicitly seeds a run row that predates the <code>type</code> column, reopens the store, and asserts <code>oldRun.Type == ""</code> ("nothing to backfill") — this is shipped, intentional behavior, not a bug in the migration. But <code>describeDelivery</code> (<code>internal/ui/server.go:1701-1702</code>) and <code>handleCreatePR</code> (<code>:652-658</code>) both call <code>naming.BranchName(run.Type, run.ChangeID)</code> unconditionally once <code>GetRun</code> succeeds, with no check for an empty <code>Type</code>; for such a row this produces <code>"/&lt;change-id&gt;"</code>, not the row's real historical branch (<code>"sgt/&lt;run-id&gt;"</code>, the pre-this-change format). No test in the shipped diff exercises either of these two call sites against a <code>Type == ""</code> row</td></tr>
   </table>
 </section>
 
@@ -108,8 +108,8 @@ a{color:var(--muted)}
   <h2>Findings</h2>
 
   <div class="item ok">
-    <h3><span class="sev low">verified</span> &nbsp; The four independently hand-built <code>"sergeant/&lt;run-id&gt;"</code> constructions are genuinely gone, not just renamed</h3>
-    <p><code>dag.BranchName(runID)</code> is deleted outright (not left as a dead, unused function — <code>grep -rn 'dag\.BranchName'</code> and <code>grep -rn 'func BranchName'</code> both return nothing in <code>internal/dag</code>). The three <code>fmt.Sprintf("sergeant/...")</code> constructions in <code>ui/server.go</code>'s <code>handleCreatePR</code>, <code>mcp/server.go</code>'s <code>sergeant_seal_pr</code> case, and <code>runner/runner.go</code>'s <code>DeliverPullRequest</code> fallback are each replaced with a <code>Store.GetRun</code> lookup followed by <code>naming.BranchName(run.Type, run.ChangeID)</code>. A repo-wide grep for the literal substring <code>"sergeant/</code> turns up only <code>Producer</code> envelope labels (<code>"sergeant/ui"</code>, <code>"sergeant/runner"</code>, <code>"sergeant/mcp"</code>), a wholly unrelated field that happens to share the same string prefix by coincidence, not a missed branch-name construction.</p>
+    <h3><span class="sev low">verified</span> &nbsp; The four independently hand-built <code>"sgt/&lt;run-id&gt;"</code> constructions are genuinely gone, not just renamed</h3>
+    <p><code>dag.BranchName(runID)</code> is deleted outright (not left as a dead, unused function — <code>grep -rn 'dag\.BranchName'</code> and <code>grep -rn 'func BranchName'</code> both return nothing in <code>internal/dag</code>). The three <code>fmt.Sprintf("sgt/...")</code> constructions in <code>ui/server.go</code>'s <code>handleCreatePR</code>, <code>mcp/server.go</code>'s <code>sgt_seal_pr</code> case, and <code>runner/runner.go</code>'s <code>DeliverPullRequest</code> fallback are each replaced with a <code>Store.GetRun</code> lookup followed by <code>naming.BranchName(run.Type, run.ChangeID)</code>. A repo-wide grep for the literal substring <code>"sgt/</code> turns up only <code>Producer</code> envelope labels (<code>"sgt/ui"</code>, <code>"sgt/runner"</code>, <code>"sgt/mcp"</code>), a wholly unrelated field that happens to share the same string prefix by coincidence, not a missed branch-name construction.</p>
   </div>
 
   <div class="item ok">
@@ -140,7 +140,7 @@ a{color:var(--muted)}
   <div class="item warn">
     <h3><span class="sev med">real gap, non-blocking for this diff's own stated scope</span> &nbsp; A pre-migration run or intent has <code>Type == ""</code>, and two of the five <code>naming.BranchName</code> call sites have no guard against it</h3>
     <p>The shipped <code>TestOpenAddsTypeColumnsToAnOlderDatabase</code> (<code>internal/store/work_type_test.go:85-183</code>) proves, deliberately and by design, that a run or intent row written before this migration reads back with <code>Type == ""</code> — "nothing to backfill" is the comment's own words, and this is the correct, intentional behavior for the migration itself. The gap is downstream of that: <code>describeDelivery</code> (<code>internal/ui/server.go:1701-1702</code>) does
-    <code>if run, err := srv.Store.GetRun(runID); err == nil { branch = naming.BranchName(run.Type, run.ChangeID) }</code> — <code>GetRun</code> succeeds for a legacy row (it has no reason not to), so <code>branch</code> becomes <code>naming.BranchName("", "&lt;change-id&gt;")</code> = <code>"/&lt;change-id&gt;"</code>, not the row's real historical branch, which is actually named <code>"sergeant/&lt;run-id&gt;"</code> (the pre-this-change format <code>dag.BranchName</code> used to compute correctly for exactly this case). <code>handleCreatePR</code> (<code>:652-658</code>) has the identical shape: it 500s only if <code>GetRun</code> itself errors, never if <code>Type</code> is empty, and would attempt <code>gh pr create --head "/&lt;change-id&gt;"</code> for a legacy run. I confirmed by direct inspection of <code>naming.BranchName</code>'s one-line body (<code>return workType + "/" + changeID</code>) that this is not a hypothetical — it is the literal, unconditional output for an empty <code>workType</code>. No test in this diff exercises <code>describeDelivery</code> or <code>handleCreatePR</code> against a <code>Type == ""</code> row; the shipped tests that reach these two functions all dispatch through the validated path, so they always carry a real type. Severity: this only affects runs and proposed intents already sitting in a database that predates this deploy — proposal.md's own out-of-scope section only disclaims <em>reclassifying</em> old rows, not the narrower, more specific fact that new code reading old rows now computes a wrong-but-plausible-looking value instead of erroring or falling back to the old format. This does not fail any scenario in <code>specs/work-type/spec.md</code>, all of which describe dispatches made through the validated path from now on — but it is a real, silent regression in <code>describeDelivery</code>'s branch report for any run that existed before this commit, and it was not evaluated in the builder's own stated verification (which covers "the branch created," not "the branch computed for a pre-existing run").</p>
+    <code>if run, err := srv.Store.GetRun(runID); err == nil { branch = naming.BranchName(run.Type, run.ChangeID) }</code> — <code>GetRun</code> succeeds for a legacy row (it has no reason not to), so <code>branch</code> becomes <code>naming.BranchName("", "&lt;change-id&gt;")</code> = <code>"/&lt;change-id&gt;"</code>, not the row's real historical branch, which is actually named <code>"sgt/&lt;run-id&gt;"</code> (the pre-this-change format <code>dag.BranchName</code> used to compute correctly for exactly this case). <code>handleCreatePR</code> (<code>:652-658</code>) has the identical shape: it 500s only if <code>GetRun</code> itself errors, never if <code>Type</code> is empty, and would attempt <code>gh pr create --head "/&lt;change-id&gt;"</code> for a legacy run. I confirmed by direct inspection of <code>naming.BranchName</code>'s one-line body (<code>return workType + "/" + changeID</code>) that this is not a hypothetical — it is the literal, unconditional output for an empty <code>workType</code>. No test in this diff exercises <code>describeDelivery</code> or <code>handleCreatePR</code> against a <code>Type == ""</code> row; the shipped tests that reach these two functions all dispatch through the validated path, so they always carry a real type. Severity: this only affects runs and proposed intents already sitting in a database that predates this deploy — proposal.md's own out-of-scope section only disclaims <em>reclassifying</em> old rows, not the narrower, more specific fact that new code reading old rows now computes a wrong-but-plausible-looking value instead of erroring or falling back to the old format. This does not fail any scenario in <code>specs/work-type/spec.md</code>, all of which describe dispatches made through the validated path from now on — but it is a real, silent regression in <code>describeDelivery</code>'s branch report for any run that existed before this commit, and it was not evaluated in the builder's own stated verification (which covers "the branch created," not "the branch computed for a pre-existing run").</p>
   </div>
 
 </section>
@@ -150,9 +150,9 @@ a{color:var(--muted)}
   <table>
     <tr><th>Claim</th><th>Evidence</th><th>Result</th></tr>
     <tr><td>Build/vet/test clean at HEAD <code>cc486c8</code></td><td><code>go build ./...</code>, <code>go vet ./...</code>, <code>go test ./internal/... -count=1</code></td><td>pass, 11/11 packages, vet silent</td></tr>
-    <tr><td>Zero remaining hand-built branch strings</td><td><code>grep -rn '"sergeant/'</code>, <code>grep -rn 'Sprintf("sergeant'</code>, <code>grep -rn 'dag\.BranchName'</code> across the whole repo</td><td>only unrelated <code>Producer</code> labels remain; <code>dag.BranchName</code> fully deleted</td></tr>
+    <tr><td>Zero remaining hand-built branch strings</td><td><code>grep -rn '"sgt/'</code>, <code>grep -rn 'Sprintf("sgt'</code>, <code>grep -rn 'dag\.BranchName'</code> across the whole repo</td><td>only unrelated <code>Producer</code> labels remain; <code>dag.BranchName</code> fully deleted</td></tr>
     <tr><td>All 5 <code>naming.BranchName</code> call sites converged, real lookups</td><td><code>grep -rn 'naming\.BranchName('</code>: <code>dag/engine.go:148</code>, <code>ui/server.go:658,1702</code>, <code>mcp/server.go:429</code>, <code>runner/runner.go:604</code></td><td>all 5 preceded by a <code>Store.GetRun</code> call; no literal passed at any production call site</td></tr>
-    <tr><td><code>internal/runner</code> does not import <code>internal/dag</code></td><td><code>grep -n '"github.com/callmeradical/sergeant/internal' internal/runner/runner.go</code></td><td>imports <code>handoff</code>, <code>naming</code>, <code>redact</code>, <code>store</code> only</td></tr>
+    <tr><td><code>internal/runner</code> does not import <code>internal/dag</code></td><td><code>grep -n '"github.com/callmeradical/sgt/internal' internal/runner/runner.go</code></td><td>imports <code>handoff</code>, <code>naming</code>, <code>redact</code>, <code>store</code> only</td></tr>
     <tr><td><code>handleDispatch</code> validates type before change resolution and both branches</td><td>Read <code>internal/ui/server.go</code> lines 1360–1487</td><td>order confirmed: decode → brief check → <code>validateWorkType</code> → <code>LoadProject</code> → <code>ValidateAgent</code> → change resolution → fork</td></tr>
     <tr><td>Fixed vocabulary matches proposal.md exactly</td><td>Read <code>validWorkTypes</code> map literal</td><td><code>feat, fix, refactor, docs, chore, test</code> — 6, no more, no fewer</td></tr>
     <tr><td>Every run/intent SELECT uses the shared column list</td><td><code>grep -n 'FROM runs\|INTO runs\|FROM intents\|INTO intents\|runColumns\|intentColumns' internal/store/*.go</code>, including <code>reconcile.go</code></td><td>all 8 full-row queries use <code>runColumns</code>/<code>intentColumns</code> + <code>scanRun</code>/<code>scanIntent</code>; no hand-copied list found</td></tr>
@@ -172,7 +172,7 @@ a{color:var(--muted)}
     plan's originally recorded type rather than re-deriving or defaulting it (independently mutation-confirmed by me,
     not just trusted from the shipped test); and the dispatched branch is genuinely named <code>&lt;type&gt;/&lt;change-id&gt;</code>
     in real git, with <code>gh pr create</code> targeting that exact same branch. The four independently
-    hand-duplicated <code>"sergeant/&lt;run-id&gt;"</code> constructions this change set out to consolidate are
+    hand-duplicated <code>"sgt/&lt;run-id&gt;"</code> constructions this change set out to consolidate are
     genuinely gone — a repo-wide grep confirms zero remaining hand-built branch-name literals, and all five real
     call sites of <code>naming.BranchName</code> converge on a real <code>Store.GetRun</code> lookup, not a
     passed-through literal. The import-cycle reasoning for relocating <code>BranchName</code> to
@@ -184,7 +184,7 @@ a{color:var(--muted)}
     and two of the five <code>naming.BranchName</code> call sites — <code>describeDelivery</code> and
     <code>handleCreatePR</code> — have no guard against this, silently computing a malformed
     <code>"/&lt;change-id&gt;"</code> branch name for such a row instead of the row's real historical
-    <code>"sergeant/&lt;run-id&gt;"</code> branch, or an explicit error. This does not fail any scenario the spec
+    <code>"sgt/&lt;run-id&gt;"</code> branch, or an explicit error. This does not fail any scenario the spec
     actually states (all of which describe dispatches made through the validated path going forward), and
     proposal.md explicitly disclaims reclassifying historical rows — but it does not address the narrower,
     concrete fact that new code now reads old rows and produces a plausible-looking wrong answer rather than an
@@ -214,7 +214,7 @@ a{color:var(--muted)}
 <hr style="border:none;border-top:2px solid var(--ink);margin:44px 0">
 
 <header>
-  <h1>Sergeant v2</h1>
+  <h1>Sgt v2</h1>
   <p>Independent review. Written by the critic, not the builder.</p>
   <p class="meta">
     Review 024 · 2026-08-24 · branch <code>v2</code> · commits <code>a9389a1</code>
@@ -237,7 +237,7 @@ a{color:var(--muted)}
     <div class="card"><div class="label">Tests</div><div class="value"><span class="status">11/11 packages pass</span></div><div class="small"><code>go test ./internal/... -count=1</code>, including the 4 new <code>internal/store/cleanup_test.go</code> tests and the 7 new <code>internal/ui/cleanup_test.go</code> tests</div></div>
     <div class="card"><div class="label"><code>RunsEligibleForCleanup</code> query</div><div class="value"><span class="status">verified, exact</span></div><div class="small">Filters <code>status IN ('passed','failed','cancelled','interrupted') AND updated_at &lt;= ?</code>, and uses the shared <code>runColumns</code> constant and <code>scanRun</code> — no hand-copied column list</div></div>
     <div class="card"><div class="label">Shared reclaim decision</div><div class="value"><span class="status">genuinely one function</span></div><div class="small"><code>reclaimFleetDir</code> is the single home of the running-check, <code>dirtyWorktreesUnder</code> check, and <code>os.RemoveAll</code>; both <code>handleCleanWorktrees</code> and <code>reclaimEligibleFleetDirs</code> call it — no duplicated copy of the logic exists anywhere</div></div>
-    <div class="card"><div class="label">Background loop actually started</div><div class="value"><span class="status">verified, real, not the dead-loop bug class</span></div><div class="small"><code>go srv.runFleetCleanupLoop(context.Background())</code> is a live statement inside <code>Server.Start()</code> (<code>internal/ui/server.go:185</code>), right after <code>ReconcileOrphanedRuns</code>; <code>Server.Start()</code> is itself called from <code>cmd/sergeant/main.go:163</code> — traced the full call chain, not just <code>grep</code>'d the function definition</div></div>
+    <div class="card"><div class="label">Background loop actually started</div><div class="value"><span class="status">verified, real, not the dead-loop bug class</span></div><div class="small"><code>go srv.runFleetCleanupLoop(context.Background())</code> is a live statement inside <code>Server.Start()</code> (<code>internal/ui/server.go:185</code>), right after <code>ReconcileOrphanedRuns</code>; <code>Server.Start()</code> is itself called from <code>cmd/sgt/main.go:163</code> — traced the full call chain, not just <code>grep</code>'d the function definition</div></div>
     <div class="card"><div class="label">Fixed constants</div><div class="value"><span class="status">verified</span></div><div class="small"><code>fleetCleanupRetention = 7 * 24 * time.Hour</code>, <code>fleetCleanupInterval = 1 * time.Hour</code>; both untyped Go constants, no env var or config read anywhere near them</div></div>
     <div class="card"><div class="label">Manual endpoint's request/response shape</div><div class="value"><span class="status">unchanged</span></div><div class="small"><code>handleCleanWorktrees</code>'s <code>task_id</code>/<code>dry_run</code>/<code>force</code> request fields and its <code>status</code>/<code>removed</code>/<code>skipped</code>/<code>count</code> response fields are byte-for-byte the same as before the refactor; only its per-directory decision now delegates to <code>reclaimFleetDir</code></div></div>
     <div class="card"><div class="label">My own mutation test</div><div class="value"><span class="status">regression genuinely caught</span></div><div class="small">Changed <code>reclaimEligibleFleetDirs</code>'s call from <code>force=false</code> to <code>force=true</code>: <code>TestReclaimEligibleFleetDirsLeavesADirtyWorktree</code> failed exactly as predicted (worktree deleted); reverted, tree confirmed clean, full suite rerun green</div></div>
@@ -262,7 +262,7 @@ a{color:var(--muted)}
     <tr><td>The actual diff</td><td><code>git diff cc486c8 HEAD -- internal/store/store.go internal/ui/server.go internal/store/cleanup_test.go internal/ui/cleanup_test.go</code>, read in full, plus <code>git show ccc8caa</code> for the follow-on commit in isolation</td></tr>
     <tr><td><code>RunsEligibleForCleanup</code></td><td>Read the query text directly (<code>internal/store/store.go</code>): <code>SELECT runColumns FROM runs WHERE status IN ('passed','failed','cancelled','interrupted') AND updated_at &lt;= ? ORDER BY updated_at ASC</code>, then <code>scanRun</code> per row — confirmed both the terminal-status list and the cutoff condition are ANDed together in one query, not applied as a post-filter in Go</td></tr>
     <tr><td>Shared reclaim function</td><td>Read <code>reclaimFleetDir</code>'s full body and both call sites: <code>handleCleanWorktrees</code> (passes <code>req.Force</code>/<code>req.DryRun</code>) and <code>reclaimEligibleFleetDirs</code> (passes <code>false, false</code> unconditionally) — confirmed via <code>grep -n 'reclaimFleetDir('</code> that exactly these 2 call sites exist, and the running-check/dirty-check/<code>RemoveAll</code> logic exists in exactly 1 place</td></tr>
-    <tr><td>Loop wiring</td><td><code>grep -n 'runFleetCleanupLoop' internal/ui/server.go</code>: defined once, invoked once via <code>go srv.runFleetCleanupLoop(context.Background())</code> inside <code>Server.Start()</code>; then <code>grep -n '\.Start()' cmd/sergeant/main.go</code> confirmed <code>server.Start()</code> is called at <code>main.go:163</code> — traced start to finish rather than trusting the function's existence alone, since this exact "defined but never started" bug class was flagged as a specific risk for this review</td></tr>
+    <tr><td>Loop wiring</td><td><code>grep -n 'runFleetCleanupLoop' internal/ui/server.go</code>: defined once, invoked once via <code>go srv.runFleetCleanupLoop(context.Background())</code> inside <code>Server.Start()</code>; then <code>grep -n '\.Start()' cmd/sgt/main.go</code> confirmed <code>server.Start()</code> is called at <code>main.go:163</code> — traced start to finish rather than trusting the function's existence alone, since this exact "defined but never started" bug class was flagged as a specific risk for this review</td></tr>
     <tr><td>Test substance: running-run refusal</td><td>Read <code>TestReclaimEligibleFleetDirsNeverTouchesARunningRun</code> (fixture: <code>status: "running"</code>, backdated 30 days) and <code>TestReclaimFleetDirRefusesARunningRunWithoutForce</code> (calls <code>reclaimFleetDir</code> directly); ran both, both pass. The commit message for <code>ccc8caa</code> itself documents that mutation testing found the direct-call test had zero prior coverage — I independently re-derived the same conclusion by inspection: the automatic path never reaches the guard because the SQL already excludes <code>running</code>, so only the direct test exercises the guard's own code</td></tr>
     <tr><td>Test substance: dirty-worktree refusal</td><td>Read <code>TestReclaimEligibleFleetDirsLeavesADirtyWorktree</code>: builds a real git repo with an untracked file under the fleet directory via <code>initDirtyGitRepo</code>, so <code>dirtyWorktreesUnder</code>'s real <code>git status --porcelain</code> invocation reports it dirty — not a stubbed or mocked dirty signal</td></tr>
     <tr><td>Database-untouched claim</td><td>Read <code>TestReclaimEligibleFleetDirsLeavesDatabaseRecordsUntouched</code>: creates a run with a phase and an envelope, backdates it past the retention window, snapshots <code>GetRun</code>/<code>ListPhasesForRun</code>/<code>ListEnvelopesForRun</code> before and after <code>reclaimEligibleFleetDirs</code>, and asserts field-level equality (status, <code>UpdatedAt</code>, phase IDs/status, envelope IDs/summary) — not just row counts</td></tr>
@@ -271,7 +271,7 @@ a{color:var(--muted)}
     <tr><td><strong>My own mutation test</strong></td><td>Edited <code>reclaimEligibleFleetDirs</code>'s call from <code>reclaimFleetDir(fleetDir, run.Status, false, false)</code> to <code>reclaimFleetDir(fleetDir, run.Status, true, false)</code> (force always on); reran <code>TestReclaimEligibleFleetDirsLeavesADirtyWorktree</code> and <code>TestReclaimEligibleFleetDirsNeverTouchesARunningRun</code></td></tr>
     <tr><td>Nonexistent-fleet-dir path</td><td>Read <code>reclaimEligibleFleetDirs</code>: <code>if _, err := os.Stat(fleetDir); err != nil { continue }</code> before ever calling <code>reclaimFleetDir</code> — matches design.md's "silently skipped, not an error" for both a missing directory and, more broadly, any stat failure; <code>grep</code>'d <code>internal/ui/cleanup_test.go</code> for a test that creates an eligible DB row with no corresponding fleet directory — found none</td></tr>
     <tr><td>Store-query-failure path</td><td>Read <code>reclaimEligibleFleetDirs</code>: on <code>RunsEligibleForCleanup</code> error, <code>log.Printf</code>s and <code>return</code>s — the function returns, but <code>runFleetCleanupLoop</code>'s <code>for {}</code>/<code>select</code> keeps running and will retry on the next hourly tick; no panic, no server crash. No test forces a store error to exercise this path directly</td></tr>
-    <tr><td>Full suite</td><td><code>cd /Users/lars/Dev/sergeant-v2 &amp;&amp; go build ./... &amp;&amp; go vet ./... &amp;&amp; go test ./internal/... -count=1</code> at HEAD <code>ccc8caa</code>; also ran <code>-run 'Reclaim'</code> and <code>-run 'TestRunsEligibleForCleanup'</code> individually with <code>-v</code> to read every subtest's own pass/fail rather than trusting the package-level summary alone</td></tr>
+    <tr><td>Full suite</td><td><code>cd /Users/lars/Dev/sgt-v2 &amp;&amp; go build ./... &amp;&amp; go vet ./... &amp;&amp; go test ./internal/... -count=1</code> at HEAD <code>ccc8caa</code>; also ran <code>-run 'Reclaim'</code> and <code>-run 'TestRunsEligibleForCleanup'</code> individually with <code>-v</code> to read every subtest's own pass/fail rather than trusting the package-level summary alone</td></tr>
   </table>
 </section>
 
@@ -290,7 +290,7 @@ a{color:var(--muted)}
 
   <div class="item ok">
     <h3><span class="sev low">verified, specifically scrutinized</span> &nbsp; The background loop is actually started, not merely defined</h3>
-    <p>This review was asked to specifically scrutinize this bug class. Traced the full chain: <code>internal/ui/server.go:185</code> contains the live statement <code>go srv.runFleetCleanupLoop(context.Background())</code>, inside <code>Server.Start()</code>, placed immediately after the existing <code>ReconcileOrphanedRuns</code> startup call (matching design.md's stated precedent) and before the HTTP listener starts serving. <code>cmd/sergeant/main.go:163</code> calls <code>server.Start()</code> — confirmed by direct <code>grep</code>, not inference — so <code>runFleetCleanupLoop</code> genuinely runs for the lifetime of every real server process, not just in a test harness that calls it directly. This is not the "implemented but never wired" bug class found elsewhere in this project's history.</p>
+    <p>This review was asked to specifically scrutinize this bug class. Traced the full chain: <code>internal/ui/server.go:185</code> contains the live statement <code>go srv.runFleetCleanupLoop(context.Background())</code>, inside <code>Server.Start()</code>, placed immediately after the existing <code>ReconcileOrphanedRuns</code> startup call (matching design.md's stated precedent) and before the HTTP listener starts serving. <code>cmd/sgt/main.go:163</code> calls <code>server.Start()</code> — confirmed by direct <code>grep</code>, not inference — so <code>runFleetCleanupLoop</code> genuinely runs for the lifetime of every real server process, not just in a test harness that calls it directly. This is not the "implemented but never wired" bug class found elsewhere in this project's history.</p>
   </div>
 
   <div class="item ok">
@@ -332,7 +332,7 @@ a{color:var(--muted)}
     <tr><td>Build/vet/test clean at HEAD <code>ccc8caa</code></td><td><code>go build ./...</code>, <code>go vet ./...</code>, <code>go test ./internal/... -count=1</code></td><td>pass, 11/11 packages, vet silent</td></tr>
     <tr><td>Eligibility query ANDs status and cutoff, uses <code>runColumns</code></td><td>Read <code>Store.RunsEligibleForCleanup</code>'s SQL text directly</td><td><code>WHERE status IN (...) AND updated_at &lt;= ?</code>, single query, <code>SELECT runColumns ... </code> + <code>scanRun</code></td></tr>
     <tr><td>Reclaim logic unified, not duplicated</td><td><code>grep -n 'reclaimFleetDir(' internal/ui/server.go</code>; read <code>handleCleanWorktrees</code> before/after via <code>git show cc486c8:internal/ui/server.go</code></td><td>exactly 2 call sites, both delegating to the one function; the old inline copy is deleted, not left alongside a new one</td></tr>
-    <tr><td>Background loop actually started at server startup</td><td><code>grep -n 'runFleetCleanupLoop' internal/ui/server.go</code>; <code>grep -n '\.Start()' cmd/sergeant/main.go</code></td><td><code>go srv.runFleetCleanupLoop(context.Background())</code> inside <code>Server.Start()</code> (line 185); <code>server.Start()</code> called from <code>main.go:163</code> — real, not dead code</td></tr>
+    <tr><td>Background loop actually started at server startup</td><td><code>grep -n 'runFleetCleanupLoop' internal/ui/server.go</code>; <code>grep -n '\.Start()' cmd/sgt/main.go</code></td><td><code>go srv.runFleetCleanupLoop(context.Background())</code> inside <code>Server.Start()</code> (line 185); <code>server.Start()</code> called from <code>main.go:163</code> — real, not dead code</td></tr>
     <tr><td><strong>My own mutation test: force override</strong></td><td>Changed <code>reclaimEligibleFleetDirs</code>'s call to <code>reclaimFleetDir(fleetDir, run.Status, true, false)</code>, reran <code>TestReclaimEligibleFleetDirsLeavesADirtyWorktree</code> and <code>TestReclaimEligibleFleetDirsNeverTouchesARunningRun</code></td><td>dirty-worktree test failed exactly as predicted (directory deleted); running-run test still passed (different guard); reverted, <code>git status --short</code> confirmed clean, full suite rerun green</td></tr>
     <tr><td>Database rows genuinely untouched</td><td>Read <code>TestReclaimEligibleFleetDirsLeavesDatabaseRecordsUntouched</code>'s field-level before/after assertions; read <code>reclaimFleetDir</code>/<code>reclaimEligibleFleetDirs</code> for any <code>Store</code> write call</td><td>test passes with field-level equality checks; neither function calls any store write method — only <code>os.RemoveAll</code> against the filesystem</td></tr>
     <tr><td>Fixed constants, no configuration</td><td>Read <code>fleetCleanupRetention</code>/<code>fleetCleanupInterval</code> declarations; <code>grep -n 'Getenv\|flag\.'</code> near the cleanup code</td><td>plain untyped <code>const</code>, 7 days and 1 hour; no env/config wiring found</td></tr>
@@ -362,7 +362,7 @@ a{color:var(--muted)}
     exactly the dirty-worktree test and nothing else, as predicted. The background loop is
     genuinely started at real server startup — <code>go srv.runFleetCleanupLoop(...)</code>
     inside <code>Server.Start()</code>, which is itself called from
-    <code>cmd/sergeant/main.go</code> — not merely defined and left uncalled, the specific
+    <code>cmd/sgt/main.go</code> — not merely defined and left uncalled, the specific
     bug class this review was asked to scrutinize. The retention window (7 days) and tick
     interval (1 hour) are fixed Go constants with no configuration path, matching the
     proposal's explicit non-goal. The manual endpoint's request and response shape are
@@ -397,7 +397,7 @@ a{color:var(--muted)}
 <hr style="border:none;border-top:2px solid var(--ink);margin:44px 0">
 
 <header>
-  <h1>Sergeant v2</h1>
+  <h1>Sgt v2</h1>
   <p>Independent review. Written by the critic, not the builder.</p>
   <p class="meta">
     Review 025 · 2026-08-24 · branch <code>v2</code> · merge commit <code>de9c0db</code>
@@ -449,7 +449,7 @@ a{color:var(--muted)}
     <tr><td>No third-party dependency</td><td><code>git diff 826df12 HEAD -- go.mod go.sum</code>: empty. <code>grep -n '&lt;script src' internal/ui/static/index.html</code>: one hit, the Tailwind CDN line at line 7, confirmed present in <code>826df12</code> already via <code>git show 826df12:internal/ui/static/index.html | grep cdn.tailwindcss</code> — pre-existing, untouched</td></tr>
     <tr><td><code>GET /api/analytics</code> purity</td><td>Read <code>handleAnalytics</code> in full: reads the query param, calls <code>ComputeWorkAnalytics</code>, writes JSON — no request body parsing, no write call. Read <code>ComputeWorkAnalytics</code>, <code>AllRunsForAnalytics</code>, <code>AllBulletsForAnalytics</code>, and <code>provenanceForRun</code> (which calls the existing <code>ListPhasesForRun</code>) end to end: every call is a <code>db.Query</code>, never <code>db.Exec</code> or an <code>UPDATE</code>/<code>INSERT</code>/<code>DELETE</code> statement</td></tr>
     <tr><td>Live endpoint</td><td><code>curl -s "http://localhost:8484/api/analytics?project=all"</code> against the already-rebuilt-and-restarted server: <code>{"total_runs":59,"by_status":{"cancelled":7,"failed":5,"interrupted":5,"passed":42},...}</code> — 7+5+5+42=59=<code>total_runs</code>; <code>by_agent</code> (22+11+7+19=59) and <code>by_type</code> (57+2=59) both sum to the same total; response shape matches <code>WorkAnalytics</code>'s JSON tags exactly</td></tr>
-    <tr><td>Full suite</td><td><code>cd /Users/lars/Dev/sergeant-v2 &amp;&amp; go build ./... &amp;&amp; go vet ./... &amp;&amp; go test ./internal/... -count=1</code> at HEAD <code>de9c0db</code>, run twice (once before the mutation experiment, once after reverting it) — both times 11/11 packages pass</td></tr>
+    <tr><td>Full suite</td><td><code>cd /Users/lars/Dev/sgt-v2 &amp;&amp; go build ./... &amp;&amp; go vet ./... &amp;&amp; go test ./internal/... -count=1</code> at HEAD <code>de9c0db</code>, run twice (once before the mutation experiment, once after reverting it) — both times 11/11 packages pass</td></tr>
   </table>
 </section>
 
@@ -569,7 +569,7 @@ a{color:var(--muted)}
 <hr style="border:none;border-top:2px solid var(--ink);margin:44px 0">
 
 <header>
-  <h1>Sergeant v2</h1>
+  <h1>Sgt v2</h1>
   <p>Independent review. Written by the critic, not the builder.</p>
   <p class="meta">
     Review 026 · 2026-08-25 · branch <code>v2</code> · merge commit <code>cb2d9ac</code>
@@ -590,13 +590,13 @@ a{color:var(--muted)}
     <div class="card"><div class="label">Signatures named in design.md</div><div class="value"><span class="status">match exactly</span></div><div class="small"><code>export.Target.Export(ctx, rec) error</code>, <code>export.Record</code>'s 9 fields, <code>Runner{Store, Target, Interval}</code>, <code>Runner.Tick</code>/<code>Runner.Run</code>, <code>Store.LoadExportCursor() (int64, error)</code>, <code>Store.SaveExportCursor(seq int64) error</code>, <code>config.Project.Export *Export</code> — all present, all with the exact shape design.md specifies</div></div>
     <div class="card"><div class="label">Spec.md scenario coverage</div><div class="value"><span class="status">9/9 scenarios, real tests</span></div><div class="small">Every named scenario in <code>specs/task-export/spec.md</code> maps to a specific test in <code>internal/export/runner_test.go</code> or <code>internal/store/store_test.go</code>; see table below</div></div>
     <div class="card"><div class="label">Retry-without-rerunning-the-write guarantee</div><div class="value"><span class="status">mutation-verified independently</span></div><div class="small">Deleted <code>Tick</code>'s stop-on-failure <code>break</code> entirely (worse than the merge commit's own description) — <code>TestExportFailureIsRetriedWithoutRerunningOriginalWrite</code> failed exactly as predicted; restored, <code>git diff --stat</code> confirmed clean</div></div>
-    <div class="card"><div class="label"><code>export.Runner</code> wiring into <code>sergeant ui</code></div><div class="value"><span class="status">not wired — dead code outside tests</span></div><div class="small"><code>cmd/sergeant/main.go</code>'s <code>startExportRunners</code> never constructs an <code>export.Runner</code> or calls <code>.Run</code>; it only <code>fmt.Fprintf</code>s a warning to stderr for a project with an <code>Export</code> block and returns. <code>grep -rn "export\.Runner\|\.Run(ctx)" cmd/ internal/</code> (excluding <code>_test.go</code>) has zero constructor/call-site hits</div></div>
+    <div class="card"><div class="label"><code>export.Runner</code> wiring into <code>sgt ui</code></div><div class="value"><span class="status">not wired — dead code outside tests</span></div><div class="small"><code>cmd/sgt/main.go</code>'s <code>startExportRunners</code> never constructs an <code>export.Runner</code> or calls <code>.Run</code>; it only <code>fmt.Fprintf</code>s a warning to stderr for a project with an <code>Export</code> block and returns. <code>grep -rn "export\.Runner\|\.Run(ctx)" cmd/ internal/</code> (excluding <code>_test.go</code>) has zero constructor/call-site hits</div></div>
   </div>
   <p><strong>Verdict:</strong> MEETS SPEC WITH CAVEATS. The library-level implementation
   (<code>internal/export</code>, the <code>store</code> cursor methods, and <code>config.Project.Export</code>)
   matches design.md's named signatures exactly, every scenario in specs/task-export/spec.md has a
   real, non-tautological test, and the PRD's hard out-of-band requirement is independently
-  mutation-verified. The caveat is <code>cmd/sergeant/main.go</code>'s <code>startExportRunners</code>,
+  mutation-verified. The caveat is <code>cmd/sgt/main.go</code>'s <code>startExportRunners</code>,
   which design.md's "Wiring" section and tasks.md both require to construct a <code>Runner</code>
   and start <code>Run</code> in a goroutine, but which in the shipped diff only logs a stderr warning
   and never constructs a <code>Runner</code> at all. See Findings for detail.</p>
@@ -607,13 +607,13 @@ a{color:var(--muted)}
   <table>
     <tr><th>Area</th><th>Method</th></tr>
     <tr><td>Binding spec</td><td>Read <code>openspec/changes/task-tracking-is-a-readonly-export/{proposal,design,tasks}.md</code>, <code>specs/task-export/spec.md</code>, and the originating <code>docs/prd-task-tracking-export.md</code> in full before reading any code</td></tr>
-    <tr><td>The actual diff</td><td><code>git show cb2d9ac --stat</code> (8 files, 830 insertions, 0 deletions — new files only, no existing file rewritten in place other than additive edits to <code>store.go</code>/<code>config.go</code>/<code>main.go</code>); read <code>internal/export/export.go</code>, <code>internal/export/runner.go</code>, <code>internal/export/runner_test.go</code>, the new sections of <code>internal/store/store.go</code>/<code>store_test.go</code>, <code>internal/config/config.go</code>/<code>config_test.go</code>, and <code>cmd/sergeant/main.go</code> in full</td></tr>
+    <tr><td>The actual diff</td><td><code>git show cb2d9ac --stat</code> (8 files, 830 insertions, 0 deletions — new files only, no existing file rewritten in place other than additive edits to <code>store.go</code>/<code>config.go</code>/<code>main.go</code>); read <code>internal/export/export.go</code>, <code>internal/export/runner.go</code>, <code>internal/export/runner_test.go</code>, the new sections of <code>internal/store/store.go</code>/<code>store_test.go</code>, <code>internal/config/config.go</code>/<code>config_test.go</code>, and <code>cmd/sgt/main.go</code> in full</td></tr>
     <tr><td>Signature match against design.md</td><td>Compared <code>export.go</code>/<code>runner.go</code> line by line against design.md's code blocks: <code>Target</code>, <code>Record</code>'s field list and comments (<code>Repo</code> empty for intent, <code>Position -1</code> for intent, <code>Statement</code> empty for bullet), <code>Runner</code>'s three fields and <code>Run</code>'s signature, <code>createExportCursorTable</code>'s exact DDL, <code>config.Export</code>'s <code>Backend</code> field</td></tr>
     <tr><td>Store wiring</td><td><code>grep -n "ExportCursor\|export_cursor\|migrateAddTables"</code> in <code>store.go</code>: <code>export_cursor</code> registered in <code>migrateAddTables</code>'s <code>wanted</code> slice (line 370) alongside <code>intents</code>/<code>bullets</code>/<code>changes</code>/<code>deliveries</code>, exactly as design.md specifies</td></tr>
     <tr><td>Spec scenario → test mapping</td><td>Read every scenario in <code>specs/task-export/spec.md</code> against <code>runner_test.go</code>'s 9 tests and <code>store_test.go</code>'s 2 new tests, matched by name and assertion content, not by title alone</td></tr>
     <tr><td>Out-of-band write-path independence</td><td>Read <code>TestBulletStatusUpdateSucceedsEvenThoughExportTargetIsUnreachable</code>: calls <code>Store.UpdateBulletStatus</code> directly, never constructs or ticks a <code>Runner</code>. Confirmed via <code>grep</code> that <code>UpdateBulletStatus</code> and every other intent/bullet write method in <code>store.go</code> has no call into <code>internal/export</code> anywhere — the independence is structural (no call site exists), not merely a timing race the test got lucky on</td></tr>
     <tr><td><strong>My own mutation test: retry guarantee</strong></td><td>Edited <code>Tick</code> in <code>internal/export/runner.go</code>, deleting the <code>break</code> after a failed <code>Target.Export</code> call entirely (so the loop falls through to <code>advanced = c.Seq</code> unconditionally, advancing the cursor past a record that failed to deliver) — a more aggressive mutation than "replace break with continue," which I tried first and found the shipped test does <em>not</em> catch (both records in that test's batch fail together, so break-vs-continue makes no observable difference in this specific fixture)</td></tr>
-    <tr><td>Production wiring</td><td><code>grep -rn "export\.Runner\|\.Run(ctx)\|export\.Target\b" --include="*.go" cmd/ internal/ | grep -v _test.go</code>; read <code>cmd/sergeant/main.go</code>'s <code>startUI</code> (line 152) and <code>startExportRunners</code> (line 171) in full</td></tr>
+    <tr><td>Production wiring</td><td><code>grep -rn "export\.Runner\|\.Run(ctx)\|export\.Target\b" --include="*.go" cmd/ internal/ | grep -v _test.go</code>; read <code>cmd/sgt/main.go</code>'s <code>startUI</code> (line 152) and <code>startExportRunners</code> (line 171) in full</td></tr>
     <tr><td>Full suite, twice</td><td><code>go test ./internal/... -count=1</code> with the prescribed <code>-skip</code> (clean, 12/12 packages) and without it (exactly the 10 named tests fail, confirmed by name)</td></tr>
   </table>
 </section>
@@ -701,16 +701,16 @@ a{color:var(--muted)}
   </div>
 
   <div class="item warn">
-    <h3><span class="sev med">real gap, not blocking against a named spec.md scenario, but a direct deviation from design.md/tasks.md</span> &nbsp; <code>export.Runner</code> is never constructed or started in <code>cmd/sergeant/main.go</code> — this is exactly the "implemented but never wired up" bug class this codebase has hit before</h3>
-    <p>design.md's "Wiring" section states plainly: "<code>cmd/sergeant/main.go</code>'s
+    <h3><span class="sev med">real gap, not blocking against a named spec.md scenario, but a direct deviation from design.md/tasks.md</span> &nbsp; <code>export.Runner</code> is never constructed or started in <code>cmd/sgt/main.go</code> — this is exactly the "implemented but never wired up" bug class this codebase has hit before</h3>
+    <p>design.md's "Wiring" section states plainly: "<code>cmd/sgt/main.go</code>'s
     <code>startUI</code>... constructs the <code>Runner</code> once, with a <code>Target</code>
     resolved from whichever project(s) have an <code>Export</code> block configured (a project with
     none constructs no <code>Target</code> and the loop simply has nothing to poll for), and starts
     <code>Run</code> in a goroutine alongside the HTTP server." tasks.md repeats this as an explicit
-    checklist item: "Wire <code>Runner</code> into <code>cmd/sergeant/main.go</code>'s
+    checklist item: "Wire <code>Runner</code> into <code>cmd/sgt/main.go</code>'s
     <code>startUI</code>: construct a <code>Runner</code> per project with an <code>Export</code>
     block configured and start <code>Run</code> in a goroutine alongside the HTTP server." The
-    shipped <code>startExportRunners</code> (<code>cmd/sergeant/main.go:171-189</code>) does neither:
+    shipped <code>startExportRunners</code> (<code>cmd/sgt/main.go:171-189</code>) does neither:
     it lists projects, and for any project with a non-nil <code>Export</code>, only
     <code>fmt.Fprintf(os.Stderr, ...)</code>s a message that no target implementation is registered
     yet, then returns. It never allocates an <code>export.Runner{}</code> value and never calls
@@ -722,7 +722,7 @@ a{color:var(--muted)}
     <code>Target</code> implementation exists yet (correctly out of scope for this change), this
     currently has zero externally observable effect — no operator can configure a working export
     today regardless. But it also means the actual poll loop, cursor-advancing machinery this
-    change built and thoroughly unit-tested is not running inside <code>sergeant ui</code> at all,
+    change built and thoroughly unit-tested is not running inside <code>sgt ui</code> at all,
     contradicting the explicit "start <code>Run</code> in a goroutine" instruction both design.md and
     tasks.md give. This is not blocking against any named scenario in
     <code>specs/task-export/spec.md</code> — every one of those 9 scenarios is phrased in terms of
@@ -786,11 +786,11 @@ a{color:var(--muted)}
     fixture; this is noted as a minor, non-blocking gap, not a defect). No scope creep: nothing beyond
     proposal.md/design.md/tasks.md was added, and no <code>Target</code> implementation, inbound path,
     or channel beyond intent/bullet was introduced. <strong>The one caveat that matters:</strong>
-    <code>cmd/sergeant/main.go</code>'s <code>startExportRunners</code> does not do what design.md's
+    <code>cmd/sgt/main.go</code>'s <code>startExportRunners</code> does not do what design.md's
     "Wiring" section and tasks.md's checklist both explicitly require — it never constructs an
     <code>export.Runner</code> and never calls <code>.Run</code> in a goroutine; it only prints a
     stderr warning for a configured project and returns. <code>export.Runner</code> is fully
-    implemented and fully tested but is dead code with respect to any real Sergeant process today —
+    implemented and fully tested but is dead code with respect to any real Sgt process today —
     exactly the "implemented but never wired up" pattern this review was asked to check for by name.
     This caveat is <strong>not blocking against any named scenario in specs/task-export/spec.md</strong>
     (all 9 scenarios are phrased and tested at the <code>Runner</code>/<code>Store</code> level, none
@@ -815,7 +815,7 @@ a{color:var(--muted)}
 </footer>
 
 <header>
-  <h1>Sergeant v2</h1>
+  <h1>Sgt v2</h1>
   <p>Independent review. Written by the critic, not the builder.</p>
   <p class="meta">
     Review 027 · 2026-08-25 · branch <code>v2</code> · merge commit <code>0c318bd</code>
@@ -834,8 +834,8 @@ a{color:var(--muted)}
   <div class="grid">
     <div class="card"><div class="label">Build</div><div class="value"><span class="status">clean</span></div><div class="small"><code>go build ./...</code> at HEAD <code>0c318bd</code>, no output</div></div>
     <div class="card"><div class="label">Vet</div><div class="value"><span class="status">clean</span></div><div class="small"><code>go vet ./internal/...</code>, no output</div></div>
-    <div class="card"><div class="label">Tests</div><div class="value"><span class="status">clean except named environmental failures</span></div><div class="small"><code>go test ./internal/... -count=1</code> run both with and without the prescribed <code>-skip</code>; without it, exactly the 10 named LLM-key-dependent tests fail (<code>TestBuildProjectGraphAppliesExcludePatterns</code>, <code>TestBuildProjectGraphMergesEveryParticipatingRepo</code>, <code>TestIncludeGroupsExcludesNonMatchingRepos</code>, <code>TestBuildNeverLeavesOutputInAPartialState</code>, <code>TestPublishFailureRestoresPriorGraph</code>, <code>TestBuildNeverSpawnsSgtGraphify</code>, <code>TestQueryAgainstABuiltGraphReturnsAnAnswer</code>, <code>TestExplainAndAffectedAreDistinctFromQuery</code>, <code>TestMCPGraphQueryAgainstABuiltGraphReturnsAnswer</code>, <code>TestBuildGraphEndpointBuildsAndPublishes</code>), all with <code>error: no LLM API key found</code>, and nothing else — none touch <code>internal/store</code>, <code>internal/dag</code>, or the <code>sergeant_get_brief</code> tests in <code>internal/mcp</code></div></div>
-    <div class="card"><div class="label">Signatures named in design.md</div><div class="value"><span class="status">match exactly</span></div><div class="small"><code>Store.RenderIntentBrief(intentID, repo string, gates []string) (string, error)</code> in <code>internal/store/brief.go</code> is a verbatim match of design.md's code block, including the exact rendering order and the <code>Fprintf</code> format strings. Both call sites design.md names — <code>internal/dag/engine.go</code>'s <code>RunStage</code> (line 356-362) and <code>internal/mcp/server.go</code>'s <code>sergeant_get_brief</code> case (line 300-316) — use it, with the exact fallback-on-error/empty-IntentID structure design.md specifies</div></div>
+    <div class="card"><div class="label">Tests</div><div class="value"><span class="status">clean except named environmental failures</span></div><div class="small"><code>go test ./internal/... -count=1</code> run both with and without the prescribed <code>-skip</code>; without it, exactly the 10 named LLM-key-dependent tests fail (<code>TestBuildProjectGraphAppliesExcludePatterns</code>, <code>TestBuildProjectGraphMergesEveryParticipatingRepo</code>, <code>TestIncludeGroupsExcludesNonMatchingRepos</code>, <code>TestBuildNeverLeavesOutputInAPartialState</code>, <code>TestPublishFailureRestoresPriorGraph</code>, <code>TestBuildNeverSpawnsSgtGraphify</code>, <code>TestQueryAgainstABuiltGraphReturnsAnAnswer</code>, <code>TestExplainAndAffectedAreDistinctFromQuery</code>, <code>TestMCPGraphQueryAgainstABuiltGraphReturnsAnswer</code>, <code>TestBuildGraphEndpointBuildsAndPublishes</code>), all with <code>error: no LLM API key found</code>, and nothing else — none touch <code>internal/store</code>, <code>internal/dag</code>, or the <code>sgt_get_brief</code> tests in <code>internal/mcp</code></div></div>
+    <div class="card"><div class="label">Signatures named in design.md</div><div class="value"><span class="status">match exactly</span></div><div class="small"><code>Store.RenderIntentBrief(intentID, repo string, gates []string) (string, error)</code> in <code>internal/store/brief.go</code> is a verbatim match of design.md's code block, including the exact rendering order and the <code>Fprintf</code> format strings. Both call sites design.md names — <code>internal/dag/engine.go</code>'s <code>RunStage</code> (line 356-362) and <code>internal/mcp/server.go</code>'s <code>sgt_get_brief</code> case (line 300-316) — use it, with the exact fallback-on-error/empty-IntentID structure design.md specifies</div></div>
     <div class="card"><div class="label">Spec.md scenario coverage</div><div class="value"><span class="status">7/7 scenarios, real tests</span></div><div class="small">Every named scenario in <code>specs/intent-brief/spec.md</code> maps to a specific, assertion-backed test in <code>internal/store/brief_test.go</code>, <code>internal/mcp/get_brief_test.go</code>, or <code>internal/dag/engine_test.go</code>; see table below</div></div>
     <div class="card"><div class="label">No-intent-id non-regression guarantee</div><div class="value"><span class="status">verified</span></div><div class="small"><code>TestRunStageWithNoIntentIDStillReceivesStageBrief</code> creates a run with no <code>IntentID</code>, runs <code>RunStage</code>, and asserts the prompt the fake agent received is exactly <code>stage.Brief</code> — not merely that the run reached a terminal status</div></div>
     <div class="card"><div class="label">Scope</div><div class="value"><span class="status">no creep</span></div><div class="small"><code>git show c8eb0e1 --stat</code>: 6 files, 438 insertions, 6 deletions — <code>internal/dag/engine.go</code> (+6), its test file, <code>internal/mcp/server.go</code> (+23/-6), its new brief test file, and <code>internal/store/brief.go</code>/<code>brief_test.go</code> (both new). No schema change, no intent-wide brief, no new stored column, nothing touching <code>IntentRecord</code>/<code>BulletRecord</code>'s shape</div></div>
@@ -844,7 +844,7 @@ a{color:var(--muted)}
   exactly, every scenario in specs/intent-brief/spec.md has a real test, build/vet/test are clean
   save the same 10 pre-existing environmental failures every prior review this session has already
   confirmed by name, the non-regression guarantee for pre-existing runs is directly verified, the
-  breaking change to <code>sergeant_get_brief</code>'s input schema is explicitly, deliberately
+  breaking change to <code>sgt_get_brief</code>'s input schema is explicitly, deliberately
   accepted in design.md's own text, and the rendered Markdown format is exactly what design.md's
   code block specifies — not an invention by whoever implemented it. No scope creep. See Findings
   for detail.</p>
@@ -855,10 +855,10 @@ a{color:var(--muted)}
   <table>
     <tr><th>Area</th><th>Method</th></tr>
     <tr><td>Binding spec</td><td>Read <code>openspec/changes/dispatch-briefs-render-from-the-stored-intent/{proposal,design,tasks}.md</code>, <code>specs/intent-brief/spec.md</code>, and the originating <code>docs/prd-canonical-intent-brief.md</code> in full before reading any code</td></tr>
-    <tr><td>The actual diff</td><td><code>git show c8eb0e1 --stat</code> and full diff of the two non-test files (<code>internal/dag/engine.go</code>, <code>internal/mcp/server.go</code>) — confirmed the 6-line <code>RunStage</code> change and the <code>sergeant_get_brief</code> schema/implementation replacement are the entire non-test surface touched</td></tr>
+    <tr><td>The actual diff</td><td><code>git show c8eb0e1 --stat</code> and full diff of the two non-test files (<code>internal/dag/engine.go</code>, <code>internal/mcp/server.go</code>) — confirmed the 6-line <code>RunStage</code> change and the <code>sgt_get_brief</code> schema/implementation replacement are the entire non-test surface touched</td></tr>
     <tr><td>Signature match against design.md</td><td>Compared <code>internal/store/brief.go</code> line by line against design.md's code block: identical field order (statement, repo/position/status, blocked reason, change id/repo, gates), identical <code>Fprintf</code> format strings, identical error-wrapping on <code>GetIntent</code> failure and the not-found case for a repo with no matching bullet</td></tr>
     <tr><td><code>RunStage</code> call site</td><td>Read <code>internal/dag/engine.go</code> lines 330-373: the shipped code is character-for-character design.md's proposed replacement — <code>e.Store.GetRun(runID)</code>, guard on <code>run.IntentID != ""</code>, <code>SortedGateNames(repoCfg)</code>, fall through to <code>stage.Brief</code>/generic string on any error</td></tr>
-    <tr><td><code>sergeant_get_brief</code> call site</td><td>Read <code>internal/mcp/server.go</code>'s full diff: <code>InputSchema</code> changed from required <code>project</code> to required <code>intent_id</code>+<code>repo</code>; implementation changed from <code>config.LoadProject(projName)</code> + raw <code>json.MarshalIndent</code> dump to <code>GetIntent</code> → <code>LoadProject(intent.Project)</code> → <code>SortedGateNames(repoCfg)</code> → <code>RenderIntentBrief</code>, exactly design.md's proposed replacement</td></tr>
+    <tr><td><code>sgt_get_brief</code> call site</td><td>Read <code>internal/mcp/server.go</code>'s full diff: <code>InputSchema</code> changed from required <code>project</code> to required <code>intent_id</code>+<code>repo</code>; implementation changed from <code>config.LoadProject(projName)</code> + raw <code>json.MarshalIndent</code> dump to <code>GetIntent</code> → <code>LoadProject(intent.Project)</code> → <code>SortedGateNames(repoCfg)</code> → <code>RenderIntentBrief</code>, exactly design.md's proposed replacement</td></tr>
     <tr><td>Spec scenario → test mapping</td><td>Read every scenario in <code>specs/intent-brief/spec.md</code> against <code>brief_test.go</code>'s 5 tests, <code>get_brief_test.go</code>'s 3 tests, and <code>engine_test.go</code>'s 2 new tests, matched by name and by reading each test body's actual assertions, not by title alone</td></tr>
     <tr><td>Prompt-content assertion, not terminal-status-only</td><td>Read <code>TestRunStagePromptIncludesIntentStatementAndBulletState</code> in full: sets <code>stage.Brief</code> to "raw operator text, must not be used", asserts the fake agent's received prompt does <em>not</em> contain that string and does contain the intent statement, repo, position, and status — directly distinguishing a rendered brief from the old raw pass-through, as tasks.md requires</td></tr>
     <tr><td>Read-only/idempotent guarantee</td><td>Read <code>TestRenderIntentBriefRenderingTwiceWritesNothing</code>: snapshots <code>st.CurrentSequence()</code> before and after two renders, asserting no new row was written, not only that the two returned strings are equal</td></tr>
@@ -875,8 +875,8 @@ a{color:var(--muted)}
     <tr><td>The UI-dispatched path's agent prompt includes the intent statement and bullet state</td><td><code>TestRunStagePromptIncludesIntentStatementAndBulletState</code> (<code>internal/dag/engine_test.go</code>) — asserts the actual prompt string, not just run status</td></tr>
     <tr><td>A blocked bullet's brief includes its recorded reason</td><td><code>TestRenderIntentBriefIncludesBlockedReason</code> (<code>internal/store/brief_test.go</code>)</td></tr>
     <tr><td>A bullet with no blocked reason omits the blocked-reason line</td><td><code>TestRenderIntentBriefOmitsBlockedReasonLineWhenNotBlocked</code></td></tr>
-    <tr><td><code>sergeant_get_brief</code> and the dispatch-time prompt agree</td><td><code>TestRenderIntentBriefAgreesForTheSameArguments</code> (direct mechanism test, string equality on <code>RenderIntentBrief</code> itself) and <code>TestGetBriefRendersTheSharedBrief</code> (<code>internal/mcp/get_brief_test.go</code>, exercises the actual MCP handler and compares its output to <code>RenderIntentBrief</code> called directly)</td></tr>
-    <tr><td><code>sergeant_get_brief</code> refuses a repo with no matching bullet</td><td><code>TestRenderIntentBriefRefusesRepoWithNoMatchingBullet</code> and <code>TestGetBriefRefusesRepoWithNoMatchingBullet</code></td></tr>
+    <tr><td><code>sgt_get_brief</code> and the dispatch-time prompt agree</td><td><code>TestRenderIntentBriefAgreesForTheSameArguments</code> (direct mechanism test, string equality on <code>RenderIntentBrief</code> itself) and <code>TestGetBriefRendersTheSharedBrief</code> (<code>internal/mcp/get_brief_test.go</code>, exercises the actual MCP handler and compares its output to <code>RenderIntentBrief</code> called directly)</td></tr>
+    <tr><td><code>sgt_get_brief</code> refuses a repo with no matching bullet</td><td><code>TestRenderIntentBriefRefusesRepoWithNoMatchingBullet</code> and <code>TestGetBriefRefusesRepoWithNoMatchingBullet</code></td></tr>
     <tr><td>Rendering twice with no state change produces identical output, writes nothing</td><td><code>TestRenderIntentBriefRenderingTwiceWritesNothing</code> — string equality plus a <code>CurrentSequence()</code> snapshot before/after proving no write occurred</td></tr>
     <tr><td>A run with no intent id still receives <code>stage.Brief</code></td><td><code>TestRunStageWithNoIntentIDStillReceivesStageBrief</code></td></tr>
   </table>
@@ -898,15 +898,15 @@ a{color:var(--muted)}
     356-362) loads the run, checks <code>IntentID != ""</code>, computes
     <code>SortedGateNames(repoCfg)</code>, and falls back to <code>stage.Brief</code> on any error —
     character-for-character design.md's proposed diff. <code>internal/mcp/server.go</code>'s
-    <code>sergeant_get_brief</code> case (line 300-316) resolves the intent to learn the project,
-    loads that project's config, computes gate names the same way <code>sergeant_run_gates</code>
+    <code>sgt_get_brief</code> case (line 300-316) resolves the intent to learn the project,
+    loads that project's config, computes gate names the same way <code>sgt_run_gates</code>
     already does, and calls the shared function — also matching design.md exactly, including the
-    added <code>"github.com/callmeradical/sergeant/internal/dag"</code> import for
+    added <code>"github.com/callmeradical/sgt/internal/dag"</code> import for
     <code>SortedGateNames</code>.</p>
   </div>
 
   <div class="item ok">
-    <h3><span class="sev low">verified</span> &nbsp; The breaking change to <code>sergeant_get_brief</code>'s input schema is deliberate and explicitly accepted, not an accidental regression</h3>
+    <h3><span class="sev low">verified</span> &nbsp; The breaking change to <code>sgt_get_brief</code>'s input schema is deliberate and explicitly accepted, not an accidental regression</h3>
     <p>The pre-change implementation (<code>git show c8eb0e1 -- internal/mcp/server.go</code>) called
     <code>config.LoadProject(projName)</code> and returned <code>json.MarshalIndent(proj, "", "  ")</code>
     — a raw project-config dump, confirming proposal.md's Problem section's description of the gap.
@@ -934,7 +934,7 @@ a{color:var(--muted)}
     <p><code>git show c8eb0e1 --stat</code>: 6 files, 438 insertions, 6 deletions. No intent-wide
     (all-bullets) brief was added (explicitly out of scope per proposal.md and the PRD's second Open
     Question), no new stored column/table/file for the rendered output, no change to
-    <code>IntentRecord</code>/<code>BulletRecord</code>'s shape, and <code>sergeant_get_brief</code>'s
+    <code>IntentRecord</code>/<code>BulletRecord</code>'s shape, and <code>sgt_get_brief</code>'s
     tool name and registration slot are untouched — only its schema and implementation changed,
     exactly as proposal.md's Out of scope section requires.</p>
   </div>
@@ -957,7 +957,7 @@ a{color:var(--muted)}
     <tr><th>Claim</th><th>Evidence</th><th>Result</th></tr>
     <tr><td>Build/vet clean at HEAD <code>0c318bd</code></td><td><code>go build ./...</code>, <code>go vet ./internal/...</code></td><td>both silent</td></tr>
     <tr><td>Full suite clean except pre-approved environmental failures</td><td><code>go test ./internal/... -count=1</code>, run once with the prescribed <code>-skip</code> and once without</td><td>with <code>-skip</code>: 12/12 packages pass; without: exactly the same 10 named tests fail as in Review 026, all "no LLM API key found," none touching store/dag/mcp-brief code</td></tr>
-    <tr><td>Signatures and both call sites match design.md</td><td>Line-by-line comparison of <code>brief.go</code>, <code>engine.go</code>'s <code>RunStage</code>, and <code>server.go</code>'s <code>sergeant_get_brief</code> case against design.md's code blocks</td><td>exact match</td></tr>
+    <tr><td>Signatures and both call sites match design.md</td><td>Line-by-line comparison of <code>brief.go</code>, <code>engine.go</code>'s <code>RunStage</code>, and <code>server.go</code>'s <code>sgt_get_brief</code> case against design.md's code blocks</td><td>exact match</td></tr>
     <tr><td>7/7 spec.md scenarios covered</td><td>Named each scenario against its test in <code>brief_test.go</code>/<code>get_brief_test.go</code>/<code>engine_test.go</code>, read each test body's assertions</td><td>all 7 present with real assertions; see Spec.md scenario coverage table above</td></tr>
     <tr><td>Breaking schema change is deliberate, not accidental</td><td>Read design.md's explicit acceptance paragraph and the pre-change <code>server.go</code> diff</td><td>confirmed intentional and documented</td></tr>
     <tr><td>Rendered format traces to design.md, not invented</td><td>Compared shipped headers to design.md's code block; read PRD's Open Questions section</td><td>format is design.md's own specification, which the PRD explicitly delegated to it</td></tr>
@@ -971,7 +971,7 @@ a{color:var(--muted)}
     <p><strong>MEETS SPEC.</strong> <code>Store.RenderIntentBrief(intentID, repo string, gates
     []string) (string, error)</code> is exactly what design.md specifies, and both call sites design.md
     names — <code>internal/dag/engine.go</code>'s <code>RunStage</code> and
-    <code>internal/mcp/server.go</code>'s <code>sergeant_get_brief</code> case — use it exactly as
+    <code>internal/mcp/server.go</code>'s <code>sgt_get_brief</code> case — use it exactly as
     described, including the fallback-to-<code>stage.Brief</code> behavior for runs with no intent id.
     All 7 scenarios named in <code>specs/intent-brief/spec.md</code> have real, assertion-backed test
     coverage across <code>internal/store/brief_test.go</code>, <code>internal/mcp/get_brief_test.go</code>,
@@ -980,7 +980,7 @@ a{color:var(--muted)}
     failures confirmed by name in every prior review this session, none of which touch this change's
     code. The non-regression guarantee for pre-existing runs is directly verified by asserting on the
     actual prompt string, not merely on terminal run status. The breaking change to
-    <code>sergeant_get_brief</code>'s input schema (<code>project</code> replaced by
+    <code>sgt_get_brief</code>'s input schema (<code>project</code> replaced by
     <code>intent_id</code>+<code>repo</code>) is explicitly, deliberately accepted in design.md's own
     text — not an accidental regression — because the old behavior never matched the tool's own
     registered description in the first place. The rendered Markdown format
@@ -1007,7 +1007,7 @@ a{color:var(--muted)}
 </footer>
 
 <header>
-  <h1>Sergeant v2</h1>
+  <h1>Sgt v2</h1>
   <p>Independent review. Written by the critic, not the builder.</p>
   <p class="meta">
     Review 028 · 2026-08-25 · branch <code>v2</code> · merge commit <code>f2324fb</code>
@@ -1211,7 +1211,7 @@ a{color:var(--muted)}
 </footer>
 
 <header>
-  <h1>Sergeant v2</h1>
+  <h1>Sgt v2</h1>
   <p>Independent review. Written by the critic, not the builder.</p>
   <p class="meta">
     Review 029 · 2026-08-25 · branch <code>v2</code> · merge commit <code>748e2e7</code>
@@ -1251,7 +1251,7 @@ a{color:var(--muted)}
     <tr><td>A shipping-gate failure leaves every bullet sealed</td><td><code>TestShippingGateFailureLeavesEveryBulletSealed</code> — real <code>POST /api/create-pr</code> completing the last seal, gate configured as <code>exit 1</code>, then <code>ListBulletsForIntent</code> asserts both bullets still <code>"sealed"</code></td><td>covered</td></tr>
     <tr><td>A failed shipping gate records which check failed</td><td><code>TestRecordShippingGateResultRecordsFailureReason</code> (store) and reinforced in <code>TestShippingGateFailureLeavesEveryBulletSealed</code>, both asserting the reason names <code>"security"</code></td><td>covered</td></tr>
     <tr><td>A passing shipping gate records no reason</td><td><code>TestRecordShippingGateResultPassRecordsNoReason</code> — explicitly seeds a stale failure reason first, then proves a pass overwrites it to empty</td><td>covered</td></tr>
-    <tr><td>Sergeant never merges as a result of a shipping gate</td><td><code>TestPassingShippingGateTriggersNoMergeAction</code> — <code>GHPRCreate</code> call-counter asserted <code>== 1</code> (the request's own PR action only, none attributable to the gate)</td><td>covered</td></tr>
+    <tr><td>Sgt never merges as a result of a shipping gate</td><td><code>TestPassingShippingGateTriggersNoMergeAction</code> — <code>GHPRCreate</code> call-counter asserted <code>== 1</code> (the request's own PR action only, none attributable to the gate)</td><td>covered</td></tr>
   </table>
 </section>
 
@@ -1320,7 +1320,7 @@ a{color:var(--muted)}
 </footer>
 
 <header>
-  <h1>Sergeant v2</h1>
+  <h1>Sgt v2</h1>
   <p>Independent review. Written by the critic, not the builder.</p>
   <p class="meta">
     Review 030 · 2026-08-25 · branch <code>v2</code> · merge commit <code>c0dea68</code>
@@ -1340,8 +1340,8 @@ a{color:var(--muted)}
   <div class="grid">
     <div class="card"><div class="label">Build</div><div class="value"><span class="status">clean</span></div><div class="small"><code>go build ./...</code>, no output</div></div>
     <div class="card"><div class="label">Vet</div><div class="value"><span class="status">clean</span></div><div class="small"><code>go vet ./internal/...</code>, no output</div></div>
-    <div class="card"><div class="label">Tests</div><div class="value"><span class="status">clean except named environmental failures</span></div><div class="small"><code>go test ./internal/... ./cmd/... -count=1</code> run both with the prescribed <code>-skip</code> (all 13 packages pass, including <code>cmd/sergeant</code>) and without it (exactly the same 10 named LLM-key-dependent tests fail — <code>TestBuildProjectGraphAppliesExcludePatterns</code>, <code>TestBuildProjectGraphMergesEveryParticipatingRepo</code>, <code>TestIncludeGroupsExcludesNonMatchingRepos</code>, <code>TestBuildNeverLeavesOutputInAPartialState</code>, <code>TestPublishFailureRestoresPriorGraph</code>, <code>TestBuildNeverSpawnsSgtGraphify</code>, <code>TestQueryAgainstABuiltGraphReturnsAnAnswer</code>, <code>TestExplainAndAffectedAreDistinctFromQuery</code>, <code>TestMCPGraphQueryAgainstABuiltGraphReturnsAnswer</code>, <code>TestBuildGraphEndpointBuildsAndPublishes</code> — all with <code>error: no LLM API key found</code>, none touching <code>internal/export</code> or <code>cmd/sergeant</code>)</div></div>
-    <div class="card"><div class="label">Entities named in design.md</div><div class="value"><span class="status">match exactly</span></div><div class="small"><code>export.Constructor func(cfg config.Export) (Target, error)</code> and <code>export.Backends map[string]Constructor</code>, starting empty (<code>internal/export/registry.go</code>, verbatim); <code>startExportRunners(st *store.Store, backends map[string]export.Constructor)</code> (<code>cmd/sergeant/main.go:179</code>); its one call site, <code>startUI</code>, passes the production registry: <code>startExportRunners(st, export.Backends)</code> (<code>main.go:163</code>)</div></div>
+    <div class="card"><div class="label">Tests</div><div class="value"><span class="status">clean except named environmental failures</span></div><div class="small"><code>go test ./internal/... ./cmd/... -count=1</code> run both with the prescribed <code>-skip</code> (all 13 packages pass, including <code>cmd/sgt</code>) and without it (exactly the same 10 named LLM-key-dependent tests fail — <code>TestBuildProjectGraphAppliesExcludePatterns</code>, <code>TestBuildProjectGraphMergesEveryParticipatingRepo</code>, <code>TestIncludeGroupsExcludesNonMatchingRepos</code>, <code>TestBuildNeverLeavesOutputInAPartialState</code>, <code>TestPublishFailureRestoresPriorGraph</code>, <code>TestBuildNeverSpawnsSgtGraphify</code>, <code>TestQueryAgainstABuiltGraphReturnsAnAnswer</code>, <code>TestExplainAndAffectedAreDistinctFromQuery</code>, <code>TestMCPGraphQueryAgainstABuiltGraphReturnsAnswer</code>, <code>TestBuildGraphEndpointBuildsAndPublishes</code> — all with <code>error: no LLM API key found</code>, none touching <code>internal/export</code> or <code>cmd/sgt</code>)</div></div>
+    <div class="card"><div class="label">Entities named in design.md</div><div class="value"><span class="status">match exactly</span></div><div class="small"><code>export.Constructor func(cfg config.Export) (Target, error)</code> and <code>export.Backends map[string]Constructor</code>, starting empty (<code>internal/export/registry.go</code>, verbatim); <code>startExportRunners(st *store.Store, backends map[string]export.Constructor)</code> (<code>cmd/sgt/main.go:179</code>); its one call site, <code>startUI</code>, passes the production registry: <code>startExportRunners(st, export.Backends)</code> (<code>main.go:163</code>)</div></div>
     <div class="card"><div class="label">Registry genuinely empty</div><div class="value"><span class="status">verified</span></div><div class="small"><code>internal/export/registry.go</code> declares <code>var Backends = map[string]Constructor{}</code> and nothing else — no placeholder/no-op backend registered anywhere in production code; <code>grep -rn "Backends\[" --include=*.go</code> (excluding <code>_test.go</code>) has zero hits</div></div>
     <div class="card"><div class="label">Loop-capture bug class</div><div class="value"><span class="status">checked, not present</span></div><div class="small"><code>runner := &export.Runner{...}</code> is declared with <code>:=</code> inside the <code>for</code> loop body (a fresh binding every iteration, not hoisted), and the goroutine takes <code>proj.Name</code> as an explicit parameter (<code>go func(projectName string) {...}(proj.Name)</code>) rather than closing over the range variable directly — correct regardless of Go version, and moot anyway since <code>go.mod</code> pins go 1.26.5, well past Go 1.22's per-iteration loop-variable semantics</div></div>
   </div>
@@ -1351,7 +1351,7 @@ a{color:var(--muted)}
   <h2>Spec.md scenario coverage</h2>
   <table>
     <tr><th>Scenario</th><th>Covering test</th><th>Result</th></tr>
-    <tr><td>A project with a registered backend causes a Runner to start</td><td><code>TestRegisteredBackendStartsExporting</code> (<code>cmd/sergeant/export_runners_test.go</code>) — real bounded poll (<code>for target.calls.Load() == 0 { ... time.Sleep(5ms) }</code> against a 2s deadline), not a hardcoded sleep-then-assert; a real intent is seeded first so a nonzero call count can only mean the Runner actually ran and delivered</td><td>covered</td></tr>
+    <tr><td>A project with a registered backend causes a Runner to start</td><td><code>TestRegisteredBackendStartsExporting</code> (<code>cmd/sgt/export_runners_test.go</code>) — real bounded poll (<code>for target.calls.Load() == 0 { ... time.Sleep(5ms) }</code> against a 2s deadline), not a hardcoded sleep-then-assert; a real intent is seeded first so a nonzero call count can only mean the Runner actually ran and delivered</td><td>covered</td></tr>
     <tr><td>An unknown backend name starts nothing</td><td><code>TestUnregisteredBackendNameStartsNothing</code> — asserts the test's own differently-named <code>Constructor</code> was never called (<code>constructed == 0</code>) and that stderr contains the exact pre-change string</td><td>covered</td></tr>
     <tr><td>No export block starts nothing and reports nothing</td><td><code>TestNoExportBlockStartsAndReportsNothing</code> — asserts zero constructions and that stderr contains no mention of the project</td><td>covered</td></tr>
   </table>
@@ -1361,7 +1361,7 @@ a{color:var(--muted)}
   <h2>Non-regression: exact stderr match</h2>
   <div class="item ok">
     <h3><span class="sev low">verified byte-for-byte</span> &nbsp; The unregistered-backend warning is character-identical to the pre-change text</h3>
-    <p>Pre-change (<code>git show cb2d9ac:cmd/sergeant/main.go</code>):
+    <p>Pre-change (<code>git show cb2d9ac:cmd/sgt/main.go</code>):
     <code>"export: project %q configures backend %q, but no export target implementation is registered yet; skipping\n"</code>.
     Post-change (<code>main.go</code>, miss branch): the identical format string, identical arguments
     (<code>proj.Name</code>, <code>proj.Export.Backend</code>), identical destination (<code>os.Stderr</code>).
@@ -1375,13 +1375,13 @@ a{color:var(--muted)}
   <h2>Scope and wiring</h2>
   <div class="item ok">
     <h3><span class="sev low">verified — no scope creep</span> &nbsp; The implementation commit touches exactly what tasks.md scopes it to</h3>
-    <p><code>git show bf512a1 --stat</code>: <code>cmd/sergeant/export_runners_test.go</code> (new, 201
-    lines), <code>cmd/sergeant/main.go</code> (+35/-9), <code>internal/export/registry.go</code> (new,
+    <p><code>git show bf512a1 --stat</code>: <code>cmd/sgt/export_runners_test.go</code> (new, 201
+    lines), <code>cmd/sgt/main.go</code> (+35/-9), <code>internal/export/registry.go</code> (new,
     16 lines). No real <code>Target</code> backend implemented, no production registration into
     <code>export.Backends</code>, no shutdown/restart handling added — all explicitly out of scope per
     proposal.md and confirmed absent. (The wider merge commit <code>c0dea68</code> also carries three
     unrelated openspec doc-only proposals for later changes already staged on <code>v2</code>; none
-    touch <code>internal/export</code>, <code>cmd/sergeant</code>, or any code path this change exercises.)</p>
+    touch <code>internal/export</code>, <code>cmd/sgt</code>, or any code path this change exercises.)</p>
   </div>
 </section>
 
@@ -1400,7 +1400,7 @@ a{color:var(--muted)}
     <code>runner</code> is freshly bound each iteration and the goroutine receives <code>proj.Name</code>
     as an explicit parameter rather than closing over the range variable. All 3 scenarios in
     <code>specs/export-wiring/spec.md</code> have named, assertion-backed coverage in
-    <code>cmd/sergeant/export_runners_test.go</code>, exercising <code>startExportRunners</code> directly
+    <code>cmd/sgt/export_runners_test.go</code>, exercising <code>startExportRunners</code> directly
     as tasks.md required. Build and vet are clean; the full suite (<code>./internal/...</code> and
     <code>./cmd/...</code>) is clean except the same 10 pre-existing, environmental, LLM-key-dependent
     failures confirmed by name against both the <code>-skip</code> and no-<code>-skip</code> runs. No
@@ -1412,7 +1412,7 @@ a{color:var(--muted)}
   <p class="meta">Review 030 · findings above are reproduced from commands run directly against the
   current <code>v2</code> working tree at HEAD <code>163191f</code>, against the merge commit
   <code>c0dea68</code> and its sole implementation commit <code>bf512a1</code>. No mutations were made
-  to <code>internal/export/registry.go</code> or <code>cmd/sergeant/main.go</code> for this review —
+  to <code>internal/export/registry.go</code> or <code>cmd/sgt/main.go</code> for this review —
   the merge commit's own message already records a mutation test against the registry lookup guard
   (bypassing the <code>ok</code> check, caught by <code>TestUnregisteredBackendNameStartsNothing</code>
   via panic, restored, clean diff), and the existing bounded-poll test already isolates the one claim
@@ -1424,7 +1424,7 @@ a{color:var(--muted)}
 </footer>
 
 <header>
-  <h1>Sergeant v2</h1>
+  <h1>Sgt v2</h1>
   <p>Independent review. Written by the critic, not the builder.</p>
   <p class="meta">
     Review 031 · 2026-08-25 · branch <code>v2</code> · merge commit <code>0065a2f</code>
@@ -1444,7 +1444,7 @@ a{color:var(--muted)}
     <div class="card"><div class="label">Build</div><div class="value"><span class="status">clean</span></div><div class="small"><code>go build ./...</code>, no output</div></div>
     <div class="card"><div class="label">Tests</div><div class="value"><span class="status">clean except named environmental failures</span></div><div class="small"><code>go test ./internal/... -count=1</code> with the prescribed <code>-skip</code>: all 12 packages pass — zero accidental code impact from what is a pure docs/test-assertion change</div></div>
     <div class="card"><div class="label">Dead-command grep</div><div class="value"><span class="status">zero hits</span></div><div class="small"><code>grep -rn 'sgt-dispatch\|sgt-watch\|sgt-notify\|sgt-td-\|sgt-graphify\|sgt-sync\|sgt-dag-run\|sgt-list\|sgt-context' skills/ .agents/skills/to-tickets/ docs/troubleshooting.md schema/project.yaml.example</code> — no matches in any of the eight touched files</div></div>
-    <div class="card"><div class="label">instruction-policy-test.sh</div><div class="value"><span class="status">byte-identical baseline</span></div><div class="small">exactly 15 <code>FAIL:</code> lines, all naming <code>AGENTS.md</code> (<code>## Procedural skills</code>, <code>.sergeant-intent.md</code>, <code>td context &lt;id&gt; --work-dir &lt;owning-repo-path&gt;</code>, etc.) — none about the eight files this change touched; matches design.md's stated pre-existing baseline exactly</div></div>
+    <div class="card"><div class="label">instruction-policy-test.sh</div><div class="value"><span class="status">byte-identical baseline</span></div><div class="small">exactly 15 <code>FAIL:</code> lines, all naming <code>AGENTS.md</code> (<code>## Procedural skills</code>, <code>.sgt-intent.md</code>, <code>td context &lt;id&gt; --work-dir &lt;owning-repo-path&gt;</code>, etc.) — none about the eight files this change touched; matches design.md's stated pre-existing baseline exactly</div></div>
     <div class="card"><div class="label">Scope</div><div class="value"><span class="status">exactly the 9 named files</span></div><div class="small"><code>git show --stat 0065a2f</code>: the five banner-carrying <code>skills/*/SKILL.md</code> files, <code>.agents/skills/to-tickets/SKILL.md</code>, <code>docs/troubleshooting.md</code>, <code>schema/project.yaml.example</code>, and <code>tests/instruction-policy-test.sh</code> — nothing else; no historical/dated docs touched</div></div>
   </div>
 </section>
@@ -1500,7 +1500,7 @@ a{color:var(--muted)}
 </footer>
 
 <header>
-  <h1>Sergeant v2</h1>
+  <h1>Sgt v2</h1>
   <p>Independent review. Written by the critic, not the builder.</p>
   <p class="meta">
     Review 032 · 2026-08-25 · branch <code>v2</code> · merge commit <code>c0246e4</code>
@@ -1588,7 +1588,7 @@ a{color:var(--muted)}
 </footer>
 
 <header>
-  <h1>Sergeant v2</h1>
+  <h1>Sgt v2</h1>
   <p>Independent review. Written by the critic, not the builder.</p>
   <p class="meta">
     Review 033 · 2026-08-25 · branch <code>v2</code> · merge commit <code>1a19659</code>
@@ -1701,7 +1701,7 @@ a{color:var(--muted)}
 </footer>
 
 <header>
-  <h1>Sergeant v2</h1>
+  <h1>Sgt v2</h1>
   <p>Independent review. Written by the critic, not the builder.</p>
   <p class="meta">
     Review 034 · 2026-08-25 · branch <code>v2</code> · merge commit <code>1a8fba3</code>
@@ -1742,9 +1742,9 @@ a{color:var(--muted)}
 <section>
   <h2>Anomaly investigation — mid-dispatch reconciliation of a live run</h2>
   <p>The merge commit describes an unresolved anomaly: mid-dispatch, this run's row was briefly written to <code>status = "interrupted"</code> with a <code>reconciled:true</code> payload — the shape only <code>internal/store/reconcile.go</code>'s <code>ReconcileOrphanedRuns</code> produces, a function its own doc comment says must never run except once, at <code>Server.Start()</code>, before the listener binds. The merge author's own investigation (ps start time unchanged, no second process/binary found, no real sleep/wake event, new tests confirmed to use <code>httptest</code>+temp stores) found no cause. This review spent a bounded effort going further, using the real production DB directly rather than re-checking the same negative signals.</p>
-  <p><strong>The anomaly is real and durably recorded</strong>, not a misread: <code>sqlite3 ~/.local/share/sergeant/sergeant.db</code>'s append-only <code>changes</code> table (nothing in this codebase deletes from it — grepped for <code>DELETE FROM changes</code> outside test files and found none) holds, for entity <code>sgt-1787669565-c9cd84ef1</code>: seq 4846 "created"/running at 14:52:45 UTC, then a run of "progress" entries roughly every 2s, then at <strong>15:08:24.804621 UTC</strong> a <code>run</code>-channel entry <code>{"id":"sgt-...","reconciled":true,"status":"interrupted","terminal":true,"transition":"status"}</code> and a <code>phase</code>-channel entry with the same <code>reconciled:true</code> shape — sandwiched between two routine progress writes only ~1.7s and ~0.25s away, with the run's own progress snapshot already reporting all 10 spec scenarios "complete" at that moment — and finally the real "passed" terminal write at 15:14:25.768840 UTC, six minutes later. This proves <code>ReconcileOrphanedRuns</code> genuinely fired against the live production database while this run was still actually in flight, not merely that someone observed a stale read.</p>
-  <p>The currently-running <code>./bin/sergeant ui</code> process (pid confirmed via <code>ps -o lstart</code>) started at 11:20:33 local (15:20:33 UTC) — <em>after</em> both the 15:08:24 UTC anomalous write and the 15:14:25 UTC real completion — so it is not the culprit and its single-line <code>/private/tmp/sergeant-ui.log</code> (only "🌐 Sergeant Factory UI running...", timestamped to this later start) cannot be evidence of what happened earlier: whatever process wrote that log for the actual incident, if any, has been overwritten by every later start of the same redirected command. No launchd/plist auto-restart mechanism was found, and <code>ReconcileOrphanedRuns</code> has exactly one call site in the whole tree (<code>server.go</code>'s <code>Start()</code>) with no second one added by this or any recent commit (checked via <code>git log -S"ReconcileOrphanedRuns"</code> and a full-repo grep). No test in the whole <code>internal/...</code> tree calls <code>.Start()</code> (grepped every <code>_test.go</code> file, zero hits) and no <code>store.Open</code> call site resolves to the real default path except when passed an explicitly empty string, which no test does.</p>
-  <p><strong>A concrete, previously-unexamined mechanism was found that fits every known fact:</strong> <code>cmd/sergeant/main.go</code>'s <code>startUI()</code> (the <code>sergeant ui</code> subcommand, lines ~153-169) opens the real default DB path and calls <code>server.Start()</code> unconditionally — there is no lock, PID file, or "already running" check anywhere in it. <code>Start()</code> runs <code>ReconcileOrphanedRuns()</code> and <code>fmt.Printf</code>s its "running" banner <em>before</em> attempting <code>http.ListenAndServe</code>. A second, accidental invocation of <code>sergeant ui</code> while one is already bound to port 8484 would: open the same real sqlite file, successfully reconcile any run currently marked <code>running</code> (mutating it out from under the live process actually driving it), print the same startup banner, then fail at the bind step and exit — all within well under a second, leaving no surviving process, no distinguishable log line (the redirect target gets reopened/overwritten by every invocation), and a <code>ps</code> snapshot of the original long-lived process that never changed. This reproduces the exact fingerprint reported. No direct evidence (shell history was empty for this user account, no coredump, no surviving log) confirms a second invocation actually happened, so this is a well-fitting <em>hypothesis</em>, not a proven root cause — root cause remains open. The real, code-level hazard is unchanged either way: <code>ReconcileOrphanedRuns</code>'s "never call this twice" contract is enforced only by a comment, not by any lock, PID check, or guard against a second <code>Start()</code> call sharing the same database file.</p>
+  <p><strong>The anomaly is real and durably recorded</strong>, not a misread: <code>sqlite3 ~/.local/share/sgt/sgt.db</code>'s append-only <code>changes</code> table (nothing in this codebase deletes from it — grepped for <code>DELETE FROM changes</code> outside test files and found none) holds, for entity <code>sgt-1787669565-c9cd84ef1</code>: seq 4846 "created"/running at 14:52:45 UTC, then a run of "progress" entries roughly every 2s, then at <strong>15:08:24.804621 UTC</strong> a <code>run</code>-channel entry <code>{"id":"sgt-...","reconciled":true,"status":"interrupted","terminal":true,"transition":"status"}</code> and a <code>phase</code>-channel entry with the same <code>reconciled:true</code> shape — sandwiched between two routine progress writes only ~1.7s and ~0.25s away, with the run's own progress snapshot already reporting all 10 spec scenarios "complete" at that moment — and finally the real "passed" terminal write at 15:14:25.768840 UTC, six minutes later. This proves <code>ReconcileOrphanedRuns</code> genuinely fired against the live production database while this run was still actually in flight, not merely that someone observed a stale read.</p>
+  <p>The currently-running <code>./bin/sgt ui</code> process (pid confirmed via <code>ps -o lstart</code>) started at 11:20:33 local (15:20:33 UTC) — <em>after</em> both the 15:08:24 UTC anomalous write and the 15:14:25 UTC real completion — so it is not the culprit and its single-line <code>/private/tmp/sgt-ui.log</code> (only "🌐 Sgt Factory UI running...", timestamped to this later start) cannot be evidence of what happened earlier: whatever process wrote that log for the actual incident, if any, has been overwritten by every later start of the same redirected command. No launchd/plist auto-restart mechanism was found, and <code>ReconcileOrphanedRuns</code> has exactly one call site in the whole tree (<code>server.go</code>'s <code>Start()</code>) with no second one added by this or any recent commit (checked via <code>git log -S"ReconcileOrphanedRuns"</code> and a full-repo grep). No test in the whole <code>internal/...</code> tree calls <code>.Start()</code> (grepped every <code>_test.go</code> file, zero hits) and no <code>store.Open</code> call site resolves to the real default path except when passed an explicitly empty string, which no test does.</p>
+  <p><strong>A concrete, previously-unexamined mechanism was found that fits every known fact:</strong> <code>cmd/sgt/main.go</code>'s <code>startUI()</code> (the <code>sgt ui</code> subcommand, lines ~153-169) opens the real default DB path and calls <code>server.Start()</code> unconditionally — there is no lock, PID file, or "already running" check anywhere in it. <code>Start()</code> runs <code>ReconcileOrphanedRuns()</code> and <code>fmt.Printf</code>s its "running" banner <em>before</em> attempting <code>http.ListenAndServe</code>. A second, accidental invocation of <code>sgt ui</code> while one is already bound to port 8484 would: open the same real sqlite file, successfully reconcile any run currently marked <code>running</code> (mutating it out from under the live process actually driving it), print the same startup banner, then fail at the bind step and exit — all within well under a second, leaving no surviving process, no distinguishable log line (the redirect target gets reopened/overwritten by every invocation), and a <code>ps</code> snapshot of the original long-lived process that never changed. This reproduces the exact fingerprint reported. No direct evidence (shell history was empty for this user account, no coredump, no surviving log) confirms a second invocation actually happened, so this is a well-fitting <em>hypothesis</em>, not a proven root cause — root cause remains open. The real, code-level hazard is unchanged either way: <code>ReconcileOrphanedRuns</code>'s "never call this twice" contract is enforced only by a comment, not by any lock, PID check, or guard against a second <code>Start()</code> call sharing the same database file.</p>
 </section>
 
 <section>
@@ -1763,7 +1763,7 @@ a{color:var(--muted)}
     confirmed the merge's reported anomaly is real, not a misread — the production <code>changes</code> table
     durably records <code>ReconcileOrphanedRuns</code> firing against this run while it was genuinely still in
     flight, mid-dispatch, at 15:08:24 UTC, six minutes before its real completion — and found a concrete,
-    fitting (but unproven) mechanism: <code>cmd/sergeant/main.go</code>'s <code>startUI()</code> has no guard
+    fitting (but unproven) mechanism: <code>cmd/sgt/main.go</code>'s <code>startUI()</code> has no guard
     against a second, accidental invocation reconciling the shared production database before failing to bind
     the port. This caveat is explicitly non-blocking against every one of the 10 named
     <code>spec.md</code> scenarios — none concern server lifecycle or reconciliation — and is recorded here as
@@ -1776,7 +1776,7 @@ a{color:var(--muted)}
 <footer>
   <p class="meta">Review 034 · findings above are reproduced from commands run directly against the current
   <code>v2</code> working tree at HEAD <code>1a8fba3</code>, and, for the anomaly investigation, against the
-  real production database at <code>~/.local/share/sergeant/sergeant.db</code> (its <code>changes</code> table
+  real production database at <code>~/.local/share/sgt/sgt.db</code> (its <code>changes</code> table
   directly, via <code>sqlite3</code>) rather than trusting the merge commit's own account of what it ruled
   out. The mutation-testing claim was independently reproduced end to end (mutate, build, run the named test,
   run the full package, restore, confirm clean) rather than accepted on the implementer's word. The anomaly's
@@ -1786,7 +1786,7 @@ a{color:var(--muted)}
 </footer>
 
 <header>
-  <h1>Sergeant v2</h1>
+  <h1>Sgt v2</h1>
   <p>Independent review. Written by the critic, not the builder.</p>
   <p class="meta">
     Review 035 · 2026-08-25 · branch <code>v2</code> · merge commit <code>db0f3db</code>
@@ -1805,8 +1805,8 @@ a{color:var(--muted)}
     <div class="card"><div class="label">Build</div><div class="value"><span class="status">clean</span></div><div class="small"><code>go build ./...</code>, no output</div></div>
     <div class="card"><div class="label">Vet</div><div class="value"><span class="status">clean</span></div><div class="small"><code>go vet ./internal/...</code>, no output</div></div>
     <div class="card"><div class="label">Tests</div><div class="value"><span class="status">clean under the prescribed skip list</span></div><div class="small">Ran the exact command <code>tasks.md</code> specifies: <code>go test ./internal/... -count=1 -skip '^(TestBuildProjectGraphAppliesExcludePatterns|...|TestBuildGraphEndpointBuildsAndPublishes)$'</code> — all 12 packages pass, including <code>internal/runner</code> (6.9s) and <code>internal/ui</code> (13.5s), the two packages this change touches</div></div>
-    <div class="card"><div class="label">Call sites wired</div><div class="value"><span class="status">confirmed, not just defined</span></div><div class="small"><code>grep -n SERGEANT_ARTIFACT_DIR\|captureArtifacts internal/runner/runner.go</code> shows both <code>RunCodeGate</code> (lines 275-336) and <code>RunAgentPhase</code> (lines 528-712) set the env var on <code>cmd.Env</code>/<code>extraEnv</code> and call <code>captureArtifacts</code> after their own <code>RecordPhase</code> — and <code>TestAgentPhaseCapturesArtifacts</code> proves the second site independently of the first, directly guarding this codebase's known "implemented but never called" bug class</div></div>
-    <div class="card"><div class="label">Durable path</div><div class="value"><span class="status">genuinely outside the worktree</span></div><div class="small"><code>artifactsRoot()</code> defaults to <code>~/.local/share/sergeant/artifacts</code>; <code>dag.FleetRoot()</code> (the worktree root <code>automated-fleet-cleanup</code> reclaims) defaults to the sibling-but-distinct <code>~/.local/share/sergeant-v2/fleet</code> — different subtrees entirely, not merely different subdirectories of the same reclaimed root</div></div>
+    <div class="card"><div class="label">Call sites wired</div><div class="value"><span class="status">confirmed, not just defined</span></div><div class="small"><code>grep -n SGT_ARTIFACT_DIR\|captureArtifacts internal/runner/runner.go</code> shows both <code>RunCodeGate</code> (lines 275-336) and <code>RunAgentPhase</code> (lines 528-712) set the env var on <code>cmd.Env</code>/<code>extraEnv</code> and call <code>captureArtifacts</code> after their own <code>RecordPhase</code> — and <code>TestAgentPhaseCapturesArtifacts</code> proves the second site independently of the first, directly guarding this codebase's known "implemented but never called" bug class</div></div>
+    <div class="card"><div class="label">Durable path</div><div class="value"><span class="status">genuinely outside the worktree</span></div><div class="small"><code>artifactsRoot()</code> defaults to <code>~/.local/share/sgt/artifacts</code>; <code>dag.FleetRoot()</code> (the worktree root <code>automated-fleet-cleanup</code> reclaims) defaults to the sibling-but-distinct <code>~/.local/share/sgt-v2/fleet</code> — different subtrees entirely, not merely different subdirectories of the same reclaimed root</div></div>
     <div class="card"><div class="label">Table + migration</div><div class="value"><span class="status">wired both ways</span></div><div class="small"><code>createArtifactsTable</code> appears both in <code>store.go</code>'s initial-schema string (line 318) and in <code>migrateAddTables</code>'s <code>wanted</code> list (line 381) — a pre-existing database gains the table too, not only a fresh one</div></div>
   </div>
 </section>
@@ -1863,8 +1863,8 @@ a{color:var(--muted)}
     — <code>TestAgentPhaseCapturesArtifacts</code> proves the second site independently, directly addressing this
     codebase's recurring "implemented but never called" bug class. The durability claim holds structurally, not
     just in the one test that exercises it: <code>artifactsRoot()</code>'s default
-    (<code>~/.local/share/sergeant/artifacts</code>) and <code>dag.FleetRoot()</code>'s default
-    (<code>~/.local/share/sergeant-v2/fleet</code>) are disjoint subtrees, and
+    (<code>~/.local/share/sgt/artifacts</code>) and <code>dag.FleetRoot()</code>'s default
+    (<code>~/.local/share/sgt-v2/fleet</code>) are disjoint subtrees, and
     <code>TestCapturedArtifactOutlivesWorktreeReclaim</code> exercises the real <code>reclaimFleetDir</code>
     mechanism end to end. The never-fails guarantee holds by construction: both call sites invoke
     <code>captureArtifacts</code> only after their own <code>PhaseRecord</code>/<code>GateResult</code> is already
@@ -1898,7 +1898,7 @@ a{color:var(--muted)}
 </footer>
 
 <header>
-  <h1>Sergeant v2</h1>
+  <h1>Sgt v2</h1>
   <p>Independent review. Written by the critic, not the builder.</p>
   <p class="meta">
     Review 036 · 2026-08-26 · branch <code>v2</code> · merge commit <code>51e7612</code>
@@ -1980,7 +1980,7 @@ a{color:var(--muted)}
   scoped: <code>TestDispatchWithARepeatedRequestIDInsideOneSecondDeduplicates</code> and
   <code>TestDispatchWithoutARequestIDCreatesANewRunEachTime</code> returned without waiting for the background
   dispatch goroutine <code>handleDispatch</code> spawns per POST, which — given <code>dispatchFixture</code>'s
-  process-global <code>t.Setenv(SERGEANT_CONFIG/SERGEANT_FLEET_DIR)</code> — let a leaked goroutine from an
+  process-global <code>t.Setenv(SGT_CONFIG/SGT_FLEET_DIR)</code> — let a leaked goroutine from an
   earlier test write into a later test's reassigned environment or its own already-closed store. Added
   <code>waitForTerminalRun</code> calls close the leak at its source; this is a genuine test-isolation fix, not a
   workaround for a production defect, and it does not touch or mask any of the four guarantees this review
@@ -2048,7 +2048,7 @@ a{color:var(--muted)}
 </footer>
 
 <header>
-  <h1>Sergeant v2</h1>
+  <h1>Sgt v2</h1>
   <p>Independent review. Written by the critic, not the builder.</p>
   <p class="meta">
     Review 037 · 2026-08-26 · branch <code>v2</code> · merge commit <code>22a50c1</code>
@@ -2148,7 +2148,7 @@ a{color:var(--muted)}
     registered in the mux and genuinely called (awaited) from <code>selectRun</code>, not merely defined — the
     codebase's recurring "implemented but never wired up" class does not recur here. The merged-into-wrong-base
     path genuinely produces <code>blocked</code> with a reason naming both branches (proven against the real
-    store write, not a mock), never a silent <code>merged</code> or no-op. D6 ("Sergeant never merges anything
+    store write, not a mock), never a silent <code>merged</code> or no-op. D6 ("Sgt never merges anything
     itself") holds under direct inspection of every subprocess call the new code makes: only <code>gh pr
     create</code> (open) and <code>gh pr view</code> (read) exist; no merge or push path was added.
     <code>handleCheckMergeStatus</code> correctly resolves each bullet's own repo via <code>proj.Repos[b.Repo]</code>,

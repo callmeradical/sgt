@@ -9,7 +9,7 @@ stored `IntentRecord` and the one `BulletRecord` matching the target repo,
 not from unrelated project configuration and not from an operator's raw
 typed text alone. Requirement D1 requires both dispatch paths to describe
 the same work identically; D4 requires that description to come from
-Sergeant's own stored rows.
+Sgt's own stored rows.
 
 #### Scenario: The UI-dispatched path's agent prompt includes the intent statement and bullet state
 
@@ -33,16 +33,16 @@ Both paths D1 names ("two ways in, one set of records") SHALL produce the
 same brief content for the same intent and bullet, since both call the same
 rendering function.
 
-#### Scenario: sergeant_get_brief and the dispatch-time prompt agree
+#### Scenario: sgt_get_brief and the dispatch-time prompt agree
 
-- **WHEN** `sergeant_get_brief` is called with an intent id and repo, and
+- **WHEN** `sgt_get_brief` is called with an intent id and repo, and
   separately a dispatch-time prompt is rendered for the same intent id and
   repo with the same gate names
 - **THEN** the two rendered documents are identical
 
-#### Scenario: sergeant_get_brief refuses a repo with no matching bullet
+#### Scenario: sgt_get_brief refuses a repo with no matching bullet
 
-- **WHEN** `sergeant_get_brief` is called with an intent id and a repo that
+- **WHEN** `sgt_get_brief` is called with an intent id and a repo that
   has no bullet on that intent
 - **THEN** the call returns an error and no brief
 

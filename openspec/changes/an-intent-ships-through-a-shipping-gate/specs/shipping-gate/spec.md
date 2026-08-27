@@ -76,14 +76,14 @@ empty for any non-blocked status.
 - **THEN** the intent's shipping-gate status is recorded as passed and its
   shipping-gate reason is empty
 
-### Requirement: Sergeant never merges as a result of a shipping gate
+### Requirement: Sgt never merges as a result of a shipping gate
 
-A shipping gate, passing or failing, SHALL NOT cause Sergeant to merge,
+A shipping gate, passing or failing, SHALL NOT cause Sgt to merge,
 create, or otherwise act on any pull request. Decision D6 requires human
 merge only, observing real PR state.
 
 #### Scenario: A passing shipping gate triggers no merge action
 
 - **WHEN** an intent's shipping gate passes
-- **THEN** Sergeant takes no merge or PR-creation action as a result beyond
+- **THEN** Sgt takes no merge or PR-creation action as a result beyond
   recording the passed status

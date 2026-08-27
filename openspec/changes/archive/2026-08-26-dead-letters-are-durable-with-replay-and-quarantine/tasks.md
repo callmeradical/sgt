@@ -1,11 +1,11 @@
 # Tasks — Dead letters are durable, with replay and quarantine
 
-One repository, `sergeant-v2`, so one task. This is bullet 3 of 4 against R5;
+One repository, `sgt-v2`, so one task. This is bullet 3 of 4 against R5;
 bullet 4 merges after it.
 
 ## Task 1 — dead-letter on exhaustion, replay, and quarantine
 
-Repository: `sergeant-v2`. Depends on: `delivery-is-durable-with-retry-and-idempotency`
+Repository: `sgt-v2`. Depends on: `delivery-is-durable-with-retry-and-idempotency`
 (merged — this task edits `internal/store/delivery.go` directly, building on
 `DeliverEnvelope`, `insertDeliveryRow`, `ListDeliveryHistory`, and the
 `deliveryState*` constants already there, including `deliveryStateDeadLetter`,

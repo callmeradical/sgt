@@ -17,5 +17,5 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - run: go build -o bin/sergeant ./cmd/sergeant/
+      - run: go build -o bin/sgt ./cmd/sgt/
       - run: go test ./... 2>/dev/null || true

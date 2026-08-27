@@ -2,7 +2,7 @@
 
 ## Repository
 
-One repository: `sergeant-v2`. Standalone.
+One repository: `sgt-v2`. Standalone.
 
 ## Requirements served
 
@@ -20,7 +20,7 @@ no sanctioned place to leave a screenshot or trace that survives past the
 run: anything written into the worktree is reclaimed by
 `automated-fleet-cleanup`, and nothing durable ever records it. This is a
 concrete, current gap — this session alone produced dozens of such
-screenshots that sergeant has no record of.
+screenshots that sgt has no record of.
 
 Note on naming: `internal/dag/engine.go` already uses the word "artifact"
 for a different concept (upstream handoff envelopes routed into a
@@ -32,13 +32,13 @@ colliding with that existing usage.
 
 ## Proposal
 
-- A gate/phase command receives `SERGEANT_ARTIFACT_DIR` in its environment,
+- A gate/phase command receives `SGT_ARTIFACT_DIR` in its environment,
   an empty directory created fresh inside the worktree before the command
   runs. Anything the command writes there is a candidate captured artifact.
 - Immediately after `RunCodeGate`/`RunAgentPhase`'s command finishes
-  (success or failure), sergeant reads that directory, copies each file it
+  (success or failure), sgt reads that directory, copies each file it
   finds into a durable, per-run location outside the worktree
-  (`~/.local/share/sergeant/artifacts/<run_id>/<phase_id>/<filename>`), and
+  (`~/.local/share/sgt/artifacts/<run_id>/<phase_id>/<filename>`), and
   records one `ArtifactRecord` row per file. This happens synchronously,
   before the phase's own result is returned — well before any worktree
   reclaim, which only ever considers a run's *terminal* state, reached

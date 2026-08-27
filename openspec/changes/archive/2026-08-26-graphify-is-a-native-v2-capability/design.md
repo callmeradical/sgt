@@ -2,7 +2,7 @@
 
 ## Ownership
 
-One repository, `sergeant-v2`. Standalone — does not depend on any R5 bullet
+One repository, `sgt-v2`. Standalone — does not depend on any R5 bullet
 and nothing depends on it yet.
 
 ## `graphify` the binary is an external tool, like `goose` or `git`
@@ -86,9 +86,9 @@ to know that, not infer it from an empty output directory.
 ## MCP tools are thin subprocess wrappers
 
 ```go
-{Name: "sergeant_graph_query", ...}     // -> graphify query "<question>" --graph <Output>/graph.json
-{Name: "sergeant_graph_explain", ...}   // -> graphify explain "<node>" --graph <Output>/graph.json
-{Name: "sergeant_graph_affected", ...}  // -> graphify affected "<node>" --graph <Output>/graph.json
+{Name: "sgt_graph_query", ...}     // -> graphify query "<question>" --graph <Output>/graph.json
+{Name: "sgt_graph_explain", ...}   // -> graphify explain "<node>" --graph <Output>/graph.json
+{Name: "sgt_graph_affected", ...}  // -> graphify affected "<node>" --graph <Output>/graph.json
 ```
 
 Each resolves the project's `Graphify.Output` from its config, checks

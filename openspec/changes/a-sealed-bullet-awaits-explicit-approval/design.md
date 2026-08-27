@@ -2,7 +2,7 @@
 
 ## Ownership
 
-One repository, `sergeant-v2`. Standalone. Touches `internal/store/store.go`
+One repository, `sgt-v2`. Standalone. Touches `internal/store/store.go`
 (new method, reusing `GetRun`, `ListBulletsForIntent`, `UpdateBulletStatus`,
 all existing) and `internal/ui/server.go`'s `handleCreatePR`.
 

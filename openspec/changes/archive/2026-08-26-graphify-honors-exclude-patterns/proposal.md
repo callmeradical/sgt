@@ -2,7 +2,7 @@
 
 ## Repository
 
-One repository: `sergeant-v2`.
+One repository: `sgt-v2`.
 
 ## Requirements served
 
@@ -25,7 +25,7 @@ today.
 The real `graphify` binary this package orchestrates (D9: "does not
 reimplement graph algorithms") has no exclude/ignore flag on its `extract`
 subcommand — confirmed against its actual `--help` output. Filtering
-cannot be achieved by passing a flag through; it must happen on sergeant's
+cannot be achieved by passing a flag through; it must happen on sgt's
 side, over the graph data the binary already produced. This is consistent
 with D9's boundary: filtering already-extracted nodes/edges by file path is
 orchestration-side data handling, not a reimplementation of extraction or

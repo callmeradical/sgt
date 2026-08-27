@@ -2,7 +2,7 @@
 
 ## Ownership and merge order
 
-One repository, `sergeant-v2`. Fourth and final bullet against R5. Depends on
+One repository, `sgt-v2`. Fourth and final bullet against R5. Depends on
 bullets 1-3 (merged): `EnvelopeRecord`'s `ID`/`RunID` (bullet 1), the
 `deliveries` table and `Store.ListDeliveryHistory`/`QuarantineDelivery`
 (bullets 2-3).

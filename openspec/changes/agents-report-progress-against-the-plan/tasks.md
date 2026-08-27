@@ -1,13 +1,13 @@
 # Tasks — A dispatched agent reports progress against its plan
 
-One repository, `sergeant-v2`, so one task and no cross-repo merge order.
+One repository, `sgt-v2`, so one task and no cross-repo merge order.
 
 ## Task 1 — seed, read and publish a reported checklist
 
-Repository: `sergeant-v2`. Depends on: nothing.
+Repository: `sgt-v2`. Depends on: nothing.
 
 - Parse `#### Scenario:` headings from the resolved change's delta specs.
-- Write `.sergeant/plan.json` into the worktree at dispatch, one `pending` item
+- Write `.sgt/plan.json` into the worktree at dispatch, one `pending` item
   per scenario with a stable id, before the agent phase starts.
 - Extend the agent prompt to instruct the agent to mark items complete in that
   file as it finishes them.

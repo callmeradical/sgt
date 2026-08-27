@@ -1,12 +1,12 @@
 # Tasks — A dispatch produces a durable, idempotent, observable record
 
-One repository throughout: `sergeant-v2`. Each task is one bullet. Merge order is
-task order; sergeant releases a bullet's PR only once its upstream bullets are
+One repository throughout: `sgt-v2`. Each task is one bullet. Merge order is
+task order; sgt releases a bullet's PR only once its upstream bullets are
 merged, so task 2 waits for task 1 and task 3 waits for task 1.
 
 ## Task 1 — a dispatch persists its intent and bullets
 
-Repository: `sergeant-v2`. Depends on: nothing. Merge first.
+Repository: `sgt-v2`. Depends on: nothing. Merge first.
 
 - Add `intent_id` to `runs` via the existing additive migration pattern.
 - Hoist the target-repository resolution above the record writes so the DAG path
@@ -23,7 +23,7 @@ resolution fails. Exit status decides.
 
 ## Task 2 — a dispatch is idempotent under `request_id`
 
-Repository: `sergeant-v2`. Depends on: task 1. Merge second.
+Repository: `sgt-v2`. Depends on: task 1. Merge second.
 
 - Add `request_id TEXT` to `runs` with a unique index, storing the absent case as
   `NULL` so absent keys never collide.
@@ -41,7 +41,7 @@ decides.
 
 ## Task 3 — clients follow a sequenced stream instead of polling
 
-Repository: `sergeant-v2`. Depends on: task 1. Merge third.
+Repository: `sgt-v2`. Depends on: task 1. Merge third.
 
 - Add an append-only `changes` table with `seq INTEGER PRIMARY KEY AUTOINCREMENT`.
 - Append a change row on every run, intent and bullet transition.
@@ -49,9 +49,9 @@ Repository: `sergeant-v2`. Depends on: task 1. Merge third.
   snapshot plus current sequence when `from` is unknown or ahead.
 - Replace the `setInterval(..., 2000)` in `internal/ui/static/index.html` with an
   `EventSource`, keeping the existing key-diff render path.
-- Add MCP tools `sergeant_run_status` and `sergeant_run_wait`, both taking a run
+- Add MCP tools `sgt_run_status` and `sgt_run_wait`, both taking a run
   id and reading the same sequence the dashboard consumes. Neither may shell out
-  to `bin/sgt-*` (D7). `sergeant_run_wait` takes a caller-supplied bound and, on
+  to `bin/sgt-*` (D7). `sgt_run_wait` takes a caller-supplied bound and, on
   exceeding it, reports the run as still executing rather than inventing a
   terminal status.
 

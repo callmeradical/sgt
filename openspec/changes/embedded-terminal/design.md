@@ -2,7 +2,7 @@
 
 ## Ownership
 
-One repository, `sergeant-v2`. Touches `go.mod` (two new direct
+One repository, `sgt-v2`. Touches `go.mod` (two new direct
 dependencies), `internal/ui/server.go` (three new routes, one new `Server`
 field), a new `internal/ui/terminal.go`, and `internal/ui/static/index.html`
 plus three new vendored static files.
@@ -50,7 +50,7 @@ func newTerminalManager() *terminalManager {
 }
 
 // Start spawns a real shell PTY with the given size and working directory
-// (cwd empty means the sergeant process's own cwd — os/exec's existing
+// (cwd empty means the sgt process's own cwd — os/exec's existing
 // default when Cmd.Dir is unset). Mirrors launchpad's pty:start exactly:
 // shell is $SHELL or /bin/zsh (POSIX only — Windows PTY support is out of
 // scope per the PRD), TERM=xterm-256color, COLORTERM=truecolor.
@@ -160,7 +160,7 @@ carry. This is not a close call.
 **A confirmation dialog before opening a terminal.** Rejected: every other
 capability this dashboard already exposes to the local operator — dispatch,
 resume, PR creation, DAG save — is unrestricted, because the operator
-*is* the same person who started `sergeant ui`. A terminal is more
+*is* the same person who started `sgt ui`. A terminal is more
 powerful than any single one of those actions, but the trust boundary
 (same local user, same machine) is identical to all of them. Gating this
 one action behind a dialog the others don't have would be an inconsistent,

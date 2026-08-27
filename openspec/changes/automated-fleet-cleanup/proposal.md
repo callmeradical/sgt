@@ -2,7 +2,7 @@
 
 ## Repository
 
-One repository: `sergeant-v2`.
+One repository: `sgt-v2`.
 
 ## Requirements served
 
@@ -15,7 +15,7 @@ terminal run's fleet worktree safely — it refuses a still-`running` run
 and refuses (without `force`) a worktree with uncommitted changes. Nothing
 ever calls it automatically. An operator who does not think to invoke it
 accumulates fleet directories under
-`~/.local/share/sergeant-v2/fleet/<run-id>/` indefinitely, for runs that
+`~/.local/share/sgt-v2/fleet/<run-id>/` indefinitely, for runs that
 finished — or died — days or weeks ago.
 
 ## Proposal

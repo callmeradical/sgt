@@ -1,10 +1,10 @@
 # Tasks — Graphify `exclude_patterns` is honored
 
-One repository, `sergeant-v2`, so one task.
+One repository, `sgt-v2`, so one task.
 
 ## Task 1 — filter the merged graph before publish
 
-Repository: `sergeant-v2`. Depends on: nothing. Read
+Repository: `sgt-v2`. Depends on: nothing. Read
 `internal/graphify/graphify.go`'s `BuildProjectGraph` and
 `participatingRepoNames` first, and inspect a real built `graph.json`'s
 shape (`nodes`/`links`/`hyperedges`, each carrying `source_file`; links via

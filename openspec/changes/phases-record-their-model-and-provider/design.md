@@ -2,7 +2,7 @@
 
 ## Ownership and merge order
 
-One repository, `sergeant-v2`. Standalone — does not depend on the R5 bullets
+One repository, `sgt-v2`. Standalone — does not depend on the R5 bullets
 and they do not depend on it, but it touches the same function
 (`runner.RunAgentPhase`) that R5 bullet 2 (merged) and bullet 3 (in flight at
 the time this is written) also touch. To avoid a conflicting concurrent edit
@@ -19,7 +19,7 @@ opaque string, contains this line before its JSON payload:
 ```
 
 `anthropic` is the provider, `claude-sonnet-4-6` is the model. This is the
-actual invocation's own report of what it used, not sergeant's request for
+actual invocation's own report of what it used, not sgt's request for
 what it wanted — the distinction R4.6 exists to capture. No other supported
 agent (`opencode`, `claude`, `codex`, `pi`) has a known equivalent line in this
 codebase; none is invented here.
@@ -46,11 +46,11 @@ parse.
 ## Provenance applies regardless of which envelope `RunAgentPhase` uses
 
 `RunAgentPhase` has two paths to a phase's `env`: the agent wrote its own
-`envelope.json` (used verbatim when the phase did not fail), or sergeant
+`envelope.json` (used verbatim when the phase did not fail), or sgt
 synthesizes one from `outBuf` (every failure, and any success where the agent
 wrote nothing). Today only the synthesized path's payload carries
 `agent`/`attempt`/`worktree`/`branch` — the agent-authored path's payload is
-whatever the agent chose to write, which does not include sergeant's own
+whatever the agent chose to write, which does not include sgt's own
 provenance fields at all.
 
 `model`/`provider` must be attached after both paths converge on a single
@@ -63,7 +63,7 @@ agent wrote its own envelope. A small helper:
 // envelope payload without disturbing whatever else it carries. If payload is
 // not a JSON object (an agent-authored envelope could in principle write
 // something else), it is returned unchanged — provenance is additive
-// metadata, not a reason to reject a payload sergeant did not itself produce.
+// metadata, not a reason to reject a payload sgt did not itself produce.
 func annotatePayloadWithProvenance(payload json.RawMessage, model, provider string) json.RawMessage
 ```
 

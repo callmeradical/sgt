@@ -2,11 +2,11 @@
 
 Status: Draft, awaiting explicit human PRD approval
 
-Extends: `docs/prd-sergeant-v2.md`, section 7 (quality and acceptance gates)
+Extends: `docs/prd-sgt.md`, section 7 (quality and acceptance gates)
 
 ## Summary
 
-Every dispatch creates an isolated worktree under sergeant's fleet
+Every dispatch creates an isolated worktree under sgt's fleet
 directory. Reclaiming that space today requires a human to remember to
 call the existing manual cleanup action — nothing does this on its own.
 Fleet directories for runs that finished (or died) days or weeks ago sit
@@ -27,7 +27,7 @@ absence of one.
 
 ## Proposal
 
-Sergeant must periodically and automatically reclaim the fleet worktree of
+Sgt must periodically and automatically reclaim the fleet worktree of
 any run that has been in a terminal state for longer than a fixed
 retention window (seven days), with no human action required to trigger
 it.

@@ -1,10 +1,10 @@
 # Tasks — A restarted coordinator reconciles orphaned runs
 
-One repository, `sergeant-v2`, so one task and no cross-repo merge order.
+One repository, `sgt-v2`, so one task and no cross-repo merge order.
 
 ## Task 1 — reconcile orphaned runs and phases at startup
 
-Repository: `sergeant-v2`. Depends on: nothing.
+Repository: `sgt-v2`. Depends on: nothing.
 
 - Add `interrupted` as a run status, include it in `ResumableStatuses`, and keep
   it out of `BulletProgression`.

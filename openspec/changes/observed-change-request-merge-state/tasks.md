@@ -1,11 +1,11 @@
 # Tasks — Observed change-request merge state
 
-One repository, `sergeant-v2`. Task order matters: 2-4 depend on 1; 5
+One repository, `sgt-v2`. Task order matters: 2-4 depend on 1; 5
 depends on 2-4 all landing.
 
 ## Task 1 — The provider seam and its GitHub implementation
 
-Repository: `sergeant-v2`. Depends on: nothing.
+Repository: `sgt-v2`. Depends on: nothing.
 
 Read first: this change's `design.md` in full; `internal/export/export.go`
 and `internal/export/registry.go` (the exact pattern this package
@@ -37,7 +37,7 @@ Scenarios needing direct test coverage:
 
 ## Task 2 — Record and use the real base branch
 
-Repository: `sergeant-v2`. Depends on: nothing (independent of Task 1).
+Repository: `sgt-v2`. Depends on: nothing (independent of Task 1).
 
 Read first: `internal/dag/engine.go`'s `prepareWorktree` (line 127) in
 full; `internal/ui/gitutil.go`'s `defaultBase`; `internal/ui/delivery.go`
@@ -70,7 +70,7 @@ Scenarios needing direct test coverage:
 
 ## Task 3 — Persist the change request onto the bullet; refuse unrecognized hosts
 
-Repository: `sergeant-v2`. Depends on: Task 1 (the provider seam) and
+Repository: `sgt-v2`. Depends on: Task 1 (the provider seam) and
 Task 2 (`run.BaseBranch` to pass as the create call's base).
 
 Read first: `internal/ui/server.go`'s current `handleCreatePR` in full,
@@ -103,7 +103,7 @@ Scenarios needing direct test coverage:
 
 ## Task 4 — Observe merge status on pipeline-view activation
 
-Repository: `sergeant-v2`. Depends on: Task 1 and Task 3 (a real `PRURL`
+Repository: `sgt-v2`. Depends on: Task 1 and Task 3 (a real `PRURL`
 must exist on a bullet before there is anything to check).
 
 Read first: `internal/ui/static/index.html`'s `selectRun` function in

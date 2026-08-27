@@ -2,7 +2,7 @@
 
 ## Repository
 
-One repository: `sergeant-v2`. Standalone.
+One repository: `sgt-v2`. Standalone.
 
 ## Requirements served
 
@@ -27,7 +27,7 @@ in the dashboard today spawns a process an operator can interact with.
 
 Add a terminal to the dashboard, modeled on `launchpad`'s working
 implementation (`node-pty` bridged to `xterm.js` over Electron IPC),
-adapted to `sergeant-v2`'s plain browser/HTTP architecture:
+adapted to `sgt-v2`'s plain browser/HTTP architecture:
 
 - A Go-spawned PTY (real shell process, not a log) per session, bridged to
   the browser over a WebSocket connection scoped to that one session.
@@ -41,14 +41,14 @@ adapted to `sergeant-v2`'s plain browser/HTTP architecture:
   instance per session, matching the reference implementation's UX.
 - No new authentication: the dashboard already binds to `127.0.0.1` only
   (`server.go:204`), and a terminal opened through it runs as the same
-  local operator already running `sergeant ui`.
+  local operator already running `sgt ui`.
 
 ## Out of scope
 
 - Multi-user or remote access, or any new auth/authz model.
 - Recording, replaying, or attributing anything typed into a terminal to
   an intent, bullet, or phase — this is unrecorded, manual operator action,
-  and Sergeant's truthfulness rule means the dashboard must not imply
+  and Sgt's truthfulness rule means the dashboard must not imply
   otherwise.
 - A file editor, browser, or other IDE-like surface — terminal only.
 - Persisting terminal scrollback as durable state.

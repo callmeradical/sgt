@@ -2,7 +2,7 @@
 
 ## Ownership and merge order
 
-One repository owns every part: `sergeant-v2`. Because a single repository is
+One repository owns every part: `sgt-v2`. Because a single repository is
 involved, the merge order is the bullet order within the intent, not a cross-repo
 sequence:
 
@@ -120,8 +120,8 @@ the change exists to remove, moved from a timer to the network.
 **The stream still ticks once a second, per connection, as a fallback.** The
 primary wake-up is an in-process notification from the store, which fires the
 moment a change is appended. It cannot see a second process writing the same
-database file, and that case is real: `sergeant mcp` records envelopes while
-`sergeant ui` serves the stream. The retired cost was a *browser* re-reading the
+database file, and that case is real: `sgt mcp` records envelopes while
+`sgt ui` serves the stream. The retired cost was a *browser* re-reading the
 whole run list thirty times a minute; one indexed `seq > ?` query per connected
 client per second is not that, and without it an MCP-driven change would never
 reach the dashboard. Refreshes on the client are coalesced over 80ms for the
@@ -138,7 +138,7 @@ keeping the sequence truthful.
 
 **`timed_out` joined the terminal run statuses, and the list became one exported
 predicate.** `store.IsTerminalRunStatus` is now the single answer to "has this run
-finished?", asked by slug reuse and by `sergeant_run_wait`. A second, shorter copy
+finished?", asked by slug reuse and by `sgt_run_wait`. A second, shorter copy
 of the list inside the MCP tool would eventually disagree and make a wait block
 forever on a status the store already calls finished. `timed_out` belongs in it
 because a timed-out run is listed as resumable precisely because nothing resumes
@@ -168,7 +168,7 @@ transition recorded with no change row — is already reported: `AppendChange`'s
 error is returned to the caller rather than swallowed, so a notification that did
 not happen is never silently treated as one that did.
 
-**Letting `sergeant_run_wait` infer a status from its own timeout.** The whole
+**Letting `sgt_run_wait` infer a status from its own timeout.** The whole
 point of the bound is that exceeding it says something about the *wait*, not about
 the run. On timeout the tool reports the status the store holds, `terminal: false`,
 `timed_out: true`, and says the run is still executing. Returning `failed` because

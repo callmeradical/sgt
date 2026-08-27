@@ -26,7 +26,7 @@ Prerequisites:
 
 ### Step 0 — Check for existing tracked work
 
-v2's task-tracking is a read-only export (decision D4); there is no command that pulls a brief from an external tracker into a dispatch. If the user's request maps to an existing ticket in an external tracker, use it for context only — state the brief yourself in the dispatch call below. Sergeant's own durable record of the work is the Intent/Bullet rows a dispatch creates, not an external task.
+v2's task-tracking is a read-only export (decision D4); there is no command that pulls a brief from an external tracker into a dispatch. If the user's request maps to an existing ticket in an external tracker, use it for context only — state the brief yourself in the dispatch call below. Sgt's own durable record of the work is the Intent/Bullet rows a dispatch creates, not an external task.
 
 ### Step 1 — Confirm the plan
 
@@ -74,7 +74,7 @@ Per dispatch call:
 1. An OpenSpec change is resolved (decision O3) before any run row, worktree, or branch exists — a failure here leaves nothing behind.
 2. A run record is created in the store.
 3. A git worktree is created per repo (plain `git worktree add`); a non-git or missing path is refused rather than cloned.
-4. Each repo's agent phase runs headlessly, receiving its brief via the `sergeant_get_brief` MCP tool or the equivalent rendered prompt the dispatch engine builds into the phase — both draw on the same rendering, so the two dispatch paths never describe the same work differently.
+4. Each repo's agent phase runs headlessly, receiving its brief via the `sgt_get_brief` MCP tool or the equivalent rendered prompt the dispatch engine builds into the phase — both draw on the same rendering, so the two dispatch paths never describe the same work differently.
 5. Phase and envelope records are written to the store as the run progresses. There is no fleet file to sync and no tmux window.
 
 ### Step 3 — Monitor
@@ -91,7 +91,7 @@ Status is read directly from the store — there is no separate sync step and no
 There is no structured response-message channel in v2. When a bullet is `blocked`:
 
 1. Read `GET /api/run-details?id=<run-id>` for the blocked reason.
-2. Resolve the underlying cause directly — in the bullet's worktree, under `~/.local/share/sergeant-v2/fleet/<run-id>/<repo>/`, or by fixing the OpenSpec change/spec mismatch a review finding named.
+2. Resolve the underlying cause directly — in the bullet's worktree, under `~/.local/share/sgt-v2/fleet/<run-id>/<repo>/`, or by fixing the OpenSpec change/spec mismatch a review finding named.
 3. `POST /api/run-resume` with `{"id": "<run-id>"}` — this is v2's actual, coarser equivalent of a response-message exchange. `blocked` is the bullet's status, not the run's; the run underneath it is `failed` (or `cancelled`/`timed_out`/`interrupted`), and resuming that run — skipping phases already recorded `passed` — is what gives the bullet a chance to leave `blocked`.
 
 There is no persistent interactive pane to attach to — a dispatched agent phase runs headlessly to completion or a bounded timeout.
@@ -100,7 +100,7 @@ There is no persistent interactive pane to attach to — a dispatched agent phas
 
 When every bullet is done, review the PRs:
 - Verify each repo's completion evidence: pinned-base scope, passing gates, and — when a review phase is configured — zero blocking findings and resolved non-outdated review threads
-- Check merge order: the intent's bullet order (decision D6) is the merge order; Sergeant releases a bullet's PR only once its upstream bullets are reviewed and merged
+- Check merge order: the intent's bullet order (decision D6) is the merge order; Sgt releases a bullet's PR only once its upstream bullets are reviewed and merged
 - If a bullet failed, read its blocked/failed reason via `GET /api/run-details?id=` and decide: fix and `POST /api/run-resume`, or reassign
 - `GET /api/bullets?run_id=<run-id>` for the run's terminal bullet state
 - Note any cross-repo implications in each PR description
@@ -124,7 +124,7 @@ Each dispatched agent phase is expected to:
 2. Pin the fixed point, normally the merge-base with current `origin/main`, and record the base SHA, commit list, and diff scope.
 3. Triage the full spec/comments, linked material, prior or redundant work, category, and readiness. Identify the originating OpenSpec change (decision O3) or explicitly record that none exists.
 4. Route before implementation using the canonical engineering skill for that phase when available, in this order:
-   - Huge/foggy work: surface `wayfinder`, `to-spec`, and Sergeant's custom `to-tickets` as HITL escalation/planning paths; do not silently execute them as implementation
+   - Huge/foggy work: surface `wayfinder`, `to-spec`, and Sgt's custom `to-tickets` as HITL escalation/planning paths; do not silently execute them as implementation
    - Hard bug/performance: load `diagnosing-bugs`, then use a deterministic red command, minimal reproduction, falsifiable hypotheses, and one-variable instrumentation
    - Uncertain logic/UI: load `prototype`, create throwaway evidence for HITL feedback, and never promote prototype code directly
    - Approved implementation: load `tdd` before implementation and use tracer-bullet vertical slices
@@ -137,7 +137,7 @@ Each dispatched agent phase is expected to:
 10. Commit, open a PR, wait for required CI, resolve all non-outdated review threads, and satisfy merge order.
 11. A bullet reaches `sealed` only after every gate passes and, once configured review has run, carries zero blocking findings.
 
-Task tracking is out of scope for a dispatched agent to create or mutate — v2's task-tracking is a read-only export (decision D4); Intent/Bullet rows in Sergeant's own store are the durable record.
+Task tracking is out of scope for a dispatched agent to create or mutate — v2's task-tracking is a read-only export (decision D4); Intent/Bullet rows in Sgt's own store are the durable record.
 
 If a canonical skill cannot be loaded, the generated brief's embedded rules remain mandatory for that phase.
 

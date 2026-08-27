@@ -1,12 +1,12 @@
 # Tasks — Server dispatch/execution decomposition
 
-One repository, `sergeant-v2`, one task. Independent of
+One repository, `sgt-v2`, one task. Independent of
 `server-remaining-groups-decomposition` — no shared type, no ordering
 dependency; either may merge first.
 
 ## Task 1 — characterize, extract, seam
 
-Repository: `sergeant-v2`. Depends on: nothing.
+Repository: `sgt-v2`. Depends on: nothing.
 
 Read first: the current `internal/ui/server.go` in full (specifically
 lines 971-1877, the functions design.md names), and the four prior

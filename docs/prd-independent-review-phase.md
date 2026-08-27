@@ -2,7 +2,7 @@
 
 Status: Draft, awaiting explicit human PRD approval
 
-Extends: `docs/prd-sergeant-v2.md`, D2 ("Trust the workflow, review the
+Extends: `docs/prd-sgt.md`, D2 ("Trust the workflow, review the
 inference"), D3 ("TDD is enforced, not assumed"), D5 ("Three interruptions
 only"), and AGENTS.md's listed v2 gap "independent review workers."
 
@@ -47,7 +47,7 @@ a bullet reaches `green` and before it is eligible for `sealed`:
   `specs/*/spec.md`, and judges against those — not its own assumptions
   about what the feature should do.
 - Findings are recorded on the bullet as structured evidence — axis,
-  severity, summary, disposition — in Sergeant's own store (D4: Sergeant
+  severity, summary, disposition — in Sgt's own store (D4: Sgt
   does not hand findings to an external tracker as their record of truth;
   a task-tracking export, if configured per the task-tracking-export PRD,
   may carry a read-only copy).

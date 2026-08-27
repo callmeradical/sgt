@@ -2,7 +2,7 @@
 
 ## Ownership
 
-One repository, `sergeant-v2`. Touches `internal/store/store.go` (new
+One repository, `sgt-v2`. Touches `internal/store/store.go` (new
 column, new bullet setter), `internal/dag/engine.go` (`prepareWorktree`),
 a new `internal/changerequest` package, `internal/ui/gitutil.go`
 (`defaultBase`), `internal/ui/server.go` (`handleCreatePR`, a new

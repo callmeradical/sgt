@@ -2,7 +2,7 @@
 
 ## ADDED Requirements
 
-### Requirement: Sergeant-owned skill files describe v2's actual dispatch surface, not v1's deleted commands
+### Requirement: Sgt-owned skill files describe v2's actual dispatch surface, not v1's deleted commands
 
 The five `skills/*/SKILL.md` files that carry a "V1 ONLY" banner today SHALL,
 after this change, contain no reference to any deleted `bin/sgt-*` command
@@ -44,7 +44,7 @@ and SHALL instruct the v2 HTTP API and MCP tools that actually exist.
 
 - **WHEN** any of `skills/dispatch/SKILL.md`, `skills/cross-repo-work/
   SKILL.md`, `skills/load-project/SKILL.md`, `skills/wiki/SKILL.md`, or
-  `skills/sergeant-help/SKILL.md` is searched for `V1 ONLY`
+  `skills/sgt-help/SKILL.md` is searched for `V1 ONLY`
 - **THEN** the string is not found in any of them
 
 ### Requirement: A skill states explicitly, rather than inventing a command, where v2 has no equivalent capability
@@ -92,7 +92,7 @@ made worse by this change.
 - **THEN** it reports zero failures for any assertion naming
   `skills/dispatch/SKILL.md`, `skills/cross-repo-work/SKILL.md`,
   `skills/load-project/SKILL.md`, `skills/wiki/SKILL.md`,
-  `skills/sergeant-help/SKILL.md`, `.agents/skills/to-tickets/SKILL.md`,
+  `skills/sgt-help/SKILL.md`, `.agents/skills/to-tickets/SKILL.md`,
   `docs/troubleshooting.md`, or `schema/project.yaml.example`
 
 #### Scenario: The test's 15 pre-existing AGENTS.md failures are unchanged in count and content

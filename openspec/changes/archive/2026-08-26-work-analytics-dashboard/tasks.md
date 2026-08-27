@@ -1,10 +1,10 @@
 # Tasks — Work analytics dashboard
 
-One repository, `sergeant-v2`, so one task.
+One repository, `sgt-v2`, so one task.
 
 ## Task 1 — analytics query, endpoint, and drawer
 
-Repository: `sergeant-v2`. Depends on: nothing. Read
+Repository: `sgt-v2`. Depends on: nothing. Read
 `openspec/changes/work-analytics-dashboard/{proposal,design}.md` and
 `specs/work-analytics/spec.md` first — they are binding. Read `AGENTS.md`.
 Work test-first per decision D3. Before writing anything, read:

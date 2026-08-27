@@ -2,12 +2,12 @@
 
 Status: Draft, awaiting explicit human PRD approval
 
-Extends: `docs/prd-sergeant-v2.md`, R7.3 (the embedded UI presents delivery
+Extends: `docs/prd-sgt.md`, R7.3 (the embedded UI presents delivery
 status without becoming a second execution engine)
 
 ## Summary
 
-Sergeant now durably records, per run, who did the work (which agent),
+Sgt now durably records, per run, who did the work (which agent),
 what kind of work it was (decision O2's work type: feat/fix/refactor/docs/
 chore/test), and what happened to it (passed/failed/blocked/merged). None
 of this is visible anywhere as an aggregate. The dashboard today shows one
@@ -17,7 +17,7 @@ kind, by which agents, and how reliably.
 
 ## Problem
 
-An operator running sergeant across multiple projects has no way to see
+An operator running sgt across multiple projects has no way to see
 their own throughput without manually reading through runs one at a time.
 Questions like "how much of what we shipped this month was bug fixes versus
 new features," "which agent is being used for what," and "what fraction of
@@ -50,7 +50,7 @@ that presents an aggregate picture of completed and in-flight work:
 - **Any change to what is recorded.** This PRD is purely a read-side view
   over run/intent/phase fields that already exist (`Type`, agent, model,
   provider, status, timestamps). It defines no new data to capture.
-- **Cross-installation or team-wide reporting.** Sergeant is single-operator,
+- **Cross-installation or team-wide reporting.** Sgt is single-operator,
   local-first; this is one operator's own local view of their own local
   history, not a shared or exported report.
 - **Real-time/streaming updates to this specific view.** The existing

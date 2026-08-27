@@ -1,11 +1,11 @@
 # Tasks — Envelopes are typed, versioned and correlated
 
-One repository, `sergeant-v2`, so one task and no cross-repo merge order. This is
+One repository, `sgt-v2`, so one task and no cross-repo merge order. This is
 bullet 1 of 4 against R5; the remaining three merge after it.
 
 ## Task 1 — give an envelope its metadata, validate it, and make it immutable
 
-Repository: `sergeant-v2`. Depends on: nothing.
+Repository: `sgt-v2`. Depends on: nothing.
 
 - Extend `EnvelopeRecord` with `Type`, `SchemaVersion`, `OccurredAt`,
   `PublishedAt`, `Producer`, `CorrelationID`, `CausationID` and `PhaseID`.

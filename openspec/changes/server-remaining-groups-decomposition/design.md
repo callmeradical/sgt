@@ -2,7 +2,7 @@
 
 ## Ownership
 
-One repository, `sergeant-v2`. Three independent tasks — no shared type
+One repository, `sgt-v2`. Three independent tasks — no shared type
 between them, and none depends on `server-dispatch-execution-
 decomposition` (disjoint functions; either change may merge first).
 

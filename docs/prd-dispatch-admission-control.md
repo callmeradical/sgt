@@ -2,9 +2,9 @@
 
 Status: Draft, awaiting explicit human PRD approval
 
-Extends: `docs/prd-sergeant-v2.md` §7 (Quality and acceptance gates) and R7
+Extends: `docs/prd-sgt.md` §7 (Quality and acceptance gates) and R7
 (Operator surfaces and delivery). Adapts the same problem and design intent
-already implemented for Sergeant v1 (`bin/sgt-dispatch`, see the v1/`main`
+already implemented for Sgt v1 (`bin/sgt-dispatch`, see the v1/`main`
 branch's `openspec/changes/dispatch-admission-control/`) to v2's Go/SQLite
 architecture — this is a re-implementation of the same product requirement,
 not a code port; v1's bash/tmux mechanism does not apply here.
@@ -78,7 +78,7 @@ same problem against one v2 instance.
   treated as "one active agent-phase process," matching v1's settled
   decision.
 - Cross-machine or multi-instance coordination. The budget and queue are
-  scoped to one running `sergeant ui` server process.
+  scoped to one running `sgt ui` server process.
 - Changing `Retries`, `Type`, `RequestID`, or any other existing
   `/api/dispatch` field's behavior.
 

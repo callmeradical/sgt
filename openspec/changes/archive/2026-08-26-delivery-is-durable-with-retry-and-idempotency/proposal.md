@@ -2,7 +2,7 @@
 
 ## Repository
 
-One repository: `sergeant-v2`.
+One repository: `sgt-v2`.
 
 ## Requirements served
 
@@ -27,7 +27,7 @@ and act on.
 
 ## Problem
 
-sergeant-v2 has exactly two places an envelope reaches a consumer, and both
+sgt-v2 has exactly two places an envelope reaches a consumer, and both
 discard their error:
 
 - `runner.RunAgentPhase` calls `Router.SaveEnvelope`, which writes the envelope

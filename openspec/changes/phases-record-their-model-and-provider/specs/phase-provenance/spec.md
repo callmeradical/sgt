@@ -24,11 +24,11 @@ was requested.
 #### Scenario: Provenance is recorded whether or not the agent wrote its own envelope
 
 - **WHEN** a successful phase's envelope was written by the agent itself,
-  not synthesized by sergeant
+  not synthesized by sgt
 - **THEN** the phase's payload still reports `model` and `provider` when the
   agent's output made them knowable
 
-An envelope's origin (agent-authored or sergeant-synthesized) must not decide
+An envelope's origin (agent-authored or sgt-synthesized) must not decide
 whether provenance is recorded — both are the same phase, and evidence from
 its execution exists regardless of which side wrote the summary.
 

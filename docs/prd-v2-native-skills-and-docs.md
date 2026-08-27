@@ -8,18 +8,18 @@ which deliberately left this exact gap for a follow-up (flagged then as
 
 ## Summary
 
-`bin/sgt-*`, `_sgt-*.sh`, and the legacy `sergeant-mcp` proxy no longer exist
+`bin/sgt-*`, `_sgt-*.sh`, and the legacy `sgt-mcp` proxy no longer exist
 on `v2` — but `skills/dispatch/SKILL.md`, `skills/cross-repo-work/SKILL.md`,
 `skills/load-project/SKILL.md`, `skills/wiki/SKILL.md`,
-`skills/sergeant-help/SKILL.md`, `.agents/skills/to-tickets/SKILL.md`,
+`skills/sgt-help/SKILL.md`, `.agents/skills/to-tickets/SKILL.md`,
 `docs/troubleshooting.md`, and `schema/project.yaml.example` still instruct
 an operator or agent to run those now-deleted commands
 (`sgt-watch --sync <task-id>`, `sgt-dispatch`, `sgt-notify`,
 `sgt-td-create`, `sgt-graphify`, and others). This PRD rewrites those files
 to describe v2's actual surface — the HTTP API (`POST /api/dispatch`,
 `/api/run-resume`, `/api/bullets`, `/api/create-pr`) and the MCP tools
-(`sergeant_get_brief`, `sergeant_run_gates`, `sergeant_run_status`,
-`sergeant_run_wait`) — instead.
+(`sgt_get_brief`, `sgt_run_gates`, `sgt_run_status`,
+`sgt_run_wait`) — instead.
 
 ## Problem
 
@@ -56,7 +56,7 @@ task-tracking model instead of v1 CLI commands:
 - `skills/wiki/SKILL.md` — audit for v1 references (`wiki-daily-digest`
   itself was explicitly kept on `v2`; only remove references to deleted
   fleet-dispatch commands, not the wiki tool itself).
-- `skills/sergeant-help/SKILL.md` — update its command reference to v2's
+- `skills/sgt-help/SKILL.md` — update its command reference to v2's
   actual commands/API surface.
 - `.agents/skills/to-tickets/SKILL.md` — replace `sgt-list`/`sgt-context`/
   `sgt-td-*`/`sgt-dispatch` references with v2 equivalents, or note

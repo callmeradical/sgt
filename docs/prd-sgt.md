@@ -1,21 +1,21 @@
-# Sergeant v2 — Product Requirements Document
+# Sgt v2 — Product Requirements Document
 
 **Status:** Draft for human review  
-**Product:** Sergeant, a local-first, Go-native software factory  
+**Product:** Sgt, a local-first, Go-native software factory  
 **Audience:** Product owner, operators, implementers, reviewers
 
 ## 1. Product vision
 
-Sergeant is a single software factory that turns bounded intent into safe,
+Sgt is a single software factory that turns bounded intent into safe,
 evidenced, reviewed delivery across multiple projects and repositories. One
 installation can load many project topologies, apply reusable factory
 pipelines, execute repository-scoped phases, and report a complete result
 without losing scope, evidence, or failure state.
 
-Sergeant v2 is the Bash replacement and the intended Go execution model. It
+Sgt v2 is the Bash replacement and the intended Go execution model. It
 replaces interactive tmux workers and the shell supervision plumbing built
 around them with Go-native coordination, deterministic code gates, and durable
-records. The Go code in `cmd/sergeant` and `internal/` is the current execution
+records. The Go code in `cmd/sgt` and `internal/` is the current execution
 foundation: a CLI for running and inspecting multi-repository factory DAGs,
 project configuration, an embedded status/refinement UI, isolated Git worktrees,
 bounded phase execution, handoff envelopes, and durable run/phase records.
@@ -24,17 +24,17 @@ v2 has **two ways in, and both write the same records**:
 
 1. **Agent-driven.** The operator launches their own agent CLI (opencode, codex,
    goose, pi, claude) in a terminal inside the project. That agent talks to
-   Sergeant over MCP (`sergeant_get_brief`, `sergeant_run_gates`,
-   `sergeant_emit_envelope`, `sergeant_seal_pr`, `sergeant_status`). Sergeant
+   Sgt over MCP (`sgt_get_brief`, `sgt_run_gates`,
+   `sgt_emit_envelope`, `sgt_seal_pr`, `sgt_status`). Sgt
    does not spawn, host, or multiplex the session; it is the system the agent
    works *within*.
-2. **Coordinator-driven.** The operator dispatches from the UI and Sergeant
+2. **Coordinator-driven.** The operator dispatches from the UI and Sgt
    coordinates the work itself, invoking bounded headless agent phases.
 
 Both create and update the same records, and both go through the same gates. Neither uses tmux. Having two different execution models inside v2
 would be a bug, not a feature.
 
-Sergeant's lessons inform the product guarantees: reliability, explicit safety
+Sgt's lessons inform the product guarantees: reliability, explicit safety
 boundaries, durable evidence, tasking, isolated workers, review, recovery, and
 controlled delivery. The composable vocabulary of Super Simple Software
 Factory informs the factory/project/phase model. Super Simple Software Factory
@@ -83,7 +83,7 @@ A hosted multi-tenant control plane is not implied.
 
 - Interactive tmux workers, persistent worker sessions, wake/respond worker
   control, or tmux as an execution dependency.
-- Preserving Sergeant's legacy shell dispatch behavior, command set, fleet file
+- Preserving Sgt's legacy shell dispatch behavior, command set, fleet file
   formats, or worker protocol as v2 compatibility requirements. Any adapter is
   future work outside this PRD.
 - A hosted multi-tenant service, organizational RBAC, shared fleet database, or
@@ -129,18 +129,18 @@ workflow or by the model. The two are trusted differently (see D2).
   gate result before implementation and a *passing* one after. Red→green is
   evidence, produced by deterministic gates with no model judgment. Bullets with
   no natural red state (pure refactor) require an explicit, recorded exemption.
-- **D4 — Sergeant stores intents and bullets itself.** Intents and bullets are first-class rows in
-  Sergeant's own store with referential integrity to worktree, branch, commit and
-  PR. Sergeant cannot enforce rules about data it does not own. Exporting a
+- **D4 — Sgt stores intents and bullets itself.** Intents and bullets are first-class rows in
+  Sgt's own store with referential integrity to worktree, branch, commit and
+  PR. Sgt cannot enforce rules about data it does not own. Exporting a
   read-only copy to a task tracker is optional.
 - **D5 — Three interruptions only.** A human is notified when (a) an inferred plan
   awaits approval, (b) a bullet is blocked on a human decision, (c) a bullet is
   ready for an irreversible step. Everything else just shows up in the
   fleet view. Telling the operator everything is fine regardless of what actually
   happened is a bug.
-- **D6 — Sequenced submission, human merge.** Sergeant releases a bullet's PR only
+- **D6 — Sequenced submission, human merge.** Sgt releases a bullet's PR only
   once its upstream bullets are reviewed and merged, observing real PR state to
-  advance the chain. Sergeant never merges. So Sergeant is never the thing that made
+  advance the chain. Sgt never merges. So Sgt is never the thing that made
   an irreversible change across several repos, which keeps R3.4 honest.
 - **D9 — graphify is a v2 capability, implemented natively.** A project may declare
   a `graphify:` block (`output`, `include_groups`, `exclude_patterns`). The system
@@ -153,11 +153,11 @@ workflow or by the model. The two are trusted differently (see D2).
   field. It survives a config save only because saving patches the YAML node tree
   and preserves keys the server does not model.
 
-- **D10 — Sergeant is an agent host, and its client contract follows the Agent
+- **D10 — Sgt is an agent host, and its client contract follows the Agent
   Host Protocol where AHP has already settled the question.** AHP
   (`microsoft/agent-host-protocol`) is the client-facing state-synchronisation
   layer *above* an agent runtime; ACP is the point-to-point layer below. Their own
-  framing is "AHP is a mutex over ACP". Sergeant already occupies the host
+  framing is "AHP is a mutex over ACP". Sgt already occupies the host
   position: it owns authoritative run state, spawns agents, and serves a
   dashboard client. It therefore inherits AHP's solved problems and must stop
   hand-rolling worse versions of them:
@@ -169,15 +169,15 @@ workflow or by the model. The two are trusted differently (see D2).
     replaying from the last sequence they saw, rather than re-reading the whole
     world every two seconds (AHP subscribe/snapshot/replay).
 
-  Sergeant does **not** adopt AHP as its wire protocol at this time. The protocol
+  Sgt does **not** adopt AHP as its wire protocol at this time. The protocol
   is five months old, its Go client is pre-1.0 (0.8.0 against spec 1.0.0), and its
   doctrine still reserves the right to break. This decision borrows AHP's settled
   designs; it does not create a dependency.
 
-  AHP is explicitly not a substitute for anything sergeant decides. Its stated
+  AHP is explicitly not a substitute for anything sgt decides. Its stated
   anti-goals include agent-to-agent coordination, tool registries, and the agent
   loop itself — which is to say, intent decomposition, merge ordering, TDD
-  evidence, gates and chain of custody all remain sergeant's own problem.
+  evidence, gates and chain of custody all remain sgt's own problem.
 
 - **D8 — The dashboard is a view of intents, and it renders the workflow from a
   definition.** The primary list is intents, not runs. Selecting an intent shows its
@@ -194,7 +194,7 @@ workflow or by the model. The two are trusted differently (see D2).
   executed also makes the view retrospective: it can answer "what happened" but not
   "what happens next" or "where are we".
 
-- **D7 — v1 is not a dependency.** Sergeant must not shell out to `sgt-*`, adopt
+- **D7 — v1 is not a dependency.** Sgt must not shell out to `sgt-*`, adopt
   v1's fleet file layout, or reuse its supervision plumbing. Where a v1 capability
   is absent, that is unimplemented v2 scope.
 
@@ -221,7 +221,7 @@ documentation rather than decaying in a wiki or a chat log.
   `openspec/`. Stores (upstream's separate planning repo, currently beta) are not
   adopted: the spec must travel *in the pull request* to produce chain of custody
   at review time, which is the entire point. Grouping related changes across repos is
-  something Sergeant does, not OpenSpec.
+  something Sgt does, not OpenSpec.
 - **O2 — Change-to-code linkage has three legs, with ranked trust.** Audit relies
   on the strongest leg available and never on the branch alone:
   1. **`openspec/changes/<id>/` present in the PR diff** — primary. Self-evident
@@ -379,7 +379,7 @@ second notification protocol.
 6. Every agent phase record identifies the agent CLI, the model, and the
    model's provider that actually executed it, derived from real evidence of
    that execution rather than only from requested configuration. A result
-   must be attributable to what produced it, not only to which sergeant
+   must be attributable to what produced it, not only to which sgt
    component dispatched it.
 
 ### R5 — Notification/envelope transport
@@ -444,9 +444,9 @@ second notification protocol.
 
 ### R7 — Operator surfaces and delivery
 
-1. `sergeant run <project>` starts a multi-repository factory run and reports
+1. `sgt run <project>` starts a multi-repository factory run and reports
    stage progression and failure clearly.
-2. `sergeant status` shows recent runs with project, status, and creation time;
+2. `sgt status` shows recent runs with project, status, and creation time;
    the operator can inspect phase-level state through the observability surface.
 3. The embedded UI can list projects, show project details, refine supported
    project configuration, list runs by project, show phases, and present
@@ -536,7 +536,7 @@ quality commands while preserving the multi-project, cross-repository factory
 model and the bounded execution requirements in this document.
 
 
-**Runtime boundary:** tmux and interactive workers are legacy Sergeant concerns
-and are out of scope as Sergeant v2 runtime dependencies. They may remain as
+**Runtime boundary:** tmux and interactive workers are legacy Sgt concerns
+and are out of scope as Sgt v2 runtime dependencies. They may remain as
 historical documentation or separately maintained legacy adapters, but no v2
 factory, notification, envelope, recovery, or acceptance path may require them.

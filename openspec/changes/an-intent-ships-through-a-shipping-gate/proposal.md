@@ -2,7 +2,7 @@
 
 ## Repository
 
-One repository: `sergeant-v2`.
+One repository: `sgt-v2`.
 
 ## Requirements served
 
@@ -66,8 +66,8 @@ Add an intent-scoped, optional shipping gate:
   .Context, name, command string, worktrees []string) (*runner.GateResult,
   error)`, sibling to `RunCodeGate` (`internal/runner/runner.go:231`) but
   not a `*PhaseRunner` method — a shipping gate has no single worktree.
-  It runs the command with `cmd.Dir` unset (the sergeant process's own
-  working directory) and `SERGEANT_BULLET_WORKTREES` set to the bullets'
+  It runs the command with `cmd.Dir` unset (the sgt process's own
+  working directory) and `SGT_BULLET_WORKTREES` set to the bullets'
   worktree paths, comma-joined, in merge order, in the command's
   environment — the substrate a project's shipping-gate command needs to
   actually inspect more than one repo. It reuses `GateResult` (not a new
@@ -79,7 +79,7 @@ Add an intent-scoped, optional shipping gate:
 
 ## Out of scope
 
-- **Sergeant merging anything.** D6 unchanged.
+- **Sgt merging anything.** D6 unchanged.
 - **Per-bullet gate changes.** `Factory.Gates`/`RunCodeGate` untouched.
 - **The independent-review-phase PRD.** Not a prerequisite either
   direction.

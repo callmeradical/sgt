@@ -1,10 +1,10 @@
 # Tasks — Serve the workflow as a graph definition
 
-One repository, `sergeant-v2`. One task, no cross-repo merge order.
+One repository, `sgt-v2`. One task, no cross-repo merge order.
 
 ## Task 1 — serve the workflow definition
 
-Repository: `sergeant-v2`. Depends on: nothing. **Already delivered in `3ac6e29`.**
+Repository: `sgt-v2`. Depends on: nothing. **Already delivered in `3ac6e29`.**
 
 - Serve `GET /api/workflow?project=&repo=` returning nodes and edges.
 - Derive stages from `factory.pipeline`, falling back to the engine default read

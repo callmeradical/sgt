@@ -1,15 +1,15 @@
 # Tasks — Branch names carry their work type
 
-One repository, `sergeant-v2`, so one task.
+One repository, `sgt-v2`, so one task.
 
 ## Task 1 — validate, record, and single-source the branch name
 
-Repository: `sergeant-v2`. Depends on: nothing. Read
+Repository: `sgt-v2`. Depends on: nothing. Read
 `internal/store/store.go`'s `RunRecord`/`IntentRecord`/`CreateRun`/`GetRun`/
 `CreateIntent`/`GetIntent`, `internal/dag/engine.go`'s `BranchName`/
 `prepareWorktree`/`Engine`, `internal/ui/server.go`'s `handleDispatch`/
 `handleApprovePlan`/`createRunAndDispatch`/`handleCreatePR`/
-`describeDelivery`, `internal/mcp/server.go`'s `sergeant_seal_pr` case, and
+`describeDelivery`, `internal/mcp/server.go`'s `sgt_seal_pr` case, and
 `internal/runner/runner.go`'s `DeliverPullRequest` first — design.md names
 every one of these precisely; read it before writing anything.
 
@@ -30,11 +30,11 @@ every one of these precisely; read it before writing anything.
   `naming.BranchName(run.Type, run.ChangeID)` — do not thread new
   parameters through `RunStage`/`recordGateStage`/`executeRun` instead.
 - Replace `internal/ui/server.go`'s `handleCreatePR`'s hand-built
-  `fmt.Sprintf("sergeant/%s", req.RunID)` and `describeDelivery`'s
+  `fmt.Sprintf("sgt/%s", req.RunID)` and `describeDelivery`'s
   `dag.BranchName(runID)` call with a run lookup plus
   `naming.BranchName(run.Type, run.ChangeID)`.
-- Replace `internal/mcp/server.go`'s `sergeant_seal_pr` case's hand-built
-  `fmt.Sprintf("sergeant/%s", runID)` the same way.
+- Replace `internal/mcp/server.go`'s `sgt_seal_pr` case's hand-built
+  `fmt.Sprintf("sgt/%s", runID)` the same way.
 - Replace `internal/runner/runner.go`'s `DeliverPullRequest`'s fallback
   branch construction the same way, using `pr.Store.GetRun(pr.RunID)`.
 - In `handleDispatch`'s no-repos branch, store `Type: req.Type` on the

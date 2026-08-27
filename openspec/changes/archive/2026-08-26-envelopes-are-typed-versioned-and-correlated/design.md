@@ -2,7 +2,7 @@
 
 ## Ownership and merge order
 
-One repository, `sergeant-v2`. First of four bullets against R5; bullets 2 to 4
+One repository, `sgt-v2`. First of four bullets against R5; bullets 2 to 4
 merge after this one because a delivery state machine needs an envelope identity
 to key on.
 

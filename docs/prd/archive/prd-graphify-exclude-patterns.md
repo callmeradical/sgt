@@ -2,7 +2,7 @@
 
 Status: Draft, awaiting explicit human PRD approval
 
-Extends: `docs/prd-sergeant-v2.md`, decision D9
+Extends: `docs/prd-sgt.md`, decision D9
 
 ## Summary
 
@@ -18,7 +18,7 @@ A project's code graph is meant to represent the code worth navigating by.
 Generated files, vendored/third-party code, and other noise a project owner
 has explicitly named should not appear in it — that is the entire purpose
 of a file-pattern exclude list. Today that declared intent is discarded: the
-graph sergeant builds and publishes contains every file from every
+graph sgt builds and publishes contains every file from every
 participating repository regardless of what `exclude_patterns` says,
 because nothing reads it. A project owner has no way to keep noise out of
 their graph short of restructuring which repositories/groups participate at
@@ -42,7 +42,7 @@ field promises.
    published graph. This is a correctness requirement on the fix itself,
    not just a description of the default.
 5. This filtering must not depend on or require any change to the
-   third-party graph-building tool sergeant orchestrates (D9) — it applies
+   third-party graph-building tool sgt orchestrates (D9) — it applies
    to what that tool already produces.
 
 ## Non-goals

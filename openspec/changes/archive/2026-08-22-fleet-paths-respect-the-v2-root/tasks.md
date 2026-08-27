@@ -1,13 +1,13 @@
 # Tasks — Every fleet path resolves through one helper
 
-One repository, `sergeant-v2`, so one task and no cross-repo merge order.
+One repository, `sgt-v2`, so one task and no cross-repo merge order.
 
 ## Task 1 — resolve every fleet path through one helper
 
-Repository: `sergeant-v2`. Depends on: nothing.
+Repository: `sgt-v2`. Depends on: nothing.
 
-- Add `FleetRoot()` to `internal/dag`, resolving `SERGEANT_FLEET_DIR` then falling
-  back to `~/.local/share/sergeant-v2/fleet`.
+- Add `FleetRoot()` to `internal/dag`, resolving `SGT_FLEET_DIR` then falling
+  back to `~/.local/share/sgt-v2/fleet`.
 - Re-express `FleetDir(runID, repoName)` as a join on `FleetRoot()` so the two
   cannot disagree.
 - Replace all four hand-built fleet paths in `internal/ui/server.go` — the three

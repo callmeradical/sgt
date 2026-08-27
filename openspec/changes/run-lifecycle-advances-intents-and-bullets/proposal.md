@@ -2,15 +2,15 @@
 
 ## Repository
 
-One repository: `sergeant-v2`, which owns the store and the run lifecycle.
+One repository: `sgt-v2`, which owns the store and the run lifecycle.
 
 ## Requirements and decisions served
 
-- **D4 — Sergeant stores intents and bullets itself.** Half-implemented. Dispatch
+- **D4 — Sgt stores intents and bullets itself.** Half-implemented. Dispatch
   writes them; nothing ever updates them.
 - **D8 — the dashboard is a view of intents.** Blocked in practice: the primary
   object would display a status that is false for most rows.
-- **D6 — sequenced submission, human merge.** Constrains the answer. Sergeant
+- **D6 — sequenced submission, human merge.** Constrains the answer. Sgt
   never merges, so no automatic transition may claim an intent is satisfied.
 
 ## Problem
@@ -51,7 +51,7 @@ The mapping is not a new decision. It follows from D6 and the documented lifecyc
 
 `sealed` stays owned by the pull-request path and `merged` by observed PR state.
 An intent becomes `satisfied` only when every one of its bullets is `merged`.
-Nothing else may set it, because under D6 sergeant is never the thing that merged.
+Nothing else may set it, because under D6 sgt is never the thing that merged.
 
 ## Out of scope
 

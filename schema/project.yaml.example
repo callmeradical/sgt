@@ -1,5 +1,5 @@
-# Example Sergeant project configuration.
-# Lives at: ~/.config/sergeant/<name>.yaml
+# Example Sgt project configuration.
+# Lives at: ~/.config/sgt/<name>.yaml
 # The filename (without .yaml) is the project identifier.
 
 # Required. Must match the filename.
@@ -96,7 +96,7 @@ graphify:
   # Optional. Only graph repos in these groups. Default: all repos.
   include_groups: [backend, frontend]
   # Optional. Exclude paths matching these globs before graphify extraction.
-  # If output points inside a source repo, Sergeant also stages outside the repo
+  # If output points inside a source repo, Sgt also stages outside the repo
   # so published graph artifacts are not extracted back in as source.
   exclude_patterns:
     - "**/node_modules/**"

@@ -6,7 +6,7 @@
 
 A dispatch SHALL record the intent behind the work and one bullet per target
 repository before any worktree or branch exists. Decision D4 places intents and
-bullets in sergeant's own store; decision D8 makes the intent the dashboard's
+bullets in sgt's own store; decision D8 makes the intent the dashboard's
 primary noun. Neither is satisfiable while a dispatch records only a run.
 
 #### Scenario: An accepted dispatch writes its intent

@@ -2,7 +2,7 @@
 
 Status: Draft, awaiting explicit human PRD approval
 
-Extends: `docs/prd-sergeant-v2.md`, decision D5
+Extends: `docs/prd-sgt.md`, decision D5
 
 ## Summary
 
@@ -19,7 +19,7 @@ This PRD defines what must be true for both.
 **D5(a).** Today, a dispatch that does not name explicit repositories
 silently defaults to every repository in the project and starts working
 immediately — there is no point at which a human confirms that
-decomposition first. This contradicts D2, which requires a plan sergeant
+decomposition first. This contradicts D2, which requires a plan sgt
 arrived at itself (rather than one the caller stated explicitly) to be
 proposed and explicitly approved before any work begins. A caller who
 forgets to name repositories today dispatches against their entire project

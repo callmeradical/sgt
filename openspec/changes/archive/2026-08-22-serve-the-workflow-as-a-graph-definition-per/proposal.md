@@ -7,7 +7,7 @@
 
 ## Repository
 
-One repository: `sergeant-v2`, in `internal/ui`.
+One repository: `sgt-v2`, in `internal/ui`.
 
 ## Requirements and decisions served
 

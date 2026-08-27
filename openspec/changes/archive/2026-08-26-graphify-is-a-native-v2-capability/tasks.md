@@ -1,10 +1,10 @@
 # Tasks — Graphify is a native v2 capability
 
-One repository, `sergeant-v2`, so one task.
+One repository, `sgt-v2`, so one task.
 
 ## Task 1 — config, native orchestrator, and MCP query surfaces
 
-Repository: `sergeant-v2`. Depends on: nothing. The `graphify` binary is
+Repository: `sgt-v2`. Depends on: nothing. The `graphify` binary is
 already installed on this machine at `/Users/lars/.local/bin/graphify` and is
 on `PATH` in the dispatch environment — confirm this yourself first with
 `graphify --help` before writing any code, and read its actual `extract`,
@@ -47,8 +47,8 @@ binary.
   `{"status": "built", "output": "<Graphify.Output>"}` on success. Register
   alongside the other `/api/*` routes.
 - Add three MCP tools to `internal/mcp/server.go`'s existing `[]Tool{...}`
-  literal and `executeTool` switch: `sergeant_graph_query`,
-  `sergeant_graph_explain`, `sergeant_graph_affected`. Each resolves the
+  literal and `executeTool` switch: `sgt_graph_query`,
+  `sgt_graph_explain`, `sgt_graph_affected`. Each resolves the
   named project's `Graphify.Output`, returns a clear "no graph built for
   this project" error if `graph.json` does not exist there (do not run the
   underlying `graphify` command against a missing graph and surface whatever

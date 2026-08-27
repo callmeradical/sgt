@@ -8,10 +8,10 @@ routes prompt files through) and `docs/prd-data-retention-and-rotation.md`
 
 ## Summary
 
-An agent phase's actual prompt (`.sergeant/prompt_<phase>.txt`) is real,
+An agent phase's actual prompt (`.sgt/prompt_<phase>.txt`) is real,
 already-generated evidence — a record of exactly what an agent was asked to
-do — but it is written directly into the worktree's `.sergeant/` directory,
-a sibling of `.sergeant/artifacts/`, not inside it. `captureArtifacts` only
+do — but it is written directly into the worktree's `.sgt/` directory,
+a sibling of `.sgt/artifacts/`, not inside it. `captureArtifacts` only
 reads the latter, so the prompt is never captured durably: once
 `automated-fleet-cleanup` reclaims the worktree (as soon as 7 days after
 the run goes terminal), the prompt is gone, and the dashboard's Activity
@@ -38,7 +38,7 @@ has no upper bound tied to the thing it's evidence for.
 
 - **An agent phase's prompt file is captured the same way any other
   pipeline artifact is** — written into (or copied into)
-  `$SERGEANT_ARTIFACT_DIR` so `captureArtifacts`' existing capture,
+  `$SGT_ARTIFACT_DIR` so `captureArtifacts`' existing capture,
   bounding, and durability guarantees apply to it with no new mechanism.
 - **An artifact never outlives its parent run.** When a run rotates
   (`RotateProject`/`rotateOneRun`), every artifact recorded against that

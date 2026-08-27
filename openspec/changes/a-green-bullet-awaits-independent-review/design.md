@@ -2,7 +2,7 @@
 
 ## Ownership
 
-One repository, `sergeant-v2`. Touches `internal/dag/engine.go` (`RunStage`'s
+One repository, `sgt-v2`. Touches `internal/dag/engine.go` (`RunStage`'s
 phase switch), `internal/handoff/envelope.go` (new `ReviewFinding` type and
 `ReviewFindings` reader, mirroring the existing `BlockedReason`), and
 `internal/runner/runner.go` (a new small helper to produce the diff a review
@@ -155,7 +155,7 @@ not add a second mechanism for finding a bullet's change id.
 
 **Routing findings to an external tracker as their record of truth.**
 Rejected per D4, same reasoning `prd-task-tracking-export.md` already
-settled: Sergeant cannot enforce D5's routing rules (blocking → blocked,
+settled: Sgt cannot enforce D5's routing rules (blocking → blocked,
 non-blocking → just visible) about data an external system owns. Any
 export is downstream and read-only, not this proposal's write path.
 

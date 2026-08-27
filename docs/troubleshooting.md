@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Use the Sergeant API and stored state before manual process or Git operations.
+Use the Sgt API and stored state before manual process or Git operations.
 Preserve exact errors and state before recovery.
 
 ## API unreachable
@@ -11,14 +11,14 @@ Check that the UI/API server is running and answering:
 curl http://127.0.0.1:8484/api/runs
 ```
 
-If it does not answer, start it with `sergeant ui` from the Sergeant checkout,
+If it does not answer, start it with `sgt ui` from the Sgt checkout,
 or confirm `mise run install` completed successfully.
 
 ## Project is missing or wrong
 
 ```bash
 curl http://127.0.0.1:8484/api/projects
-ls ~/.config/sergeant/
+ls ~/.config/sgt/
 ```
 
 Project name is the YAML filename without `.yaml`. Validate fields against
@@ -43,10 +43,10 @@ curl "http://127.0.0.1:8484/api/run-details?id=<run-id>"
 ```
 
 Check the stalled phase's `duration_ms` and whether the worktree under
-`~/.local/share/sergeant-v2/fleet/<run-id>/<repo>/` has recent file-modification
+`~/.local/share/sgt-v2/fleet/<run-id>/<repo>/` has recent file-modification
 activity — v2 has no tmux pane to check `pane_activity` against. `in_progress`
-well past the phase's expected budget (`SERGEANT_AGENT_TIMEOUT`,
-`SERGEANT_GATE_TIMEOUT`) with no recent worktree activity is a stall. Preserve
+well past the phase's expected budget (`SGT_AGENT_TIMEOUT`,
+`SGT_GATE_TIMEOUT`) with no recent worktree activity is a stall. Preserve
 the worktree and branch, resolve the cause, then `POST /api/run-resume` with
 `{"id": "<run-id>"}` (see `skills/dispatch/SKILL.md`).
 
@@ -65,7 +65,7 @@ no-mistakes axi status --run <run-id>
 
 - `ask-user`: obtain the explicit decision.
 - actionable code finding: route separate td remediation.
-- auto-fix: Do not authorize an in-run fix in Sergeant's validation-only
+- auto-fix: Do not authorize an in-run fix in Sgt's validation-only
   workflow; route the finding to separate owning-repository td remediation.
 - retained gate: do not edit, abort, or restart it to bypass the finding.
 
@@ -96,13 +96,13 @@ existing graph without confirming the desired global-per-project path.
 
 | State | Path or command |
 |---|---|
-| Project registry | `~/.config/sergeant/` |
-| Run/bullet/intent state | `~/.local/share/sergeant/sergeant.db` — via the API or `sqlite3` directly |
-| Worktree | `~/.local/share/sergeant-v2/fleet/<run-id>/<repo>/` |
+| Project registry | `~/.config/sgt/` |
+| Run/bullet/intent state | `~/.local/share/sgt/sgt.db` — via the API or `sqlite3` directly |
+| Worktree | `~/.local/share/sgt-v2/fleet/<run-id>/<repo>/` |
 | Git state | `git status`, worktree list, branch and PR heads |
 | no-mistakes run | `no-mistakes axi status --run <id>` |
 
 
-If documentation does not cover the observed failure, use the `sergeant-help`
+If documentation does not cover the observed failure, use the `sgt-help`
 skill to search the docs, then create a td task containing the exact reproduction,
 expected behavior, preserved state, and acceptance criteria.

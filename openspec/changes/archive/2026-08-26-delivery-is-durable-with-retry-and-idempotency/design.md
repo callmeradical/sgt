@@ -2,7 +2,7 @@
 
 ## Ownership and merge order
 
-One repository, `sergeant-v2`. Second of four bullets against R5. Depends on
+One repository, `sgt-v2`. Second of four bullets against R5. Depends on
 `envelopes-are-typed-versioned-and-correlated` (merged), which gave envelopes
 `ID` and `CorrelationID` — this bullet's `deliveries.envelope_id` foreign key
 would have nothing stable to reference otherwise.

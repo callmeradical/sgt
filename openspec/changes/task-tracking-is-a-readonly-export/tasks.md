@@ -1,10 +1,10 @@
 # Tasks — Task tracking is a read-only export
 
-One repository, `sergeant-v2`, so one task.
+One repository, `sgt-v2`, so one task.
 
 ## Task 1 — a second, independent reader of the existing change log
 
-Repository: `sergeant-v2`. Depends on: nothing. Read first:
+Repository: `sgt-v2`. Depends on: nothing. Read first:
 `internal/store/changes.go` in full (the `changes` table, `ListChangesSince`,
 `SubscribeChanges`'s doc comment on why a fallback tick is required),
 `internal/store/store.go`'s `migrateAddTables` (table-registration
@@ -27,7 +27,7 @@ function.
 - Add `Export *Export` to `config.Project` in `internal/config/config.go`,
   modeled exactly like `Graphify` (pointer, `omitempty`, preserved by the
   existing YAML round-trip — do not add special-case save logic).
-- Wire `Runner` into `cmd/sergeant/main.go`'s `startUI`: construct a
+- Wire `Runner` into `cmd/sgt/main.go`'s `startUI`: construct a
   `Runner` per project with an `Export` block configured and start `Run` in
   a goroutine alongside the HTTP server.
 - Do not implement any `Target`. Do not add a `Sync`/read-back method to

@@ -1,11 +1,11 @@
 ---
 name: load-project
-description: Use when a Sergeant project is named, registered, edited, synced, or graphed; resolves repository ownership, configuration, paths, and inherited instructions.
+description: Use when a Sgt project is named, registered, edited, synced, or graphed; resolves repository ownership, configuration, paths, and inherited instructions.
 ---
 
 # Skill: load-project
 
-Resolve Sergeant project ownership, configuration, and paths before work begins.
+Resolve Sgt project ownership, configuration, and paths before work begins.
 
 ## When to use
 
@@ -15,7 +15,7 @@ repository ownership is not already established by project-details output.
 ## Load project context
 
 1. If the project name is unknown, run `GET /api/projects` or list
-   `~/.config/sergeant/*.yaml` and require an exact registered name.
+   `~/.config/sgt/*.yaml` and require an exact registered name.
 2. Run `GET /api/project-details?name=<project>`, or read the project YAML
    directly via `internal/config.LoadProject`.
 3. From the output, record:
@@ -38,7 +38,7 @@ repository's resolved path plus the instructions that will govern execution.
 Use this procedure when the user asks to add or change a project:
 
 1. Read `docs/schema.md` and the existing YAML when editing.
-2. Write `~/.config/sergeant/<project>.yaml`; do not put credentials, tokens, or
+2. Write `~/.config/sgt/<project>.yaml`; do not put credentials, tokens, or
    secret values in project YAML.
 3. Use absolute repository paths or paths relative to the global `dev_root`.
 4. Configure one project-level `graphify.output` outside source repositories when
@@ -65,8 +65,8 @@ Use this procedure for project architecture questions or explicit graph updates:
    decision D9).
 4. Require `<graphify.output>/graph.json` and `GRAPH_REPORT.md` to exist after a
    successful build.
-5. Use the `sergeant_graph_query`, `sergeant_graph_explain`, and
-   `sergeant_graph_affected` MCP tools for focused questions; read `GRAPH_REPORT.md`
+5. Use the `sgt_graph_query`, `sgt_graph_explain`, and
+   `sgt_graph_affected` MCP tools for focused questions; read `GRAPH_REPORT.md`
    for broad architecture, community, and god-node context.
 6. Do not publish generated graph output inside an owning source repository.
 

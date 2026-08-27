@@ -5,9 +5,9 @@ before:
     - go mod tidy
 
 builds:
-  - id: sergeant
-    main: ./cmd/sergeant/
-    binary: sergeant
+  - id: sgt
+    main: ./cmd/sgt/
+    binary: sgt
     env:
       - CGO_ENABLED=0
     goos:
@@ -20,10 +20,10 @@ builds:
       - -s -w -X main.version={{.Version}}
 
 archives:
-  - id: sergeant
+  - id: sgt
     builds:
-      - sergeant
-    name_template: "sergeant-{{ .Os }}-{{ .Arch }}"
+      - sgt
+    name_template: "sgt-{{ .Os }}-{{ .Arch }}"
     format: binary
 
 checksum:
@@ -32,7 +32,7 @@ checksum:
 release:
   github:
     owner: callmeradical
-    name: sergeant
+    name: sgt
   name_template: "{{.Tag}}"
   draft: false
 

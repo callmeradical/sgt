@@ -1,6 +1,6 @@
 ## Context
 
-One repository: `sergeant-v2`. All of this change lives in
+One repository: `sgt-v2`. All of this change lives in
 `internal/runner/runner.go`, the single file that already knows how to
 validate and invoke every supported agent harness (`opencode`/`oc`, `claude`,
 `goose`, `codex`, `pi`). No other repository is involved and there is no

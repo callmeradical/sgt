@@ -2,7 +2,7 @@
 
 ## Repository
 
-One repository: `sergeant-v2`.
+One repository: `sgt-v2`.
 
 ## Requirements served
 
@@ -87,4 +87,4 @@ proposal's guard needs to be inspectable — the same "API first" pattern
   not to add `UnquarantineDelivery`).
 - **Changing what `merged` means or when it's set.** `sealed → merged` stays
   exactly as already documented (merged is only reachable from observed
-  pull-request state; sergeant never merges) — untouched by this proposal.
+  pull-request state; sgt never merges) — untouched by this proposal.

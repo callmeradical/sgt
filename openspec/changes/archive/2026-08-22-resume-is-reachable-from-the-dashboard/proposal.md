@@ -2,7 +2,7 @@
 
 ## Repository
 
-One repository: `sergeant-v2`, which owns the endpoint and the embedded dashboard.
+One repository: `sgt-v2`, which owns the endpoint and the embedded dashboard.
 
 ## Requirements and decisions served
 

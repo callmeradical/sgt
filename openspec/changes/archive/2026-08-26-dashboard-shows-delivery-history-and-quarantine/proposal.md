@@ -2,7 +2,7 @@
 
 ## Repository
 
-One repository: `sergeant-v2`.
+One repository: `sgt-v2`.
 
 ## Requirement served
 
@@ -63,8 +63,8 @@ already-guarded write (refused unless the delivery's latest state is
   a bare repo name vs. a worktree path — which this proposal is not willing
   to guess at without a considered design). Follow-on work, not this bullet.
 - **MCP tools.** R5.6 names this "when enabled" — softer than the CLI/UI
-  half of the same sentence. Adding `sergeant_delivery_status` /
-  `sergeant_delivery_quarantine`-shaped tools to `internal/mcp/server.go` is
+  half of the same sentence. Adding `sgt_delivery_status` /
+  `sgt_delivery_quarantine`-shaped tools to `internal/mcp/server.go` is
   mechanical (7 tools already follow one pattern there) but is separate
   follow-on work, not bundled into this bullet.
 - **Scoping by project, repository, phase, or correlation ID independently

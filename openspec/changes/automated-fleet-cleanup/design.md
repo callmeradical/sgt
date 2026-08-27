@@ -2,10 +2,10 @@
 
 ## Ownership
 
-One repository, `sergeant-v2`. Touches `internal/store/store.go` (a new
+One repository, `sgt-v2`. Touches `internal/store/store.go` (a new
 query for cleanup-eligible runs), `internal/ui/server.go` (extracting
 `handleCleanWorktrees`'s reclaim logic into a function both the HTTP
-handler and the new background loop call), and `cmd/sergeant/main.go` (or
+handler and the new background loop call), and `cmd/sgt/main.go` (or
 wherever the server is started — starting the background loop alongside
 the server).
 
@@ -49,7 +49,7 @@ uncommitted-changes guard).
 
 ## The background loop
 
-Started once, alongside the server (in `cmd/sergeant/main.go`, next to
+Started once, alongside the server (in `cmd/sgt/main.go`, next to
 wherever `ui.NewServer`/`ReconcileOrphanedRuns` already run at startup —
 this mirrors that existing "something runs automatically as part of
 server lifecycle" precedent rather than inventing a new one):
@@ -85,7 +85,7 @@ load on a local SQLite database.
 ## Rejected alternatives
 
 **A cron-style external invocation instead of an in-process ticker.**
-Rejected: sergeant-v2 already runs as a long-lived server process
+Rejected: sgt-v2 already runs as a long-lived server process
 (managed by launchd in this deployment); adding a second scheduled
 entry point external to it would duplicate supervision concerns for no
 benefit a ticker inside the existing process doesn't already provide.

@@ -68,7 +68,7 @@ twice.
 - **THEN** it receives that run's status, slug and phase results
 
 Fails today: the MCP server exposes five tools and none accepts a run id.
-`sergeant_status` takes an optional project filter, so a caller can enumerate runs
+`sgt_status` takes an optional project filter, so a caller can enumerate runs
 but cannot address one.
 
 #### Scenario: An unknown run id is reported as unknown

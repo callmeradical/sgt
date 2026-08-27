@@ -2,14 +2,14 @@
 
 ## Ownership
 
-One repository, `sergeant-v2`. Touches only prose/config files (five
+One repository, `sgt-v2`. Touches only prose/config files (five
 `skills/*/SKILL.md`, one `.agents/skills/*/SKILL.md`, two `docs`/`schema`
 files) and `tests/instruction-policy-test.sh`. No Go code changes.
 
 ## Baseline: what `instruction-policy-test.sh` requires today, and what stays true
 
 Running it now produces exactly 15 failures, all `AGENTS.md`-related
-(`## Procedural skills`, `.sergeant-intent.md`, `td context <id> --work-dir
+(`## Procedural skills`, `.sgt-intent.md`, `td context <id> --work-dir
 <owning-repo-path>`, etc. — none about the eight files this change touches).
 Every `require_text`/`reject_text` line naming one of this change's eight
 files currently **passes**, because the files currently still carry the v1
@@ -33,20 +33,20 @@ Replace each v1 procedure with its v2 equivalent:
 | v1 (removed) | v2 (replacement) |
 |---|---|
 | `sgt-dispatch <project> --td <task-id>` / `sgt-dispatch <project> "<brief>" --repos ... --branch ... --deps ...` | `POST /api/dispatch` with JSON body `{"project", "brief", "repos", "agent", "type", "change_id", "request_id"}` (`internal/ui/server.go` `handleDispatch`). `type` is O2's fixed vocabulary (`feat`/`fix`/`refactor`/`docs`/`chore`/`test`); `change_id` resolves to an OpenSpec change per O3, scaffolded from the brief if omitted. `request_id` is the idempotency key (D10) — a repeat returns the original run, not a duplicate. |
-| `bin/sgt-watch <task-id>` polling `.sergeant-status`/`.sergeant-message`/`.sergeant-result` | `GET /api/runs?project=<name>` for the list, `GET /api/run-details?id=<run-id>` for phase-level detail (`handleRuns`, `handleRunDetails`). No file sync — status is read directly from the store (truthfulness rule, `AGENTS.md`). |
-| `sgt-respond <task-id> <repo> "<response>"` + tmux pane nudge | No structured response-message channel exists in v2. Resolve the underlying cause directly (in the bullet's worktree, under `~/.local/share/sergeant-v2/fleet/<run-id>/<repo>/`, or by fixing the OpenSpec change/spec mismatch a review finding named), then `POST /api/run-resume {"id": "<run-id>"}` (`handleRunResume`) — this is v2's actual, coarser equivalent: it resumes a `failed`/`blocked` run, skipping phases already recorded `passed`. |
+| `bin/sgt-watch <task-id>` polling `.sgt-status`/`.sgt-message`/`.sgt-result` | `GET /api/runs?project=<name>` for the list, `GET /api/run-details?id=<run-id>` for phase-level detail (`handleRuns`, `handleRunDetails`). No file sync — status is read directly from the store (truthfulness rule, `AGENTS.md`). |
+| `sgt-respond <task-id> <repo> "<response>"` + tmux pane nudge | No structured response-message channel exists in v2. Resolve the underlying cause directly (in the bullet's worktree, under `~/.local/share/sgt-v2/fleet/<run-id>/<repo>/`, or by fixing the OpenSpec change/spec mismatch a review finding named), then `POST /api/run-resume {"id": "<run-id>"}` (`handleRunResume`) — this is v2's actual, coarser equivalent: it resumes a `failed`/`blocked` run, skipping phases already recorded `passed`. |
 | `tmux attach -t sgt-<task-id>` | No v2 equivalent — v2 has no persistent interactive pane to attach to; a dispatched agent phase runs headlessly to completion or a bounded timeout (`RunAgentPhase`). |
 | Treehouse pool section (`sgt-treehouse-init`, `treehouse get --lease`, `treehouse return`) | Removed outright. D7 forbids tmux; v2's worktree isolation (`internal/dag/engine.go`, plain `git worktree add`) has no pooling concept and needs none — each run's worktrees are cleaned up by the existing fleet-cleanup mechanism (`internal/ui/fleet.go`). |
-| `--deps "a>b,a>c"` dependency flag | No flag equivalent. Cross-bullet merge order is a property of the Intent itself (D6: "Sergeant releases a bullet's PR only once its upstream bullets are reviewed and merged"), set when the intent's bullets were decomposed (D2), not stated per-dispatch. |
-| Worker contract steps referencing `.sergeant-brief.md`, `.sergeant-message`, `.sergeant-response`, `td start`/`td log`/`td handoff`/`td review`, `sgt-no-mistakes-finding`, `sgt-review-findings`, `bin/_sgt-review-axes.sh` | Replaced with: a dispatched agent receives its brief via `sergeant_get_brief` (MCP) or the rendered prompt `Store.RenderIntentBrief` builds into the phase (both call the same function, dispatch-briefs-render-from-the-stored-intent); reports findings via envelope payload (`internal/handoff`), read by the review phase (`a-green-bullet-awaits-independent-review`) if one is configured; a blocking finding transitions the bullet to `blocked`, resolved as described above. Task tracking is out of scope for a dispatched agent to create or mutate (D4) — see task-tracking-is-a-readonly-export. |
-| "td task creation" section (`sgt-dispatch` auto-creating td tasks, `sgt-td-create`) | Removed; replaced with a note that v2 records no task in an external tracker as part of dispatch — Intent/Bullet rows in Sergeant's own store are the durable record (D4), and export (if configured) is read-only. |
+| `--deps "a>b,a>c"` dependency flag | No flag equivalent. Cross-bullet merge order is a property of the Intent itself (D6: "Sgt releases a bullet's PR only once its upstream bullets are reviewed and merged"), set when the intent's bullets were decomposed (D2), not stated per-dispatch. |
+| Worker contract steps referencing `.sgt-brief.md`, `.sgt-message`, `.sgt-response`, `td start`/`td log`/`td handoff`/`td review`, `sgt-no-mistakes-finding`, `sgt-review-findings`, `bin/_sgt-review-axes.sh` | Replaced with: a dispatched agent receives its brief via `sgt_get_brief` (MCP) or the rendered prompt `Store.RenderIntentBrief` builds into the phase (both call the same function, dispatch-briefs-render-from-the-stored-intent); reports findings via envelope payload (`internal/handoff`), read by the review phase (`a-green-bullet-awaits-independent-review`) if one is configured; a blocking finding transitions the bullet to `blocked`, resolved as described above. Task tracking is out of scope for a dispatched agent to create or mutate (D4) — see task-tracking-is-a-readonly-export. |
+| "td task creation" section (`sgt-dispatch` auto-creating td tasks, `sgt-td-create`) | Removed; replaced with a note that v2 records no task in an external tracker as part of dispatch — Intent/Bullet rows in Sgt's own store are the durable record (D4), and export (if configured) is read-only. |
 | Flags reference table | Replaced with the `POST /api/dispatch` JSON body fields table above. |
 | Troubleshooting table (tmux/worktree/fleet-state entries) | Replaced: "Worker stuck" → check `GET /api/run-details?id=` for the stalled phase; "Need to recover a waiting/orphaned worker" → `POST /api/run-resume`; "Need to retry a failed repo" → fix the cause, then `POST /api/run-resume`. |
 
 ## `skills/cross-repo-work/SKILL.md`
 
 Remove the banner. Replace `sgt-context <project>` (repo ownership lookup)
-with reading the project YAML directly (`~/.config/sergeant/<name>.yaml`,
+with reading the project YAML directly (`~/.config/sgt/<name>.yaml`,
 `internal/config.LoadProject`) or `GET /api/project-details`. Replace
 "`prerequisite>dependent` notation accepted by `sgt-dispatch`" with: state
 merge order directly as the bullet order within the intent (D6), since
@@ -64,7 +64,7 @@ merge order, terminal state) is kept as-is — none of it names a v1 command;
 ## `skills/load-project/SKILL.md`
 
 Remove the banner. Replace `sgt-list`/`bin/sgt-list` (list registered
-projects) with: list `~/.config/sergeant/*.yaml` or `GET /api/projects`.
+projects) with: list `~/.config/sgt/*.yaml` or `GET /api/projects`.
 Replace `sgt-context <project>`/`bin/sgt-context <project>` with
 `GET /api/project-details?name=<project>` or reading the project YAML
 directly via `internal/config.LoadProject`. Replace `sgt-sync <project>`
@@ -94,7 +94,7 @@ invented v2 command. Everything else (storage ownership, daily-digest
 procedure, scheduled execution, failure behavior) names no v1 command and
 is unchanged.
 
-## `skills/sergeant-help/SKILL.md`
+## `skills/sgt-help/SKILL.md`
 
 Remove the banner. The documentation map table's rows are unaffected (they
 name doc files, not commands) except: add a note that v2's command
@@ -137,9 +137,9 @@ constraint is v1-specific to `bin/sgt-cleanup`'s atomic-rename
 implementation, which doesn't exist on v2).
 
 Rewrite with v2 answers: "Command not found" → N/A, replaced with "API
-unreachable" (check `sergeant ui` is running, `curl http://127.0.0.1:8484/
+unreachable" (check `sgt ui` is running, `curl http://127.0.0.1:8484/
 api/runs`). "Project is missing or wrong" → `GET /api/projects` /
-`~/.config/sergeant/*.yaml`, same as `load-project`. "Repository is missing
+`~/.config/sgt/*.yaml`, same as `load-project`. "Repository is missing
 or behind" → plain `git status`/`git fetch` in the repo path from project
 YAML (no `sgt-sync`). "Wrong `td` executable" section — remove; v2 has no
 `td` dependency at all (only the read-only export path does, and only if
@@ -150,10 +150,10 @@ than tmux pane_activity. "GitHub account cannot access a repo" — unchanged,
 names no v1 command. "Graphify output is wrong or recursive" → replace
 `sgt-context`/regeneration guidance with `POST /api/build-graph` and the
 `Project.Graphify` config block (D9). "Where to inspect state" table →
-replace fleet-file paths with: project registry (`~/.config/sergeant/`,
-unchanged), run/bullet/intent state (`~/.local/share/sergeant/sergeant.db`,
+replace fleet-file paths with: project registry (`~/.config/sgt/`,
+unchanged), run/bullet/intent state (`~/.local/share/sgt/sgt.db`,
 queryable via the API or `sqlite3` directly), worktree (`~/.local/share/
-sergeant-v2/fleet/<run-id>/<repo>/`).
+sgt-v2/fleet/<run-id>/<repo>/`).
 
 ## `schema/project.yaml.example`
 
@@ -240,14 +240,14 @@ verification step confirms by running the test after both are written)
 ## Rejected alternatives
 
 **Delete these skill files instead of rewriting them**, matching what the
-v1-removal work did to `.agents/skills/sergeant-setup/SKILL.md`. Rejected:
-`sergeant-setup` was a one-time bootstrap/install concern that `AGENTS.md`'s
+v1-removal work did to `.agents/skills/sgt-setup/SKILL.md`. Rejected:
+`sgt-setup` was a one-time bootstrap/install concern that `AGENTS.md`'s
 policy content adequately replaces on its own. Dispatch, cross-repo work,
 project loading, wiki maintenance, and help are recurring, day-to-day
 procedures a v2 operator or agent genuinely needs walked through — deleting
 them leaves a real gap `AGENTS.md` alone does not fill (it states policy,
 not step-by-step procedure). The five-file "V1 ONLY" banner pattern was
-consistent between these and `sergeant-setup`, but the right response to
+consistent between these and `sgt-setup`, but the right response to
 that pattern differs by what the file is *for*, not by the pattern alone.
 
 **Leave `.agents/skills/to-tickets/SKILL.md`'s task-creation commands as

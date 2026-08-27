@@ -2,7 +2,7 @@
 
 Status: Draft, awaiting explicit human PRD approval
 
-Extends: `docs/prd-sergeant-v2.md` D8/R7.5 (the dashboard renders real
+Extends: `docs/prd-sgt.md` D8/R7.5 (the dashboard renders real
 lifecycle position, not a curated subset of it) and R4.2 (records
 correlate project/run/stage/repo/phase/gate — the Activity feed is where
 an operator reads that correlation back as a narrative).

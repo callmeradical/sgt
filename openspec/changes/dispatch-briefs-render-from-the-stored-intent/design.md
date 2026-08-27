@@ -2,9 +2,9 @@
 
 ## Ownership
 
-One repository, `sergeant-v2`. Touches `internal/store/` (new file, new
+One repository, `sgt-v2`. Touches `internal/store/` (new file, new
 method), `internal/dag/engine.go` (`RunStage`), and `internal/mcp/server.go`
-(`sergeant_get_brief`'s schema and implementation).
+(`sgt_get_brief`'s schema and implementation).
 
 ## `Store.RenderIntentBrief` — a pure rendering over existing rows
 
@@ -103,7 +103,7 @@ this proposal adds a preferred path, it does not remove the one that exists
 today, so no run that worked before this change can start failing because
 of it.
 
-## `internal/mcp/server.go`'s `sergeant_get_brief`
+## `internal/mcp/server.go`'s `sgt_get_brief`
 
 Schema (`server.go:101-109`) changes from a single required `project`
 string to:
@@ -120,7 +120,7 @@ Implementation (`server.go:298-305`) changes from `config.LoadProject` +
 raw dump to:
 
 ```go
-case "sergeant_get_brief":
+case "sgt_get_brief":
 	intentID, _ := args["intent_id"].(string)
 	repo, _ := args["repo"].(string)
 	intent, err := s.Store.GetIntent(intentID)
@@ -160,7 +160,7 @@ have it load gates itself.** Rejected: would make `internal/store` import
 for a fact (gate names) that is not itself persisted. Passing `gates
 []string` keeps the dependency direction the same as it is today.
 
-**Keep `sergeant_get_brief`'s `project` parameter and have it guess or list
+**Keep `sgt_get_brief`'s `project` parameter and have it guess or list
 all in-progress intents for that project.** Rejected: ambiguous when a
 project has more than one in-flight intent, and every other MCP tool this
 session touches resolves to one target of one operation, not a filtered

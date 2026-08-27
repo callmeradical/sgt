@@ -2,7 +2,7 @@
 
 ## Ownership
 
-One repository, `sergeant-v2`. Touches `internal/store/store.go` (new
+One repository, `sgt-v2`. Touches `internal/store/store.go` (new
 bullet status, new `BlockedReason` field), `internal/runner/runner.go`
 (reading an optional reason out of an agent-authored envelope), and
 `internal/ui/server.go` (`bulletStatusForRunOutcome`).
@@ -18,7 +18,7 @@ bullet status, new `BlockedReason` field), `internal/runner/runner.go`
 
 ## Where the reason comes from
 
-An agent's own envelope (`.sergeant/envelope.json`, already read by
+An agent's own envelope (`.sgt/envelope.json`, already read by
 `RunAgentPhase`) may include a `blocked_reason` key **inside its existing
 `payload` object**, not as a new top-level `Envelope` struct field.
 
@@ -81,7 +81,7 @@ existing "every bullet in the intent, per run outcome" semantics intact for
 the unrelated `green` case, which carries no reason.
 
 When no envelope named a `blocked_reason`, use a synthesized one:
-`"gates did not pass; no further automatic attempt available"`. Sergeant
+`"gates did not pass; no further automatic attempt available"`. Sgt
 dispatches a bullet's work exactly once per run and a run's own retry
 budget is already exhausted by the time it concludes `"failed"` — so this
 synthesized case is not a weaker fallback for some failures, it is what

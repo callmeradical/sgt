@@ -2,16 +2,16 @@
 
 Status: Draft, awaiting explicit human PRD approval
 
-Extends: `docs/prd-sergeant-v2.md` R7.3 (the embedded UI can list
+Extends: `docs/prd-sgt.md` R7.3 (the embedded UI can list
 projects, show project details, and "refine supported project
 configuration" without becoming a second execution engine).
 
 ## Summary
 
-Sergeant v2 has no settings surface today, at any level: no global
+Sgt v2 has no settings surface today, at any level: no global
 settings store exists at all (confirmed — no `dev_root`, `DevRoot`, or
 equivalent global-config concept anywhere in `internal/config`, unlike
-v1's `~/.config/sergeant/config.yaml`), and the one piece of
+v1's `~/.config/sgt/config.yaml`), and the one piece of
 project-level settings machinery that does exist
 (`POST /api/refine-project`) has no UI calling it and doesn't cover every
 field the schema defines. This PRD adds a settings page with two tiers —
@@ -32,12 +32,12 @@ project config — confirmed real and working for `Defaults.Agent`
 - **There is no global settings layer at all.** Every setting today is
   either compiled-in or per-project. `config.LoadProject` resolves a
   named project's own YAML file; nothing loads a machine-wide default
-  first. v1 had exactly this concept (`~/.config/sergeant/config.yaml`'s
+  first. v1 had exactly this concept (`~/.config/sgt/config.yaml`'s
   `dev_root`), and v2 has no equivalent — a project that wants a setting
   today must repeat it in every project file.
 - **Repo paths have no base-directory resolution.** `Repo.Path` is used
   as-is (only `~/`-prefix expansion exists, inline in
-  `internal/mcp/server.go`'s `sergeant_run_gates` handler — not even in
+  `internal/mcp/server.go`'s `sgt_run_gates` handler — not even in
   `config.go` itself); there is no concept of "resolve this repo's path
   relative to a configured base directory" the way v1's `dev_root`
   worked. Adding a global "dev folder base" setting requires adding this
@@ -61,8 +61,8 @@ project config — confirmed real and working for `Defaults.Agent`
 ## Proposal
 
 1. **A new global settings store.** A single file (mirroring v1's
-   `~/.config/sergeant/config.yaml` precedent — e.g.
-   `~/.config/sergeant/settings.yaml`, distinct from any per-project
+   `~/.config/sgt/config.yaml` precedent — e.g.
+   `~/.config/sgt/settings.yaml`, distinct from any per-project
    YAML) holding machine-wide defaults: agent, model, the dev-folder
    base directory, and feature flags. Loaded once, read by every place
    that currently only consults project-level `Defaults`.
@@ -159,15 +159,15 @@ project config — confirmed real and working for `Defaults.Agent`
 4. **Launch scope for this PRD: agent, model, dev-folder base, and
    feature flags.** `Retries` and the dispatch-admission budget are
    explicitly deferred, not launch-blocking.
-5. **The global settings file lives under `~/.config/sergeant/` on
+5. **The global settings file lives under `~/.config/sgt/` on
    macOS and Linux** — deliberately preserving v1's exact convention
    rather than switching to Go's OS-idiomatic default (`os.UserConfigDir()`
    returns `~/Library/Application Support` on macOS, not `~/.config`).
    **On Windows, use the OS-appropriate location instead** (e.g.
    `os.UserConfigDir()`'s own Windows result, typically
-   `%AppData%\sergeant`) rather than forcing the same Unix dotfile
+   `%AppData%\sgt`) rather than forcing the same Unix dotfile
    convention onto a platform where it's foreign. Concretely: branch on
-   `runtime.GOOS`, hardcode `~/.config/sergeant` for `darwin`/`linux`,
+   `runtime.GOOS`, hardcode `~/.config/sgt` for `darwin`/`linux`,
    defer to `os.UserConfigDir()` for everything else.
 6. **The per-provider model list is pulled from `models.dev`**
    (`https://models.dev/api.json`), the same source the user's own
@@ -200,7 +200,7 @@ project config — confirmed real and working for `Defaults.Agent`
    candidate to implement against rather than a purely speculative,
    empty registry.
 2. Is `token-meter`/`tokenmeter-client` importable directly as a Go
-   module dependency from the `sergeant` repo (both are private under
+   module dependency from the `sgt` repo (both are private under
    the same GitHub owner — likely just a `go.mod` require plus normal
    private-module auth, but worth confirming rather than assuming), or
    does its model-identity logic need to be vendored/reimplemented

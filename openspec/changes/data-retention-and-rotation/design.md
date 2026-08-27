@@ -2,7 +2,7 @@
 
 ## Ownership
 
-One repository, `sergeant-v2`. Touches `internal/config/config.go` (new
+One repository, `sgt-v2`. Touches `internal/config/config.go` (new
 `Retention` field), `internal/store/store.go` (new table),
 a new `internal/store/retention.go`, `internal/store/analytics.go`
 (`ComputeWorkAnalytics`), a new `internal/ui/retention.go`,

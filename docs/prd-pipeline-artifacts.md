@@ -2,7 +2,7 @@
 
 Status: Draft, awaiting explicit human PRD approval
 
-Extends: `docs/prd-sergeant-v2.md` R4.3-R4.5 (captured output must be
+Extends: `docs/prd-sgt.md` R4.3-R4.5 (captured output must be
 sanitized, redacted, and bounded before it is stored) and R5.6/R7.5
 (dashboard exposes durable evidence). This PRD adds a second evidence
 channel — binary artifacts, not text — governed by the same durability and
@@ -19,7 +19,7 @@ and the worktree they'd naturally land in is reclaimed by
 `automated-fleet-cleanup` on a schedule — so even an ad hoc "just leave the
 files in the worktree" approach loses them. This PRD adds a durable,
 bounded artifact channel: a phase/gate writes files to a known directory,
-sergeant copies them out before the worktree can be reclaimed, records
+sgt copies them out before the worktree can be reclaimed, records
 them against that run, and the dashboard renders them beneath the
 pipeline/gates/delivery graph for the run that produced them.
 
@@ -31,18 +31,18 @@ evidence has none of that. A Playwright-based UI gate that wants to prove
 "the button moved, here's the screenshot" has no sanctioned place to put
 the screenshot that survives past the run. This is a real, current gap —
 not a hypothetical one — since this session generated dozens of such
-screenshots that exist nowhere sergeant knows about.
+screenshots that exist nowhere sgt knows about.
 
 ## Proposal
 
 - **Capture convention.** A phase or gate command receives a directory
-  path (via an environment variable, e.g. `SERGEANT_ARTIFACT_DIR`) scoped
+  path (via an environment variable, e.g. `SGT_ARTIFACT_DIR`) scoped
   to that phase, inside its worktree. Anything the command writes there
   before exiting is a candidate artifact. Nothing is required — a phase
   that writes nothing produces no artifacts, same as today.
 - **Durable capture, before reclaim.** Immediately after the phase/gate
   finishes (success or failure — a failing UI test's screenshot is often
-  the most valuable one), sergeant copies every file found in that
+  the most valuable one), sgt copies every file found in that
   directory out of the worktree into a durable, per-run location
   independent of the worktree's lifecycle, and records one metadata row
   per file (run id, phase kind/name, repo, filename, content type, size,
@@ -89,7 +89,7 @@ screenshots that exist nowhere sergeant knows about.
 ## Open questions
 
 - Exact durable storage location (filesystem tree under
-  `~/.local/share/sergeant/artifacts/<run_id>/`, vs. SQLite blob storage) —
+  `~/.local/share/sgt/artifacts/<run_id>/`, vs. SQLite blob storage) —
   an implementation decision for OpenSpec's `design.md`, not a product
   requirement. Given images can be several hundred KB to a few MB each, a
   filesystem tree with DB-recorded metadata (mirroring how delivery

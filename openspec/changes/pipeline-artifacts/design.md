@@ -2,7 +2,7 @@
 
 ## Ownership
 
-One repository, `sergeant-v2`. Touches `internal/store/store.go` (new
+One repository, `sgt-v2`. Touches `internal/store/store.go` (new
 table), a new `internal/store/artifact.go`, `internal/runner/runner.go`
 (`RunCodeGate`, `RunAgentPhase`), a new `internal/ui/artifacts.go`,
 `internal/ui/server.go` (two new routes), and
@@ -18,10 +18,10 @@ SQLite as a blob, so the database itself stays small and query-fast
 regardless of how many screenshots accumulate:
 
 ```
-~/.local/share/sergeant/artifacts/<run_id>/<phase_id>/<filename>
+~/.local/share/sgt/artifacts/<run_id>/<phase_id>/<filename>
 ```
 
-(`SERGEANT_ARTIFACTS_ROOT` env override, mirroring `SERGEANT_UI_LOCK`'s
+(`SGT_ARTIFACTS_ROOT` env override, mirroring `SGT_UI_LOCK`'s
 override pattern in `internal/ui/lock.go`, for tests.)
 
 ## `internal/store/store.go` — new table
@@ -91,9 +91,9 @@ Call sites, both after the command has already run and the phase record's
 `Payload` has been built (so `phaseID` — `phaseRec.ID` — is known):
 
 - `RunCodeGate` (`runner.go:264`): before building `cmd`, create
-  `artifactDir := filepath.Join(pr.Worktree, ".sergeant", "artifacts")`,
+  `artifactDir := filepath.Join(pr.Worktree, ".sgt", "artifacts")`,
   `os.MkdirAll` it, and append
-  `"SERGEANT_ARTIFACT_DIR="+artifactDir` to `cmd.Env` (currently unset —
+  `"SGT_ARTIFACT_DIR="+artifactDir` to `cmd.Env` (currently unset —
   `cmd.Env` must default to `os.Environ()` plus this one addition, since an
   explicitly-set `cmd.Env` replaces the inherited environment entirely).
   After `pr.Store.RecordPhase(phaseRec)`, call
@@ -136,7 +136,7 @@ is empty — this is additive, not a mandatory element every run shows.
 **Storing artifact bytes as a SQLite blob column.** Rejected for the same
 reason `deliveries` doesn't embed envelope payloads: images are large
 enough, and numerous enough over a project's lifetime, that keeping them
-out of the query path (`sergeant.db`'s size and every `SELECT *` against
+out of the query path (`sgt.db`'s size and every `SELECT *` against
 tables sharing its pages) matters. A plain file tree with a metadata row is
 simpler to reason about and to prune later (`data-retention-and-rotation`
 only has to delete files + rows, not run a `VACUUM`).

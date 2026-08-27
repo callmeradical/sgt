@@ -1,10 +1,10 @@
 # Tasks — v2-native skills and docs
 
-One repository, `sergeant-v2`, so one task.
+One repository, `sgt-v2`, so one task.
 
 ## Task 1 — rewrite the eight files and their test assertions together
 
-Repository: `sergeant-v2`. Depends on: nothing.
+Repository: `sgt-v2`. Depends on: nothing.
 
 Read first: every file this change touches, as it exists today (design.md
 quotes the exact lines that change); `AGENTS.md`'s D1, D2, D4, D5, D6, D7,
@@ -23,7 +23,7 @@ Then, per design.md's file-by-file transformation table:
 
 - Rewrite `skills/dispatch/SKILL.md`, `skills/cross-repo-work/SKILL.md`,
   `skills/load-project/SKILL.md`, `skills/wiki/SKILL.md`,
-  `skills/sergeant-help/SKILL.md` — remove the "V1 ONLY" banner from each,
+  `skills/sgt-help/SKILL.md` — remove the "V1 ONLY" banner from each,
   replace every v1 command reference per design.md's tables.
 - Rewrite `.agents/skills/to-tickets/SKILL.md` — replace v1 references;
   state the read-only-export gap explicitly for task creation/mutation.

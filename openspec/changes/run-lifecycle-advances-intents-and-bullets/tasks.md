@@ -1,10 +1,10 @@
 # Tasks — A run's outcome advances its intent and bullets
 
-One repository, `sergeant-v2`, so one task and no cross-repo merge order.
+One repository, `sgt-v2`, so one task and no cross-repo merge order.
 
 ## Task 1 — advance bullets on a terminal run and derive intent status
 
-Repository: `sergeant-v2`. Depends on: nothing.
+Repository: `sgt-v2`. Depends on: nothing.
 
 - Add a store method that advances every bullet of a run to a given status, and
   one that recomputes an intent's status from its bullets.

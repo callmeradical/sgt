@@ -1,10 +1,10 @@
 # Tasks — A sealed bullet awaits explicit approval
 
-One repository, `sergeant-v2`, so one task.
+One repository, `sgt-v2`, so one task.
 
 ## Task 1 — seal on approval, refuse otherwise, make it inspectable
 
-Repository: `sergeant-v2`. Depends on: nothing. Reuses existing
+Repository: `sgt-v2`. Depends on: nothing. Reuses existing
 `Store.GetRun`, `Store.ListBulletsForIntent`, `Store.UpdateBulletStatus` —
 read them first so the new method matches existing error-handling and
 naming conventions in `internal/store/store.go`.

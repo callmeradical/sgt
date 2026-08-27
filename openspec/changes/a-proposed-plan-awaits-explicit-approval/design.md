@@ -2,7 +2,7 @@
 
 ## Ownership
 
-One repository, `sergeant-v2`. Touches `internal/store/store.go` (new
+One repository, `sgt-v2`. Touches `internal/store/store.go` (new
 bullet status, new listing method), `internal/ui/server.go`
 (`handleDispatch`'s branch point, new endpoints), and reuses existing
 change resolution (O3), worktree/run creation, and dispatch machinery
@@ -117,7 +117,7 @@ already needs, not a new concept.
 ## Rejected alternatives
 
 **A separate `PlanRecord`/`ProposedBullet` table instead of reusing
-Intent/Bullet.** Rejected: D4 already makes intent/bullet sergeant's
+Intent/Bullet.** Rejected: D4 already makes intent/bullet sgt's
 first-class planning record, and D8 makes the intent the dashboard's
 primary noun. A parallel table would give the dashboard two different
 things to reconcile before and after approval, for what is the same

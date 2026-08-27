@@ -1,10 +1,10 @@
 # Tasks — Phases record their model and provider
 
-One repository, `sergeant-v2`, so one task.
+One repository, `sgt-v2`, so one task.
 
 ## Task 1 — parse and attach real model/provider evidence to a phase's payload
 
-Repository: `sergeant-v2`. Depends on: nothing in this repo's open work
+Repository: `sgt-v2`. Depends on: nothing in this repo's open work
 (dispatch this only once R5 bullet 3, dead-lettering, has already merged —
 both bullets edit `internal/runner/runner.go`'s `RunAgentPhase`, and
 dispatching in parallel with an in-flight change to the same function risks a
@@ -32,7 +32,7 @@ conflicting merge).
   !failed { ... } else { ... }` block produces `env`, call
   `env.Payload = annotatePayloadWithProvenance(env.Payload, model, provider)`
   once, before `Router.SaveEnvelope` is called — this must cover both the
-  agent-authored-envelope branch and the sergeant-synthesized branch, not just
+  agent-authored-envelope branch and the sgt-synthesized branch, not just
   the synthesized one.
 - Do not add parsing for `opencode`, `claude`, `codex`, or `pi`. Do not add
   token/cost fields. Do not add any CLI/UI/MCP surface. Do not change

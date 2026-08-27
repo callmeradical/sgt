@@ -1,12 +1,12 @@
 # Tasks — Data retention and rotation
 
-One repository, `sergeant-v2`, one task list. Task 3 depends on
+One repository, `sgt-v2`, one task list. Task 3 depends on
 `pipeline-artifacts` having landed (its `artifacts` table); Tasks 1-2 do
 not.
 
 ## Task 1 — Config, schema, and rollup storage
 
-Repository: `sergeant-v2`. Depends on: nothing.
+Repository: `sgt-v2`. Depends on: nothing.
 
 Read first: this change's `design.md` in full; `internal/config/config.go`'s
 `Export`/`Graphify` fields for the pointer convention; `internal/store/delivery.go`
@@ -32,7 +32,7 @@ Scenarios:
 
 ## Task 2 — Rotation and analytics integration
 
-Repository: `sergeant-v2`. Depends on: Task 1.
+Repository: `sgt-v2`. Depends on: Task 1.
 
 Read first: `internal/ui/fleet.go`'s `fleetCleaner`/`runFleetCleanupLoop`
 (the pattern `retentionRotator` follows); `internal/store/store.go`'s
@@ -70,7 +70,7 @@ Scenarios needing real, test-first coverage:
 
 ## Task 3 — Artifact rotation
 
-Repository: `sergeant-v2`. Depends on: Task 2, and on `pipeline-artifacts`
+Repository: `sgt-v2`. Depends on: Task 2, and on `pipeline-artifacts`
 having landed its `artifacts` table (guard with `hasTable("artifacts")`
 before querying it if that change has not landed yet, per design.md).
 

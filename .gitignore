@@ -4,7 +4,7 @@ dist/
 
 # design-critique snapshots (local)
 .impeccable/
-bin/sergeant
+bin/sgt
 
 # per-run agent scratch written into worktrees
-.sergeant/
+.sgt/

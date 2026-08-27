@@ -2,7 +2,7 @@
 
 ## Ownership and merge order
 
-One repository, `sergeant-v2`, so a single bullet and no cross-repo merge order.
+One repository, `sgt-v2`, so a single bullet and no cross-repo merge order.
 
 ## The helper
 
@@ -13,7 +13,7 @@ One repository, `sergeant-v2`, so a single bullet and no cross-repo merge order.
 func FleetRoot() string
 ```
 
-It resolves `SERGEANT_FLEET_DIR`, else `~/.local/share/sergeant-v2/fleet`.
+It resolves `SGT_FLEET_DIR`, else `~/.local/share/sgt-v2/fleet`.
 `FleetDir(runID, repoName)` becomes `filepath.Join(FleetRoot(), runID, repoName)`,
 so the two cannot disagree.
 
@@ -48,7 +48,7 @@ behaviour today and leaves the cause in place. Four copies of a path is why thre
 of them drifted.
 
 **A package-level `var fleetRoot` computed at init.** Breaks the tests, which set
-`SERGEANT_FLEET_DIR` per test with `t.Setenv`. Resolution has to happen per call.
+`SGT_FLEET_DIR` per test with `t.Setenv`. Resolution has to happen per call.
 
 **Making the fleet root a field on Server.** Wider change, and it would leave
 `internal/dag` resolving the root independently — two authorities instead of one.

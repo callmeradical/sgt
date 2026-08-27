@@ -2,7 +2,7 @@
 
 ## Ownership
 
-One repository, `sergeant-v2`. Touches `internal/config/config.go`
+One repository, `sgt-v2`. Touches `internal/config/config.go`
 (`Project`), `internal/store/store.go` (`IntentRecord`, a new pure
 predicate, a new write method), `internal/runner/runner.go` (a new
 sibling to `RunCodeGate`), and `internal/ui/server.go` (`handleCreatePR`).
@@ -113,8 +113,8 @@ separate migration step.
 // bullets. Unlike RunCodeGate, it is not a *PhaseRunner method: a shipping
 // gate evaluates an intent as a whole, which may span several
 // repositories/worktrees, so there is no single pr.Worktree to run it in.
-// The command runs with cmd.Dir unset (the sergeant process's own working
-// directory) and SERGEANT_BULLET_WORKTREES set to the bullets' worktree
+// The command runs with cmd.Dir unset (the sgt process's own working
+// directory) and SGT_BULLET_WORKTREES set to the bullets' worktree
 // paths, comma-joined in merge order, in its environment — the substrate a
 // project's shipping-gate command needs to inspect more than one repo.
 //
@@ -132,7 +132,7 @@ func RunShippingGate(ctx context.Context, name, command string, worktrees []stri
 	cmd := exec.CommandContext(gateCtx, "bash", "-c", command)
 	superviseGroup(cmd)
 	joined := strings.Join(worktrees, ",")
-	cmd.Env = append(os.Environ(), "SERGEANT_BULLET_WORKTREES="+joined)
+	cmd.Env = append(os.Environ(), "SGT_BULLET_WORKTREES="+joined)
 
 	var outBuf bytes.Buffer
 	cmd.Stdout = &outBuf
