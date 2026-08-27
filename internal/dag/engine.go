@@ -155,33 +155,45 @@ func (e *Engine) prepareWorktree(ctx context.Context, repoPath, runID, repoName 
 	}
 	branch := naming.BranchName(run.Type, run.ChangeID)
 
+	// Resolve the repository's real default branch exactly once, before the
+	// worktree is created. The run.BaseBranch == "" guard is what makes this
+	// "once, ever, per run": a resumed run whose worktree was removed but
+	// whose branch survived reaches this code again, and must not recapture
+	// (and potentially get a different, wrong answer if the operator's own
+	// checkout has since moved on) what the run's first attempt already
+	// correctly recorded.
+	//
+	// This deliberately does NOT read the source checkout's current HEAD.
+	// The operator's own working copy can be sitting on any branch — a
+	// feature branch, a stale checkout, mid-rebase — and none of that is the
+	// base new work should start from. resolveDefaultBranch answers "what is
+	// this repo's default branch" independent of what happens to be checked
+	// out right now.
+	baseBranch := run.BaseBranch
+	if baseBranch == "" {
+		baseBranch = resolveDefaultBranch(ctx, repoPath)
+		if baseBranch != "" {
+			_ = e.Store.SetRunBaseBranch(runID, baseBranch)
+		}
+	}
+
 	// If the branch already exists, a previous attempt at this run id got far
 	// enough to create it, and it may carry commits. Attach to it as it stands.
 	//
-	// Do NOT pass -B here. -B resets the branch to HEAD, which is right when
-	// starting fresh and destroys work when resuming: a run whose worktree was
-	// removed but whose branch survived would lose every commit the earlier
-	// attempt made. Resuming a run must never discard the work being resumed.
+	// Do NOT pass -B here. -B resets the branch to the start point, which is
+	// right when starting fresh and destroys work when resuming: a run whose
+	// worktree was removed but whose branch survived would lose every commit
+	// the earlier attempt made. Resuming a run must never discard the work
+	// being resumed.
 	args := []string{"-C", repoPath, "worktree", "add"}
 	if branchExists(ctx, repoPath, branch) {
 		args = append(args, wt, branch)
 	} else {
-		args = append(args, "-b", branch, wt, "HEAD")
-	}
-
-	// Capture the run's real base branch exactly once, before the worktree
-	// is created. The run.BaseBranch == "" guard is what makes this "once,
-	// ever, per run": a resumed run whose worktree was removed but whose
-	// branch survived reaches this code again, and must not recapture (and
-	// potentially get a different, wrong answer if the operator's own
-	// checkout has since moved on) what the run's first attempt already
-	// correctly recorded. A failed gitOutput (e.g. a detached HEAD) leaves
-	// BaseBranch empty rather than recording garbage; defaultBase has its
-	// own fallback for that case.
-	if run.BaseBranch == "" {
-		if head := gitOutput(ctx, repoPath, "rev-parse", "--abbrev-ref", "HEAD"); head != "" {
-			_ = e.Store.SetRunBaseBranch(runID, head)
+		startPoint := baseBranch
+		if startPoint == "" {
+			startPoint = "HEAD"
 		}
+		args = append(args, "-b", branch, wt, startPoint)
 	}
 
 	cmd := exec.CommandContext(ctx, "git", args...)
@@ -217,6 +229,32 @@ func copyChangeDir(src, dst string) error {
 		}
 		return os.WriteFile(target, data, 0644)
 	})
+}
+
+// resolveDefaultBranch determines a repository's real default branch —
+// origin/HEAD if a remote is configured, else a local main/master — without
+// ever consulting what the source checkout currently has checked out. That
+// independence is the whole point: the operator's own working copy is free
+// to sit on any branch without affecting where dispatched work starts from.
+//
+// The guess chain mirrors internal/ui/gitutil.go's defaultBase, which resolves
+// the same question for display purposes after a run already recorded its
+// base branch. The two cannot import each other (ui depends on dag), so the
+// chain is duplicated rather than shared.
+func resolveDefaultBranch(ctx context.Context, repoPath string) string {
+	if ref := gitOutput(ctx, repoPath, "symbolic-ref", "refs/remotes/origin/HEAD"); ref != "" {
+		return strings.TrimPrefix(ref, "refs/remotes/")
+	}
+	for _, candidate := range []string{"origin/main", "origin/master", "main", "master"} {
+		if gitOutput(ctx, repoPath, "rev-parse", "--verify", candidate) != "" {
+			return candidate
+		}
+	}
+	// No remote and no conventionally named local branch: fall back to
+	// whatever is checked out, same as the pre-fix behaviour, rather than
+	// refusing to dispatch. A failed gitOutput (e.g. a detached HEAD with no
+	// symbolic name) leaves this "", and the caller falls back to "HEAD".
+	return gitOutput(ctx, repoPath, "rev-parse", "--abbrev-ref", "HEAD")
 }
 
 // branchExists reports whether a local branch is already present. It is the
