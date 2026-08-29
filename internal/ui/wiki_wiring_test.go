@@ -38,6 +38,47 @@ func TestAWikiWriteFailureDoesNotChangeTheRunsRecordedStatus(t *testing.T) {
 	}
 }
 
+// Scenario: "A completed run gets its own concept page" for the two
+// terminal statuses bulletStatusForRunOutcome does NOT advance bullets
+// for (cancelled, interrupted) — the exact distinction recordTerminalRun's
+// own doc comment calls out: a wiki entry is recorded "for every terminal
+// status, not only the ones that advance bullets." Review 042's critic
+// found this covered only by a throwaway, now-deleted test; this is the
+// committed regression test for it.
+func TestWikiEntryIsRecordedForNonAdvancingTerminalStatuses(t *testing.T) {
+	for _, status := range []string{"cancelled", "interrupted"} {
+		t.Run(status, func(t *testing.T) {
+			srv, st := terminalRunFixture(t, "pending")
+			t.Setenv("SGT_WIKI_ROOT", t.TempDir())
+
+			srv.recordTerminalRun("sgt-run", status)
+
+			// bulletStatusForRunOutcome must genuinely not advance this
+			// status's bullets - otherwise this test is not exercising the
+			// branch it claims to.
+			for i, got := range bulletStatuses(t, st, "sgt-run-intent") {
+				if got != "pending" {
+					t.Fatalf("bullet %d status = %q after a %q run, want pending (unadvanced) — this test no longer exercises the non-advancing branch", i+1, got, status)
+				}
+			}
+
+			run, err := st.GetRun("sgt-run")
+			if err != nil {
+				t.Fatal(err)
+			}
+			date := run.UpdatedAt.UTC().Format("2006-01-02")
+			pagePath := filepath.Join(wiki.ProjectRoot(run.Project), date, run.ID+".md")
+			raw, err := os.ReadFile(pagePath)
+			if err != nil {
+				t.Fatalf("wiki concept page was not written for a %q run: %v", status, err)
+			}
+			if !strings.Contains(string(raw), status) {
+				t.Errorf("concept page for a %q run does not mention its own status:\n%s", status, raw)
+			}
+		})
+	}
+}
+
 // Scenario: "A blocked run's page names the real reason" — the exact
 // string blockedReasonForRun produced for this run, not a generic or
 // placeholder message, and asserted by equality.
