@@ -19,6 +19,7 @@ func TestSectionsParsesInDocumentOrder(t *testing.T) {
 		"Installation",
 		"Your first project",
 		"Day-to-day workflow",
+		"Filesystem and database",
 		"Configuration reference",
 		"Troubleshooting",
 		"Command reference",

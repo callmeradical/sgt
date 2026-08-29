@@ -147,6 +147,47 @@ Check on things without reading logs:
 - The `sgt_status` / `sgt_run_status` / `sgt_run_wait` MCP tools, from
   inside an agent session — see MCP tools for agents below.
 
+## Filesystem and database
+
+Sgt's own account of what it works on, and how it did the work, lives in
+a small number of well-known places on disk. Knowing them is how an
+operator inspects, backs up, or migrates that history directly, without
+going through the API — and it is the same account the dashboard, the
+CLI, and the MCP surface all read from; none of them is a second source
+of truth.
+
+### Directories
+
+| Path | Contents | Override |
+|---|---|---|
+| `~/.config/sgt/<project>.yaml` | Project definitions — repos, groups, agent instructions, factory gates. One file per project. | none |
+| `~/.local/share/sgt/sgt.db` | The SQLite database: every run, phase, envelope, intent, and bullet Sgt has ever recorded. | none |
+| `~/.local/share/sgt/artifacts/<run_id>/<phase_id>/` | Durable copies of files a gate or agent phase captured (screenshots, traces), outliving that run's worktree. | `SGT_ARTIFACTS_ROOT` |
+| `~/.local/share/sgt-v2/fleet/<run_id>/<repo>/` | The isolated git worktree a dispatched agent phase actually worked in. Reclaimed automatically 7 days after its run goes terminal. | `SGT_FLEET_DIR` |
+| `~/.local/share/sgt-v2/sgt-ui.lock` | The single-instance lock `sgt ui` holds for its lifetime — a second invocation refuses to start rather than reconciling a live run out from under the first. | `SGT_UI_LOCK` |
+
+The fleet root and UI lock path still carry the `sgt-v2` segment rather
+than `sgt` — that name predates and is unrelated to the later
+`Sergeant`→`Sgt` rename (see Installation's upgrade section above); it
+is how this engine has distinguished its own data from any legacy
+layout since before the rename existed. This is a real, current path,
+not a typo.
+
+### Database tables
+
+| Table | What it records |
+|---|---|
+| `runs` | One row per dispatch — status, brief, work type, OpenSpec change id, and the intent it serves. |
+| `phases` | One row per phase attempt within a run — status, duration, and its (redacted) output payload. |
+| `envelopes` | One row per typed handoff or notification a phase produced. |
+| `intents` | An intent's durable statement of desired change — the primary durable object every run/phase/worktree exists to serve. |
+| `bullets` | One row per repo-scoped vertical slice of an intent — status, branch, worktree path, and pull request URL. |
+| `changes` | An append-only record of which OpenSpec change each intent was resolved against, and when. |
+| `deliveries` | Durable retry state for outbound envelope delivery. |
+| `artifacts` | Durable metadata (path, size, content type) for each captured artifact file; a dropped-count row when a phase's artifact cap was exceeded, so a drop is never silent. |
+| `retention_rollups` | One row per project — the surviving aggregate counts of runs and bullets that have since been rotated out of the tables above, so historical totals stay accurate after the detailed rows are gone. |
+| `export_cursor` | Per-target progress cursor for the read-only task-tracking export. |
+
 ## Configuration reference
 
 Every project field — `repos`, `groups`, `agent_instructions`,
