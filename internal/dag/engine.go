@@ -232,15 +232,17 @@ func copyChangeDir(src, dst string) error {
 }
 
 // resolveDefaultBranch determines a repository's real default branch —
-// origin/HEAD if a remote is configured, else a local main/master — without
-// ever consulting what the source checkout currently has checked out. That
-// independence is the whole point: the operator's own working copy is free
-// to sit on any branch without affecting where dispatched work starts from.
+// local main/master if either exists, else origin/HEAD if a remote is
+// configured — without ever consulting what the source checkout currently
+// has checked out. That independence is the whole point: the operator's own
+// working copy is free to sit on any branch without affecting where
+// dispatched work starts from.
 //
 // The guess chain mirrors internal/ui/gitutil.go's defaultBase, which resolves
 // the same question for display purposes after a run already recorded its
 // base branch. The two cannot import each other (ui depends on dag), so the
-// chain is duplicated rather than shared.
+// chain is duplicated rather than shared — keep them in sync by hand when
+// either changes.
 func resolveDefaultBranch(ctx context.Context, repoPath string) string {
 	// A local branch is preferred over any origin/* remote-tracking ref. Sgt
 	// is single-user and local-first: a commit the operator makes to their
