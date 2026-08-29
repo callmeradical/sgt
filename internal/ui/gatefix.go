@@ -78,7 +78,7 @@ func (srv *Server) handleRunFix(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	failure, ok := srv.lastFailedPhase(runID)
+	failure, ok := srv.lastFailedPhase(runID, "")
 	if !ok {
 		http.Error(w, fmt.Sprintf("run %s has no failed phase to correct", runID), http.StatusConflict)
 		return
@@ -148,7 +148,7 @@ func (srv *Server) runFixCycles(ctx context.Context, cancel context.CancelFunc, 
 			return
 		}
 
-		failure, ok := srv.lastFailedPhase(runID)
+		failure, ok := srv.lastFailedPhase(runID, repoName)
 		if !ok {
 			break
 		}
@@ -196,6 +196,10 @@ func (srv *Server) runFixCycles(ctx context.Context, cancel context.CancelFunc, 
 		}
 
 		if !cycleFailed {
+			if ctx.Err() != nil {
+				srv.recordTerminalRun(runID, "cancelled")
+				return
+			}
 			srv.recordTerminalRun(runID, "passed")
 			return
 		}
@@ -205,10 +209,17 @@ func (srv *Server) runFixCycles(ctx context.Context, cancel context.CancelFunc, 
 		"corrective fix budget exhausted (%d/%d attempts); gate still failing", limit, limit))
 }
 
-// lastFailedPhase returns the most recently recorded failed phase for runID,
-// across every repo the run touched. ListPhasesForRun orders by created_at
-// ascending, so the last match in iteration order is the most recent one.
-func (srv *Server) lastFailedPhase(runID string) (store.PhaseRecord, bool) {
+// lastFailedPhase returns the most recently recorded failed phase for runID.
+// When repoName is non-empty, only that repo's phases are considered — the
+// corrective loop (runFixCycles) is bound to one repo's worktree for its
+// entire lifetime, so every cycle must keep reading that same repo's
+// failure, never a different repo's that failed more recently (a run's
+// "current" failure can otherwise drift to a repo the loop isn't actually
+// running in). An empty repoName considers every repo the run touched — used
+// once, by handleRunFix, to discover which repo to bind the loop to in the
+// first place. ListPhasesForRun orders by created_at ascending, so the last
+// match in iteration order is the most recent one.
+func (srv *Server) lastFailedPhase(runID, repoName string) (store.PhaseRecord, bool) {
 	phases, err := srv.Store.ListPhasesForRun(runID)
 	if err != nil {
 		return store.PhaseRecord{}, false
@@ -216,10 +227,14 @@ func (srv *Server) lastFailedPhase(runID string) (store.PhaseRecord, bool) {
 	var last store.PhaseRecord
 	found := false
 	for _, p := range phases {
-		if p.Status == "failed" {
-			last = p
-			found = true
+		if p.Status != "failed" {
+			continue
 		}
+		if repoName != "" && p.Repo != repoName {
+			continue
+		}
+		last = p
+		found = true
 	}
 	return last, found
 }

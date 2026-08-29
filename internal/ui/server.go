@@ -369,19 +369,21 @@ func (srv *Server) handleRunDetails(w http.ResponseWriter, r *http.Request) {
 
 	// fixRetriesLimit is the "M" in a corrective cycle's "Attempt N of M"
 	// label (a-failed-gate-is-corrected-in-place): the configured bound on
-	// corrective cycles for the repo this run's phases belong to. Best
-	// effort — a run whose project no longer loads, or one with no phases
-	// yet, still serves its other fields; it just falls back to the
-	// built-in default rather than failing the whole request.
+	// corrective cycles for the repo a fix cycle would bind to. This must
+	// resolve the same repo handleRunFix itself would pick (lastFailedPhase
+	// with no repo filter — the most recently failed phase across every repo
+	// the run touched), not an unrelated heuristic like "the first repo with
+	// any recorded phase", or the displayed bound could name a different
+	// repo's setting than the one a fix cycle actually uses. Best effort — a
+	// run whose project no longer loads, or one with no failed phase yet,
+	// still serves its other fields; it just falls back to the built-in
+	// default rather than failing the whole request.
 	fixRetriesLimit := 5
 	if run, err := srv.Store.GetRun(runID); err == nil && run != nil {
 		if proj, err := config.LoadProject(run.Project); err == nil {
 			repoName := ""
-			for _, p := range phases {
-				if p.Repo != "" {
-					repoName = p.Repo
-					break
-				}
+			if failure, ok := srv.lastFailedPhase(runID, ""); ok {
+				repoName = failure.Repo
 			}
 			fixRetriesLimit = proj.ResolvedFixRetries(repoName)
 		}
