@@ -242,18 +242,30 @@ func copyChangeDir(src, dst string) error {
 // base branch. The two cannot import each other (ui depends on dag), so the
 // chain is duplicated rather than shared.
 func resolveDefaultBranch(ctx context.Context, repoPath string) string {
-	if ref := gitOutput(ctx, repoPath, "symbolic-ref", "refs/remotes/origin/HEAD"); ref != "" {
-		return strings.TrimPrefix(ref, "refs/remotes/")
-	}
-	for _, candidate := range []string{"origin/main", "origin/master", "main", "master"} {
+	// A local branch is preferred over any origin/* remote-tracking ref. Sgt
+	// is single-user and local-first: a commit the operator makes to their
+	// own local main is real, current work the instant it lands, whether or
+	// not they have since pushed it — but origin/main only reflects that
+	// commit after an explicit fetch/push. Starting a dispatch from a stale
+	// remote-tracking ref can silently hand an agent code missing the
+	// operator's own just-made local fixes.
+	for _, candidate := range []string{"main", "master"} {
 		if gitOutput(ctx, repoPath, "rev-parse", "--verify", candidate) != "" {
 			return candidate
 		}
 	}
-	// No remote and no conventionally named local branch: fall back to
-	// whatever is checked out, same as the pre-fix behaviour, rather than
-	// refusing to dispatch. A failed gitOutput (e.g. a detached HEAD with no
-	// symbolic name) leaves this "", and the caller falls back to "HEAD".
+	if ref := gitOutput(ctx, repoPath, "symbolic-ref", "refs/remotes/origin/HEAD"); ref != "" {
+		return strings.TrimPrefix(ref, "refs/remotes/")
+	}
+	for _, candidate := range []string{"origin/main", "origin/master"} {
+		if gitOutput(ctx, repoPath, "rev-parse", "--verify", candidate) != "" {
+			return candidate
+		}
+	}
+	// No local main/master, no remote: fall back to whatever is checked out,
+	// same as the pre-fix behaviour, rather than refusing to dispatch. A
+	// failed gitOutput (e.g. a detached HEAD with no symbolic name) leaves
+	// this "", and the caller falls back to "HEAD".
 	return gitOutput(ctx, repoPath, "rev-parse", "--abbrev-ref", "HEAD")
 }
 
