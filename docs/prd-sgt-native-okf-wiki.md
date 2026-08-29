@@ -92,12 +92,9 @@ all three.
 
 ## Open questions
 
-- **One wiki per project, or one wiki for all of Sgt's work regardless
-  of project?** "In its own folder for its work" doesn't settle this —
-  a per-project wiki matches how every other Sgt view already scopes by
-  project; a single global wiki gives one place to browse everything
-  Sgt has ever done regardless of which project it was for. Left for
-  explicit resolution before `design.md`, not decided here.
-- **Exact root location** (e.g. under each project's own directory, or
-  under Sgt's own `~/.local/share/sgt/` data root) — an implementation
-  decision for `design.md`, informed by the answer to the question above.
+- **Resolved: one wiki per project**, matching how every other Sgt view
+  (dashboard, analytics, run list) already scopes by project.
+- **Exact root location** (e.g. under Sgt's own `~/.local/share/sgt/`
+  data root, keyed by project name, versus something rooted in the
+  project's own configured repositories) — an implementation decision
+  for `design.md`.
