@@ -627,3 +627,30 @@ dag:
 	}
 }
 
+// stageForRepo must find the one stage a repo belongs to and scope it down
+// to that repo alone, leaving every other repo the stage bundled out; and
+// must report false, not panic or return a stage naming some other repo,
+// when no resolved stage mentions the given repo at all (Review 045 noted
+// this fallback path had no direct test).
+func TestStageForRepo(t *testing.T) {
+	stages := []config.DAGStage{
+		{Name: "stage-a", Repos: []string{"svc", "shared"}},
+		{Name: "stage-b", Repos: []string{"other"}},
+	}
+
+	got, ok := stageForRepo(stages, "svc")
+	if !ok {
+		t.Fatal("expected a stage for svc")
+	}
+	if got.Name != "stage-a" {
+		t.Errorf("stage name = %q, want stage-a", got.Name)
+	}
+	if len(got.Repos) != 1 || got.Repos[0] != "svc" {
+		t.Errorf("scoped Repos = %v, want [svc] only -- shared must not survive the scoping", got.Repos)
+	}
+
+	if _, ok := stageForRepo(stages, "nonexistent"); ok {
+		t.Error("expected ok=false for a repo no resolved stage mentions")
+	}
+}
+
