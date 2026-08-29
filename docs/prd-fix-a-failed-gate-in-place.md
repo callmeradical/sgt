@@ -54,14 +54,30 @@ progress in the process.
   already re-runs a gate following an agent phase — a human should not
   have to separately remember to trigger the retry themselves.
 - A bounded number of corrective attempts, so a genuinely unfixable
-  failure still reaches a human rather than looping forever. The exact
-  bound is an implementation decision for `design.md`; this PRD only
-  requires that some bound exists.
-- This is an explicit, operator-triggered action for a first version —
-  it does not fire automatically the instant any gate fails. Matches D5's
-  "three interruptions only" philosophy: silently escalating how much
-  unattended agent activity a project incurs, without an operator having
-  asked for it, is a bigger decision than this PRD makes on its own.
+  failure still reaches a human rather than looping forever. The bound
+  is a setting — a new field alongside `Defaults.Retries`/per-repo
+  `Retries` (`internal/config`'s existing project-default-with-repo-
+  override pattern, today scoped to agent-phase retries), defaulting to
+  5 when unset. Not a fixed, non-configurable constant: unlike fleet
+  cleanup's retention window, the right number of corrective attempts
+  genuinely varies by project.
+- Starting the first corrective attempt is an explicit, operator-
+  triggered action — it does not fire automatically the instant any gate
+  fails. Matches D5's "three interruptions only" philosophy: silently
+  escalating how much unattended agent activity a project incurs,
+  without an operator having asked for it, is a bigger decision than
+  this PRD makes on its own. Once that first attempt is triggered,
+  though, the diagnose-fix-retest loop continues on its own — the
+  operator does not have to re-trigger each subsequent attempt by hand —
+  until the gate passes or the configured bound is reached, at which
+  point it falls back to requiring a human, the same as today.
+- Each corrective attempt is visually identified in the dashboard as its
+  own child task under the original run, numbered against the
+  configured bound (e.g., "Attempt 2 of 5"), and the workflow graph
+  visualizes the real retry cycle as a connected loop — the actual
+  phase sequence each attempt traverses (for example `test` → `build` →
+  `test`) shown as looping edges, not a flat, disconnected list of
+  attempts.
 
 ## Out of scope
 
@@ -84,12 +100,8 @@ progress in the process.
 
 ## Open questions
 
-- Exact bound on corrective attempts before falling back to `blocked`
-  with a human required — a `design.md` decision informed by whatever
-  default this codebase already uses for agent-phase retries
-  (`RunAgentPhase`'s existing `retries` parameter).
-- Should a corrective attempt's own phase records be visually
-  distinguished in the dashboard from the original run's phases (so an
-  operator can tell "this passed on the second, corrective attempt" from
-  "this passed the first time")? Left open, not required for a first
-  version.
+None blocking. Both prior open questions (the retry bound and whether
+corrective attempts are visually distinguished) are resolved in the
+Proposal above. Left to `design.md`: the exact project-YAML field name
+for the new retry-bound setting, and the precise graph/child-task
+rendering shape.
