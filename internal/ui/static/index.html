@@ -73,8 +73,15 @@
     </div>
 
     <!-- Dispatch Stage CTA & Global Actions -->
-    <div class="flex items-center space-x-3">
-      <div class="flex items-center space-x-2 text-[#8b949e] text-xs">
+    <div class="flex items-center space-x-3 min-w-0">
+      <!-- min-w-0 lets this row shrink instead of forcing the header wider;
+           overflow-x-auto is the safety net below lg once 5 buttons each
+           carrying a visible label (Review 046: they overflow the header
+           outright at real phone widths, pushing Refresh off-screen with no
+           way to reach it) no longer all fit side by side -- nothing is
+           ever unreachable, even on the narrowest real phone, though most
+           phones fit all of them without needing to scroll at all. -->
+      <div class="flex items-center space-x-2 text-[#8b949e] text-xs min-w-0 overflow-x-auto">
         <!-- Below lg, #master-rail (the run list) is otherwise unreachable — see
              design.md's "Mobile rail toggle". Matches #master-rail's own
              lg breakpoint so the two states are always consistent: never
@@ -87,7 +94,7 @@
           <i class="fa-solid fa-bars" aria-hidden="true"></i>
         </button>
         <button type="button" id="btn-open-manual" onclick="openManualDrawer(this)" aria-label="Manual" title="Sgt manual" class="min-w-[44px] min-h-[44px] flex items-center justify-center gap-1 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14] rounded"><i class="fa-solid fa-book"></i><span class="lg:hidden text-[10px] font-bold">Manual</span></button>
-        <button type="button" id="btn-open-analytics" onclick="openAnalyticsDrawer(this)" aria-label="Work analytics" title="Work analytics" class="min-w-[44px] min-h-[44px] flex items-center justify-center gap-1 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14] rounded"><i class="fa-solid fa-chart-line"></i><span class="lg:hidden text-[10px] font-bold">Work analytics</span></button>
+        <button type="button" id="btn-open-analytics" onclick="openAnalyticsDrawer(this)" aria-label="Work analytics" title="Work analytics" class="min-w-[44px] min-h-[44px] flex items-center justify-center gap-1 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14] rounded"><i class="fa-solid fa-chart-line"></i><span class="lg:hidden text-[10px] font-bold">Analytics</span></button>
         <button type="button" id="btn-open-workers" onclick="openWorkersDrawer(this)" aria-label="Worktrees" title="Allocated worktrees (includes retained, non-running ones)" class="relative min-w-[44px] min-h-[44px] flex items-center justify-center gap-1 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14] rounded">
           <i class="fa-solid fa-folder-tree"></i>
           <span class="lg:hidden text-[10px] font-bold">Worktrees</span>

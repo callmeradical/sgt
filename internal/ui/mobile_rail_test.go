@@ -176,7 +176,11 @@ func TestMobileNavMarkupMatchesDesign(t *testing.T) {
 		`id="master-rail" aria-label="Pipeline runs" class="hidden lg:flex`,
 		// Visible labels alongside icon-only controls, shown only below lg.
 		`<span class="lg:hidden text-[10px] font-bold">Manual</span>`,
-		`<span class="lg:hidden text-[10px] font-bold">Work analytics</span>`,
+		// Shortened from "Work analytics" (Review 046: the full-length label
+		// was part of why the header overflowed at real phone widths) --
+		// the button's own aria-label/title stay "Work analytics" (checked
+		// below), only the tiny visible span shortens.
+		`<span class="lg:hidden text-[10px] font-bold">Analytics</span>`,
 		`<span class="lg:hidden text-[10px] font-bold">Worktrees</span>`,
 		`<span class="lg:hidden text-[10px] font-bold">Refresh</span>`,
 		`<span class="lg:hidden text-[10px] font-bold">Stop run</span>`,
@@ -198,6 +202,35 @@ func TestMobileNavMarkupMatchesDesign(t *testing.T) {
 		if !strings.Contains(src, want) {
 			t.Errorf("index.html should still contain the pre-existing tooltip %q", want)
 		}
+	}
+}
+
+// Review 046: at real phone widths (320-375px, confirmed with an actual
+// resized viewport, not just markup inspection), the 5 buttons that gained a
+// visible label below lg overflowed the header outright -- the Refresh
+// button was pushed off-screen past body's overflow-hidden with no way to
+// reach it at all. min-w-0 lets the button row's flex ancestors shrink
+// instead of forcing the header wider, and overflow-x-auto on the row
+// itself is what turns "content that doesn't fit" into "reachable by
+// scrolling" instead of "clipped and gone" -- the actual fix for that
+// defect. This test cannot measure real overflow (that needs a real or
+// emulated viewport, which is exactly what the markup-string tests in this
+// file could not catch the first time), but it does assert the specific
+// escape-hatch classes are present, so a future edit that accidentally
+// drops them regressing back to Review 046's exact failure is caught here
+// rather than needing another live-viewport pass to notice.
+func TestMobileHeaderButtonRowHasAHorizontalScrollFallback(t *testing.T) {
+	raw, err := staticFS.ReadFile("static/index.html")
+	if err != nil {
+		t.Fatalf("read embedded index.html: %v", err)
+	}
+	src := string(raw)
+
+	if !strings.Contains(src, `class="flex items-center space-x-2 text-[#8b949e] text-xs min-w-0 overflow-x-auto"`) {
+		t.Error("the header's button row must allow shrinking (min-w-0) and fall back to horizontal scroll (overflow-x-auto) so a button can never become permanently unreachable at a narrow width")
+	}
+	if !strings.Contains(src, `class="flex items-center space-x-3 min-w-0"`) {
+		t.Error("the button row's own flex parent must also allow shrinking (min-w-0), or the row's overflow-x-auto has no narrower width to actually scroll within")
 	}
 }
 
