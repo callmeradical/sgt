@@ -108,9 +108,10 @@ in the block; when directives conflict, the later repository-specific directive
 is the intended authority. Sgt does not structurally merge or deduplicate
 free-form instruction prose. The `review` stage does not classify or route
 using any of these layers: `internal/dag/engine.go`'s `reviewPrompt` builds
-the review agent's prompt from only the diff, the stage, and the repo name,
-deliberately excluding role, group, and instruction context so an independent
-review cannot see the implementing agent's own reasoning. When a review phase
+the review agent's prompt from only the diff and the repo name (it also
+accepts a `*config.DAGStage` parameter, but does not read it), deliberately
+excluding role, group, and instruction context so an independent review
+cannot see the implementing agent's own reasoning. When a review phase
 reports an `error`-severity finding, `internal/ui/dispatch.go`'s
 `blockedReasonForRun` reads it back from that phase's envelope to explain why
 the run's bullet is blocked.
