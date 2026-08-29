@@ -799,7 +799,7 @@
         } catch (mergeErr) {
           console.error("Failed checking merge status:", mergeErr);
         }
-        renderWorkflowGraph(current, data.phases || []);
+        renderWorkflowGraph(current, data.phases || [], data.fix_retries_limit);
         renderActivity(data.envelopes || []);
         fetchDeliveryHistory(runId);
         refreshRunDrawer(current);
@@ -1723,7 +1723,7 @@
         </section>`;
     }
 
-    async function renderWorkflowGraph(run, phases) {
+    async function renderWorkflowGraph(run, phases, fixRetriesLimit) {
       const host = document.getElementById('workflow-graph');
       const list = phases || [];
 
@@ -1755,8 +1755,8 @@
       }
 
       const artifacts = await fetchArtifactsForRun(run.id);
-      host.innerHTML = lanes.join('') + artifactsSectionHTML(artifacts);
-      lastGraphRender = { run, phases: list };
+      host.innerHTML = lanes.join('') + fixCyclesHTML(list, fixRetriesLimit) + artifactsSectionHTML(artifacts);
+      lastGraphRender = { run, phases: list, fixRetriesLimit };
     }
 
     // fetchArtifactsForRun answers this run's captured pipeline artifacts
@@ -1825,6 +1825,60 @@
       return `<a href="${href}" target="_blank" rel="noopener" class="text-[11px] text-[#58a6ff] underline decoration-dotted">${escapeHTML(a.filename)}</a>`;
     }
 
+    // fixCyclesHTML groups a run's phases whose fix_cycle is 1 or higher into
+    // labeled "Attempt N of M" child blocks, one per corrective cycle
+    // (a-failed-gate-is-corrected-in-place), distinct from the run's own
+    // original phase sequence (fix_cycle 0, rendered by the lanes above and
+    // not repeated here). limit is M, the configured corrective-cycle bound
+    // (GET /api/run-details' fix_retries_limit) — a run that never entered a
+    // corrective cycle has no cycle-1+ phases and this renders nothing.
+    //
+    // Within a block, each phase renders in its real recorded order
+    // (phases already arrive created_at-ascending from the store), connected
+    // by a "→" so the chain reads as the actual sequence the cycle
+    // traversed (e.g. fix → build → test) rather than an
+    // unconnected list — the gate it re-attempts is the chain's own last
+    // link, not a separate label.
+    function fixCyclesHTML(phases, limit) {
+      const list = (phases || []).filter(p => (p.fix_cycle || 0) > 0);
+      if (list.length === 0) return '';
+
+      const byCycle = new Map();
+      list.forEach(p => {
+        const cycle = p.fix_cycle;
+        if (!byCycle.has(cycle)) byCycle.set(cycle, []);
+        byCycle.get(cycle).push(p);
+      });
+
+      const cycles = [...byCycle.keys()].sort((a, b) => a - b);
+      const m = limit || cycles[cycles.length - 1];
+
+      const blocks = cycles.map(cycle => {
+        const cyclePhases = byCycle.get(cycle);
+        const chain = cyclePhases.map((p, i) => {
+          const look = PHASE_LOOK[p.status] || { cls: 'text-[#8b949e]', label: p.status };
+          const node = `<span class="${look.cls} font-mono" title="${escapeAttr(p.status)}">${escapeHTML(p.name)}</span>`;
+          return i === 0 ? node : `<span class="text-[#6e7681]"> → </span>${node}`;
+        }).join('');
+        return `
+          <div class="mb-2 last:mb-0 p-2 rounded border border-[#30363d] bg-[#0d1117]" aria-label="${escapeAttr('Attempt ' + cycle + ' of ' + m)}">
+            <div class="text-[9px] uppercase font-bold text-[#8b949e] tracking-wider mb-1.5">Attempt ${escapeHTML(cycle)} of ${escapeHTML(m)}</div>
+            <div class="flex items-center flex-wrap gap-1 text-[11px]">
+              <i class="fa-solid fa-rotate text-[9px] text-[#6e7681]" aria-hidden="true" title="Repeats the gate this cycle re-attempts"></i>
+              ${chain}
+            </div>
+          </div>`;
+      }).join('');
+
+      return `
+        <section class="mt-5 pt-3 border-t border-[#21262d]" aria-label="Corrective fix cycles">
+          <div class="flex items-center gap-1.5 mb-2 font-mono text-[11px] font-bold text-white">
+            <i class="fa-solid fa-wrench text-[#8b949e] text-[9px]" aria-hidden="true"></i>Corrective cycles
+          </div>
+          ${blocks}
+        </section>`;
+    }
+
     // bulletsForRun answers repo -> bullet for the intent behind runId, so the
     // workflow graph's Delivery group can render each bullet's real lifecycle
     // position instead of always showing every stage as not-reached. A run
@@ -1851,7 +1905,7 @@
       if (!lastGraphRender) return;
       clearTimeout(graphResizeTimer);
       graphResizeTimer = setTimeout(() => {
-        renderWorkflowGraph(lastGraphRender.run, lastGraphRender.phases);
+        renderWorkflowGraph(lastGraphRender.run, lastGraphRender.phases, lastGraphRender.fixRetriesLimit);
       }, 120);
     });
 
