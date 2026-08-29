@@ -11,6 +11,7 @@ the full v1/v2 distinction.
 
 | Goal | Document |
 |---|---|
+| What is Sgt, install it, run your first project, day-to-day workflow, command/MCP reference | [`internal/manual/manual.md`](../internal/manual/manual.md) — also reachable via `sgt help [topic]` or `GET /api/manual` |
 | Understand v2's architecture and design rationale | [Architecture overview](architecture.md) |
 | Read the binding product requirements and settled decisions | [PRD: Sgt v2](prd-sgt.md) |
 | Diagnose API/server problems | [Troubleshooting](troubleshooting.md) |
@@ -36,15 +37,14 @@ the full v1/v2 distinction.
 
 ## Not yet written for v2
 
-No v2-native replacement exists yet for: first install/first project setup,
-what-is-Sgt framing, or a skill-sources overview. The v1 docs that
-used to serve that purpose (`what-is-sgt.md`, `getting-started.md`,
+`internal/manual/manual.md` now covers first install/first project setup
+and what-is-Sgt framing (see Start here, above). No v2-native replacement
+exists yet for a skill-sources overview specifically. The v1 docs that used
+to serve these purposes (`what-is-sgt.md`, `getting-started.md`,
 `skills.md`, `using-sgt.md`) described the removed `sgt-*` shell
 toolbelt and tmux-based workers throughout, with no accurate v2 procedure to
 substitute in-place — they have been archived to `docs/archive/v1/` (see
-Historical, below) rather than left live and stale. Until v2-native
-replacements are written, the closest available guidance is `README.md`'s
-Quick start and `AGENTS.md`'s "Two ways in" section.
+Historical, below) rather than left live and stale.
 
 ## Historical
 
