@@ -34,6 +34,7 @@ import (
 	"github.com/callmeradical/sgt/internal/redact"
 	"github.com/callmeradical/sgt/internal/runner"
 	"github.com/callmeradical/sgt/internal/store"
+	"github.com/callmeradical/sgt/internal/wiki"
 )
 
 // stageRunner is the one method executeRun needs from a stage-execution
@@ -595,19 +596,51 @@ func (srv *Server) executeRun(
 // The intent is not touched here. Its status is derived from the bullets by the
 // store, because an intent may span several bullets and several runs, so no one
 // run knows whether the intent is complete.
+//
+// Because this is the single place a run's outcome becomes a fact, it is also
+// where that fact is rendered into the project's OKF wiki (recordWikiEntry),
+// for every terminal status, not only the ones that advance bullets.
 func (srv *Server) recordTerminalRun(runID, status string) {
 	if err := srv.Store.UpdateRunStatus(runID, status); err != nil {
 		log.Printf("sgt: recording terminal status %s for run %s: %v", status, runID, err)
 		return
 	}
-	bulletStatus, advances := bulletStatusForRunOutcome(status)
-	if !advances {
+
+	var reason string
+	if bulletStatus, advances := bulletStatusForRunOutcome(status); advances {
+		reason = srv.blockedReasonForRun(runID, bulletStatus)
+		if err := srv.Store.AdvanceBulletsForRun(runID, bulletStatus, reason); err != nil {
+			log.Printf("sgt: advancing the bullets of run %s to %s: %v", runID, bulletStatus, err)
+		}
+	}
+
+	srv.recordWikiEntry(runID, reason)
+}
+
+// recordWikiEntry renders runID's just-recorded terminal outcome into the
+// project's OKF wiki (internal/wiki), loading the run's bullets after
+// AdvanceBulletsForRun has completed so the page reflects their final
+// status. Called synchronously and inline, not from a goroutine, matching
+// captureArtifacts' own best-effort, synchronous posture: a wiki-write
+// problem is logged here, never surfaced to the caller, and never changes
+// the run's own terminal status, which recordTerminalRun already wrote
+// before this runs.
+func (srv *Server) recordWikiEntry(runID, blockedReason string) {
+	run, err := srv.Store.GetRun(runID)
+	if err != nil {
+		log.Printf("sgt: wiki: loading run %s: %v", runID, err)
 		return
 	}
-	reason := srv.blockedReasonForRun(runID, bulletStatus)
-	if err := srv.Store.AdvanceBulletsForRun(runID, bulletStatus, reason); err != nil {
-		log.Printf("sgt: advancing the bullets of run %s to %s: %v", runID, bulletStatus, err)
+
+	var bullets []store.BulletRecord
+	if run.IntentID != "" {
+		bullets, err = srv.Store.ListBulletsForIntent(run.IntentID)
+		if err != nil {
+			log.Printf("sgt: wiki: loading bullets for run %s: %v", runID, err)
+		}
 	}
+
+	wiki.RecordRun(wiki.Entry{Run: *run, Bullets: bullets, BlockedReason: blockedReason})
 }
 
 // blockedReasonForRun resolves the reason a run's bullets carry when they
