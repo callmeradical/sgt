@@ -1,13 +1,12 @@
-# Product Requirements: `sgt help` Searches a Real Sgt Manual
+# Product Requirements: Sgt Has a Real Manual, Reachable from `sgt help` and the Dashboard
 
 Status: Draft, awaiting explicit human PRD approval
 
 Extends: `docs/prd-sgt.md`, R7 (operator surfaces and delivery)
 
-Sequencing: `docs/prd-v2-native-skills-and-docs.md` (removing stale v1
-command references from `skills/sgt-help/SKILL.md` and other files) should
-be implemented before this PRD, so the skill this PRD extends is already
-accurate when this work starts.
+Sequencing: resolved. `docs/prd-v2-native-skills-and-docs.md` shipped
+first (`docs/schema.md` was its only remaining stale file, fixed in
+commit `6594e31`); `skills/sgt-help/SKILL.md` was already accurate.
 
 ## Summary
 
@@ -24,8 +23,11 @@ separate files (`docs/architecture.md`, `docs/schema.md`,
 `docs/troubleshooting.md`, `AGENTS.md`, `skills/*/SKILL.md`) with no
 single, coherent, start-to-finish manual the way (for example) Omarchy's
 manual (omarchy.org/manual) is one navigable document covering
-installation through advanced configuration. This PRD gives Sgt both: a
-real manual, and a `sgt help` that can actually answer from it.
+installation through advanced configuration. This PRD gives Sgt a real
+manual, reachable three ways from the same source: `sgt help`, the
+existing embedded dashboard (already has a drawer pattern for secondary
+views — Workers, Work analytics — that this fits directly), and the
+agent-facing `skills/sgt-help/SKILL.md`.
 
 ## Problem
 
@@ -84,6 +86,11 @@ to lie about that gap, fails at its basic job.
   either showing the relevant section directly or naming the specific
   section that answers it — instead of always printing the same static
   subcommand list regardless of what was asked.
+- **The manual is also reachable from the dashboard**, following the
+  embedded UI's existing drawer pattern (the same shape as its Workers
+  and Work analytics drawers) rather than introducing a new page-routing
+  concept. A person working in the dashboard should not have to drop to
+  a terminal to read the same manual `sgt help` answers from.
 - **Prefer live, authoritative sources over static prose wherever both
   exist for the same fact.** Where a fact is also directly observable
   from the running system — the actual subcommand list, the actual MCP
@@ -95,10 +102,11 @@ to lie about that gap, fails at its basic job.
   explicit and central, not incidental, and extends it to the manual
   itself wherever a section describes something the running system can
   state more authoritatively than prose can.
-- **`sgt help` and `skills/sgt-help/SKILL.md` share the same manual as
-  their reference**, so the CLI and the agent-facing skill answer
-  consistently rather than maintaining two independently drifting
-  understandings of where each answer lives.
+- **`sgt help`, the dashboard's manual drawer, and `skills/sgt-help/
+  SKILL.md` all share the same manual as their reference**, so the CLI,
+  the UI, and the agent-facing skill answer consistently rather than
+  maintaining three independently drifting understandings of where each
+  answer lives.
 - **Honest gaps, never fabrication.** Where no good answer exists after
   the manual is built, `sgt help` says so and points to the closest
   existing document — mirroring `skills/sgt-help/SKILL.md`'s existing
@@ -112,10 +120,15 @@ to lie about that gap, fails at its basic job.
   day-to-day workflow through troubleshooting), not maximal coverage —
   closer to Omarchy's own "zero bloat here: just everything I use" than
   to documenting every edge case.
-- **Rewriting `skills/sgt-help/SKILL.md`'s stale v1 command references.**
-  That is `docs/prd-v2-native-skills-and-docs.md`'s job. This PRD's
-  implementation must not leave the CLI and the skill contradicting each
-  other, but fixing that pre-existing staleness is the other PRD's scope.
+- **Rewriting `skills/sgt-help/SKILL.md`'s command references.** Already
+  resolved: `docs/prd-v2-native-skills-and-docs.md` shipped first per the
+  agreed sequencing, and its investigation found `skills/sgt-help/
+  SKILL.md` already accurate — the one remaining stale file was
+  `docs/schema.md`, fixed separately. Nothing left for this PRD to avoid
+  touching here.
+- **A new full-page dashboard view, or any new page-routing mechanism.**
+  The manual drawer reuses the existing drawer pattern exactly — this PRD
+  does not add a second way to navigate the dashboard.
 - **A fuzzy/semantic search engine, embeddings, or a vector index.** Sgt's
   documentation corpus is small; exact and keyword matching over real,
   current content (including the manual once it exists) is sufficient at
