@@ -20,8 +20,8 @@ var raw string
 
 // Section is one ##-delimited section of the manual, in document order.
 type Section struct {
-	Title string
-	Body  string
+	Title string `json:"title"`
+	Body  string `json:"body"`
 }
 
 // commandEntry is one row of the command reference. commandTable is a
