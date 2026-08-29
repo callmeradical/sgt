@@ -51,13 +51,18 @@ the profile ownership/mode rules and versioned consumer schema.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `name` | string | yes | Short identifier for this repo. Used in output and context blocks. For `sgt-graphify`, it must match `[A-Za-z0-9._-]+`, cannot contain spaces, and cannot be `.` or `..`, so Sgt can safely prefix merged source paths with it. |
+| `name` | string | yes | Short identifier for this repo. Used in output and context blocks. Not currently validated against any character-class pattern in `internal/config` or `internal/graphify` — it is used as a project-scoped repo identifier (a map key in `config.Project.Repos`) and, during a graph build, joined directly into a scratch directory path (`internal/graphify/graphify.go`, `filepath.Join(scratch, name)`) with no character check applied there today. |
 | `path` | string | yes | Path on disk. Absolute (`/...`) and home-relative (`~/...`) paths pass through. Relative paths are resolved from `dev_root` in `config.yaml`. |
-| `url` | string | no | Git remote URL. Used by `sgt-sync` to clone if path doesn't exist. |
 | `group` | string | no | Group name this repo belongs to. Must match a key in `groups`. |
 | `role` | string | no | Human description of this repo's role in the project. Sgt includes it in worker context and review routing. |
 | `agent_instructions` | string | no | Instructions injected into agent context when working in this repo. Overrides group-level instructions for the same repo and participates in merged review-routing context. |
 | `identity` | string | no | GitHub CLI user for `gh auth switch` before dispatching this repo. Overrides project-level `identity` and `config.default_identity`. Resolution order: `repo.identity` → `project.identity` → `config.default_identity` → no-op. |
+
+`config.Repo` (`internal/config/config.go`) has no `url`/`URL` field. There is
+no clone-if-missing behavior for a repo's `path`: `internal/dag/engine.go`'s
+`prepareWorktree` refuses to dispatch agents into a repo whose `path` is not
+already a git repository (a missing path fails the same check) rather than
+cloning one into place.
 
 ---
 
@@ -76,9 +81,9 @@ Each key under `groups` is a group name. Value is a map with:
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `output` | string | yes | Published output directory for the merged project graph. A trailing `/` is allowed. If this path is a directory symlink, `sgt-graphify` preserves the symlink and publishes into its target. Sgt only replaces the published graph after a complete run and preserves existing `wiki/` and `memory/` directories. |
+| `output` | string | yes | Published output directory for the merged project graph. A trailing `/` is allowed. `internal/graphify/graphify.go`'s `BuildProjectGraph` builds the graph in a scratch directory first and only touches `output` once the merged graph is verified non-empty: any existing directory at `output` is moved aside to a timestamped backup, the scratch directory is renamed into `output`'s place, and the backup is removed once that rename succeeds (or restored on failure). This is a plain directory replace — it does not special-case a directory symlink at `output`, and it does not preserve any existing `wiki/` or `memory/` subdirectories underneath it. |
 | `include_groups` | list | no | Only graph repos belonging to these groups. Default: all repos. |
-| `exclude_patterns` | list | no | Glob patterns to exclude from graphify traversal (e.g., `**/node_modules/**`). Sgt applies them before `graphify extract`, so they keep working with current Graphify CLIs that do not accept exclude flags. If `graphify.output` lives inside a source repo, Sgt stages extraction outside that repo and excludes the configured output path so published graph artifacts are never re-ingested as source. |
+| `exclude_patterns` | list | no | Glob patterns excluding files from the published graph (gitignore-style: `*` matches within one path segment, `**` matches across any number of segments), matched against each node's, link's, and hyperedge's `source_file`. Applied by `internal/graphify/graphify.go`'s `filterGraphFile` to the merged `graph.json`, after the per-repo graphs are merged and before `output` is published — not before extraction, and not via flags to the external `graphify` binary that `BuildProjectGraph` still shells out to for `extract`/`merge-graphs` (decision D9). |
 
 ---
 
@@ -101,10 +106,14 @@ Agent instruction prose is concatenated in this order:
 `sgt-context` emits every nonempty layer in one block. Later layers appear later
 in the block; when directives conflict, the later repository-specific directive
 is the intended authority. Sgt does not structurally merge or deduplicate
-free-form instruction prose, but `sgt-dispatch` still classifies review routing
-from a single normalized in-memory context built from the mission, repo role,
-repo group name, repo group description, and merged default/group/repository
-instructions.
+free-form instruction prose. The `review` stage does not classify or route
+using any of these layers: `internal/dag/engine.go`'s `reviewPrompt` builds
+the review agent's prompt from only the diff, the stage, and the repo name,
+deliberately excluding role, group, and instruction context so an independent
+review cannot see the implementing agent's own reasoning. When a review phase
+reports an `error`-severity finding, `internal/ui/dispatch.go`'s
+`blockedReasonForRun` reads it back from that phase's envelope to explain why
+the run's bullet is blocked.
 
 ---
 
