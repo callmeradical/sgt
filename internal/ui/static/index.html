@@ -22,6 +22,24 @@
         transition-duration: 0.01ms !important;
       }
     }
+    /* Below lg, #master-rail is normally `hidden`. toggleMobileRail() adds this
+       class to show it as a full-screen overlay over the canvas instead of
+       pushing it — the id selector's specificity beats the plain `.hidden`
+       utility class regardless of source order. Scoped to below lg so this
+       never activates at lg and above, where the rail keeps its always-visible
+       desktop layout untouched. */
+    @media (max-width: 1023.98px) {
+      #master-rail.mobile-rail-open {
+        display: flex;
+        position: fixed;
+        top: 2.75rem;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 30;
+        width: 100%;
+      }
+    }
   </style>
 </head>
 <body class="bg-[#0b0e14] text-[#c9d1d9] h-screen overflow-hidden flex flex-col antialiased selection:bg-emerald-500/30 text-xs">
@@ -57,13 +75,25 @@
     <!-- Dispatch Stage CTA & Global Actions -->
     <div class="flex items-center space-x-3">
       <div class="flex items-center space-x-2 text-[#8b949e] text-xs">
-        <button type="button" id="btn-open-manual" onclick="openManualDrawer(this)" aria-label="Manual" title="Sgt manual" class="min-w-[44px] min-h-[44px] flex items-center justify-center hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14] rounded"><i class="fa-solid fa-book"></i></button>
-        <button type="button" id="btn-open-analytics" onclick="openAnalyticsDrawer(this)" aria-label="Work analytics" title="Work analytics" class="min-w-[44px] min-h-[44px] flex items-center justify-center hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14] rounded"><i class="fa-solid fa-chart-line"></i></button>
-        <button type="button" id="btn-open-workers" onclick="openWorkersDrawer(this)" aria-label="Worktrees" title="Allocated worktrees (includes retained, non-running ones)" class="relative min-w-[44px] min-h-[44px] flex items-center justify-center hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14] rounded">
+        <!-- Below lg, #master-rail (the run list) is otherwise unreachable — see
+             design.md's "Mobile rail toggle". Matches #master-rail's own
+             lg breakpoint so the two states are always consistent: never
+             hidden with no way to reveal it, never a toggle with nothing to
+             toggle. -->
+        <button type="button" id="btn-toggle-rail" onclick="toggleMobileRail()"
+          aria-label="Pipeline runs" aria-expanded="false" aria-controls="master-rail"
+          title="Pipeline runs"
+          class="lg:hidden min-w-[44px] min-h-[44px] flex items-center justify-center hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14] rounded">
+          <i class="fa-solid fa-bars" aria-hidden="true"></i>
+        </button>
+        <button type="button" id="btn-open-manual" onclick="openManualDrawer(this)" aria-label="Manual" title="Sgt manual" class="min-w-[44px] min-h-[44px] flex items-center justify-center gap-1 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14] rounded"><i class="fa-solid fa-book"></i><span class="lg:hidden text-[10px] font-bold">Manual</span></button>
+        <button type="button" id="btn-open-analytics" onclick="openAnalyticsDrawer(this)" aria-label="Work analytics" title="Work analytics" class="min-w-[44px] min-h-[44px] flex items-center justify-center gap-1 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14] rounded"><i class="fa-solid fa-chart-line"></i><span class="lg:hidden text-[10px] font-bold">Work analytics</span></button>
+        <button type="button" id="btn-open-workers" onclick="openWorkersDrawer(this)" aria-label="Worktrees" title="Allocated worktrees (includes retained, non-running ones)" class="relative min-w-[44px] min-h-[44px] flex items-center justify-center gap-1 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14] rounded">
           <i class="fa-solid fa-folder-tree"></i>
+          <span class="lg:hidden text-[10px] font-bold">Worktrees</span>
           <span id="stat-workers-active" class="absolute top-1 right-1.5 min-w-[13px] h-[13px] px-0.5 flex items-center justify-center rounded-full bg-[#1f6feb] text-white text-[9px] font-bold leading-none">0</span>
         </button>
-        <button onclick="fetchRuns(); fetchFleet();" aria-label="Refresh state" title="Refresh state" class="min-w-[44px] min-h-[44px] flex items-center justify-center hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14] rounded"><i class="fa-solid fa-rotate-right"></i></button>
+        <button onclick="fetchRuns(); fetchFleet();" aria-label="Refresh state" title="Refresh state" class="min-w-[44px] min-h-[44px] flex items-center justify-center gap-1 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14] rounded"><i class="fa-solid fa-rotate-right"></i><span class="lg:hidden text-[10px] font-bold">Refresh</span></button>
       </div>
     </div>
   </header>
@@ -141,8 +171,9 @@
               Activity <span id="activity-count" class="font-mono text-[#8b949e]">0</span>
             </button>
             <button id="btn-stop-run" onclick="cancelActiveRun()" aria-label="Stop run" title="Stop run"
-              class="min-w-[44px] min-h-[44px] flex items-center justify-center rounded text-[#8b949e] hover:text-rose-400 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14]">
+              class="min-w-[44px] min-h-[44px] flex items-center justify-center gap-1 rounded text-[#8b949e] hover:text-rose-400 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14]">
               <i class="fa-regular fa-circle-stop text-sm" aria-hidden="true"></i>
+              <span class="lg:hidden text-[10px] font-bold">Stop run</span>
             </button>
           </div>
         </div>
@@ -312,6 +343,28 @@
         lastFocusedBeforeModal.focus();
       }
       lastFocusedBeforeModal = null;
+    }
+
+    // Below lg, #master-rail is the only way to reach the run list (see
+    // design.md's "Mobile rail toggle"). toggleMobileRail() flips the CSS
+    // class that turns it into a full-screen overlay over the canvas (the
+    // #master-rail.mobile-rail-open rule in <style>, scoped to below lg so
+    // it never activates at lg and above). closeMobileRail() is also called
+    // after selecting a run from the rail — a run selection is the rail's
+    // whole purpose, so staying open afterward would just be another modal
+    // to dismiss.
+    function toggleMobileRail() {
+      const rail = document.getElementById('master-rail');
+      const btn = document.getElementById('btn-toggle-rail');
+      const opening = !rail.classList.contains('mobile-rail-open');
+      rail.classList.toggle('mobile-rail-open', opening);
+      if (btn) btn.setAttribute('aria-expanded', String(opening));
+    }
+
+    function closeMobileRail() {
+      document.getElementById('master-rail').classList.remove('mobile-rail-open');
+      const btn = document.getElementById('btn-toggle-rail');
+      if (btn) btn.setAttribute('aria-expanded', 'false');
     }
 
     function setConnectionError(isError) {
@@ -568,7 +621,7 @@
           if (!btn) {
             btn = document.createElement('button');
             btn.setAttribute('data-run-id', r.id);
-            btn.onclick = () => selectRun(r.id);
+            btn.onclick = () => { selectRun(r.id); closeMobileRail(); };
             listContainer.appendChild(btn);
           }
 
