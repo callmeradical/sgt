@@ -1,12 +1,16 @@
 package ui
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -341,4 +345,94 @@ func TestReclaimFleetDirForceOverridesTheRunningRefusal(t *testing.T) {
 		t.Errorf("removed = false, want true when force is set")
 	}
 	mustNotExist(t, dir)
+}
+
+// Review 24's caveat: an eligible run whose fleet directory no longer exists
+// (already cleaned, or never created) must be skipped before reclaimFleetDir
+// is ever called for it — not merely tolerated because os.RemoveAll on a
+// nonexistent path also happens to succeed. Asserting only that the run
+// survives and no panic occurs is not enough: os.RemoveAll's silent success
+// on a missing path makes that assertion pass even with the os.Stat skip
+// removed entirely, so this test also captures the log output and asserts
+// no "reclaimed" line names the directory-less run — the only way to prove
+// the skip actually happened rather than merely produced no visible harm.
+// A run alongside it with a real directory proves the loop keeps working
+// correctly for every other eligible run rather than aborting on the
+// missing one.
+func TestReclaimEligibleFleetDirsSkipsARunWithNoFleetDirectory(t *testing.T) {
+	srv, st, fleetRoot, dbPath := cleanupFixture(t)
+
+	// Eligible, but its fleet directory was never created (or was already
+	// removed by an earlier pass) — deliberately no os.MkdirAll here.
+	if err := st.CreateRun(&store.RunRecord{ID: "old-no-dir", Project: "p", TaskID: "old-no-dir", Status: "passed"}); err != nil {
+		t.Fatal(err)
+	}
+	backdateRun(t, dbPath, "old-no-dir", time.Now().UTC().Add(-30*24*time.Hour))
+
+	// A second eligible run with a real directory, so the test also proves
+	// the missing-directory run does not abort the rest of the pass.
+	if err := st.CreateRun(&store.RunRecord{ID: "old-with-dir", Project: "p", TaskID: "old-with-dir", Status: "passed"}); err != nil {
+		t.Fatal(err)
+	}
+	backdateRun(t, dbPath, "old-with-dir", time.Now().UTC().Add(-30*24*time.Hour))
+	fleetDir := filepath.Join(fleetRoot, "old-with-dir")
+	if err := os.MkdirAll(fleetDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	var logBuf bytes.Buffer
+	origOutput := log.Writer()
+	log.SetOutput(&logBuf)
+	defer log.SetOutput(origOutput)
+
+	srv.fleet.reclaimEligibleFleetDirs() // must not panic or error for the missing directory
+
+	if _, err := st.GetRun("old-no-dir"); err != nil {
+		t.Fatalf("run with no fleet directory vanished from the store after reclaim: %v", err)
+	}
+	mustNotExist(t, fleetDir)
+
+	logged := logBuf.String()
+	if strings.Contains(logged, "old-no-dir") {
+		t.Errorf("reclaimFleetDir was invoked for a run with no fleet directory (found in log output), want it skipped before ever being called:\n%s", logged)
+	}
+	if !strings.Contains(logged, "old-with-dir") {
+		t.Errorf("expected the real-directory run to still be reclaimed and logged:\n%s", logged)
+	}
+}
+
+// fakeFleetRunSourceThatFails implements fleetRunSource with
+// RunsEligibleForCleanup always failing, so a test can exercise
+// reclaimEligibleFleetDirs' query-failure path without a real database error.
+type fakeFleetRunSourceThatFails struct{}
+
+func (fakeFleetRunSourceThatFails) ListRecentRuns(limit int) ([]store.RunRecord, error) {
+	return nil, nil
+}
+func (fakeFleetRunSourceThatFails) RunsEligibleForCleanup(cutoff time.Time) ([]store.RunRecord, error) {
+	return nil, fmt.Errorf("simulated store failure")
+}
+func (fakeFleetRunSourceThatFails) ListBulletsForIntent(intentID string) ([]store.BulletRecord, error) {
+	return nil, nil
+}
+
+// Review 24's other caveat: a store-query failure must be visibly logged
+// and return — never silently swallowed, and never panic or crash the
+// server — so an operator watching logs can tell a tick failed rather than
+// concluding (wrongly) that there was simply nothing to reclaim. Asserting
+// only "did not panic" is not enough: ignoring the error entirely and
+// falling through to an empty loop also does not panic. This test captures
+// the log output and asserts the failure is actually named in it.
+func TestReclaimEligibleFleetDirsSurvivesAStoreQueryFailure(t *testing.T) {
+	var logBuf bytes.Buffer
+	origOutput := log.Writer()
+	log.SetOutput(&logBuf)
+	defer log.SetOutput(origOutput)
+
+	fc := newFleetCleaner(fakeFleetRunSourceThatFails{})
+	fc.reclaimEligibleFleetDirs() // must return, not panic, when the query itself fails
+
+	if !strings.Contains(logBuf.String(), "simulated store failure") {
+		t.Errorf("expected the query failure to be logged, got:\n%s", logBuf.String())
+	}
 }
