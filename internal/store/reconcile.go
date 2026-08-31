@@ -65,21 +65,23 @@ func (s *Store) ReconcileOrphanedRuns() (ReconcileResult, error) {
 	}
 
 	var result ReconcileResult
+	var orphanIDs []string
 
 	for _, run := range orphans {
+		orphanIDs = append(orphanIDs, run.ID)
 		// Move the run itself.
 		if err := s.reconcileRun(run.ID); err != nil {
 			return result, err
 		}
 		result.RunsReconciled++
-
-		// Move every running phase that belongs to this run.
-		n, err := s.reconcileRunningPhasesOfRun(run.ID)
-		if err != nil {
-			return result, err
-		}
-		result.PhasesReconciled += n
 	}
+
+	// Move all running phases that belong to these runs in a single batch.
+	n, err := s.reconcileRunningPhases(orphanIDs)
+	if err != nil {
+		return result, err
+	}
+	result.PhasesReconciled += n
 
 	return result, nil
 }
@@ -105,53 +107,85 @@ func (s *Store) reconcileRun(runID string) error {
 	})
 }
 
-// reconcileRunningPhasesOfRun moves every running phase of runID to interrupted,
+// reconcileRunningPhases moves every running phase of the given runIDs to interrupted,
 // appends a change for each, and returns how many it moved.
 //
 // A phase stuck at running is neither passed nor re-run on resume — resume skips
 // only phases holding a passed record. Leaving it would silently drop work.
-func (s *Store) reconcileRunningPhasesOfRun(runID string) (int, error) {
-	// Read the running phases before updating, so we can append individual
-	// change records with their IDs. A bulk UPDATE with no read-back would
-	// prevent per-phase change records, and a client following the sequence
-	// would not know which phase moved.
-	phRows, err := s.db.Query(
-		`SELECT id FROM phases WHERE run_id = ? AND status = 'running' ORDER BY created_at ASC`,
-		runID,
-	)
-	if err != nil {
-		return 0, err
-	}
-	var phaseIDs []string
-	for phRows.Next() {
-		var id string
-		if err := phRows.Scan(&id); err != nil {
-			phRows.Close()
-			return 0, err
-		}
-		phaseIDs = append(phaseIDs, id)
-	}
-	phRows.Close()
-	if err := phRows.Err(); err != nil {
-		return 0, err
+func (s *Store) reconcileRunningPhases(runIDs []string) (int, error) {
+	if len(runIDs) == 0 {
+		return 0, nil
 	}
 
-	for _, phaseID := range phaseIDs {
+	type phaseToReconcile struct {
+		id    string
+		runID string
+	}
+
+	var phases []phaseToReconcile
+	var totalReconciled int
+
+	// Process runIDs in chunks to avoid SQLite bind parameter limits
+	chunkSize := 500
+	for i := 0; i < len(runIDs); i += chunkSize {
+		end := i + chunkSize
+		if end > len(runIDs) {
+			end = len(runIDs)
+		}
+		chunk := runIDs[i:end]
+
+		// Build the IN clause with placeholders
+		placeholders := ""
+		args := make([]interface{}, len(chunk))
+		for j, id := range chunk {
+			if j > 0 {
+				placeholders += ", "
+			}
+			placeholders += "?"
+			args[j] = id
+		}
+
+		// Read the running phases before updating, so we can append individual
+		// change records with their IDs. A bulk UPDATE with no read-back would
+		// prevent per-phase change records, and a client following the sequence
+		// would not know which phase moved.
+		query := `SELECT id, run_id FROM phases WHERE status = 'running' AND run_id IN (` + placeholders + `) ORDER BY created_at ASC`
+		phRows, err := s.db.Query(query, args...)
+		if err != nil {
+			return totalReconciled, err
+		}
+
+		for phRows.Next() {
+			var p phaseToReconcile
+			if err := phRows.Scan(&p.id, &p.runID); err != nil {
+				phRows.Close()
+				return totalReconciled, err
+			}
+			phases = append(phases, p)
+		}
+		phRows.Close()
+		if err := phRows.Err(); err != nil {
+			return totalReconciled, err
+		}
+	}
+
+	for _, p := range phases {
 		if _, err := s.db.Exec(
 			`UPDATE phases SET status = 'interrupted' WHERE id = ? AND status = 'running'`,
-			phaseID,
+			p.id,
 		); err != nil {
-			return len(phaseIDs), err
+			return totalReconciled, err
 		}
-		if err := s.recordTransition(ChannelPhase, phaseID, map[string]interface{}{
-			"id":         phaseID,
-			"run_id":     runID,
+		if err := s.recordTransition(ChannelPhase, p.id, map[string]interface{}{
+			"id":         p.id,
+			"run_id":     p.runID,
 			"status":     "interrupted",
 			"reconciled": true,
 		}); err != nil {
-			return len(phaseIDs), err
+			return totalReconciled, err
 		}
+		totalReconciled++
 	}
 
-	return len(phaseIDs), nil
+	return totalReconciled, nil
 }
