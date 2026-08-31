@@ -537,7 +537,7 @@ func (s *Store) hasTable(table string) (bool, error) {
 }
 
 func (s *Store) hasColumn(table, column string) (bool, error) {
-	rows, err := s.db.Query(fmt.Sprintf("PRAGMA table_info(%s)", table))
+	rows, err := s.db.Query("SELECT * FROM pragma_table_info(?)", table)
 	if err != nil {
 		return false, err
 	}
