@@ -694,6 +694,13 @@ func TestDeriveChangeIDIsKebabCaseAndCapped(t *testing.T) {
 		{"keeps digits", "bump to v2 API", "bump-to-v2-api"},
 		{"newlines are separators", "first line\nsecond line", "first-line-second-line"},
 		{"no alphanumerics yields nothing", "!!! ???", ""},
+		{"long string cut at word boundary", "this is a very long string that will be cut at a word boundary because it is too long", "this-is-a-very-long-string-that-will-be-cut-at"},
+		{"long string ending exactly at hyphen", "this-is-a-very-long-string-that-will-be-cut-at-a-word-boundary", "this-is-a-very-long-string-that-will-be-cut-at"},
+		{"long string cut mid-word", "thisisaverylongstringthatwillbecutatawordboundarybecauseitistoolongwithnospaces", "thisisaverylongstringthatwillbecutatawordboundar"},
+		{"48 chars long", "012345678901234567890123456789012345678901234567", "012345678901234567890123456789012345678901234567"},
+		{"49 chars long cut mid-word", "012345678901234567890123456789012345678901234567a", "012345678901234567890123456789012345678901234567"},
+		{"49 chars long cut at hyphen", "012345678901234567890123456789012345678901234567-a", "012345678901234567890123456789012345678901234567"},
+		{"50 chars long cut at hyphen", "012345678901234567890123456789012345678901234567-ab", "012345678901234567890123456789012345678901234567"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
