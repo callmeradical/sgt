@@ -85,7 +85,13 @@ type PhaseRecord struct {
 	// Attempt is the 1-based sequence number for this phase invocation. The first
 	// attempt is 1; each retry increments by 1 with no gaps. A value of 0 means
 	// the record predates this field and the attempt count is unknown.
-	Attempt   int       `json:"attempt,omitempty"`
+	Attempt int `json:"attempt,omitempty"`
+	// FixCycle is which corrective cycle this phase belongs to
+	// (a-failed-gate-is-corrected-in-place): 0 is the run's own original
+	// attempt, 1 is the first corrective cycle, 2 the second, and so on. It is
+	// orthogonal to Attempt, which counts one phase's own retries within a
+	// single turn — FixCycle instead counts whole gate-fix-retest cycles.
+	FixCycle  int       `json:"fix_cycle,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -306,6 +312,7 @@ func (s *Store) migrate() error {
 		duration_ms INTEGER,
 		payload TEXT,
 		attempt INTEGER NOT NULL DEFAULT 0,
+		fix_cycle INTEGER NOT NULL DEFAULT 0,
 		created_at DATETIME NOT NULL,
 		FOREIGN KEY (run_id) REFERENCES runs(id)
 	);
@@ -435,6 +442,10 @@ func (s *Store) migrateAddColumns() error {
 		{"intents", "type", "ALTER TABLE intents ADD COLUMN type TEXT NOT NULL DEFAULT ''"},
 		// attempt is 1-based; 0 means "pre-dates this field" (unknown attempt count).
 		{"phases", "attempt", "ALTER TABLE phases ADD COLUMN attempt INTEGER NOT NULL DEFAULT 0"},
+		// fix_cycle is which corrective cycle a phase belongs to
+		// (a-failed-gate-is-corrected-in-place); existing rows predate the
+		// feature and are all the run's own original attempt, cycle 0.
+		{"phases", "fix_cycle", "ALTER TABLE phases ADD COLUMN fix_cycle INTEGER NOT NULL DEFAULT 0"},
 
 		// Envelope metadata added by R5.1/R5.2. DEFAULT '' so existing rows read
 		// back as empty rather than NULL, making the zero value the "no type
@@ -817,9 +828,9 @@ func (s *Store) RecordPhase(p *PhaseRecord) error {
 		payloadStr = string(p.Payload)
 	}
 	_, err := s.db.Exec(
-		`INSERT OR REPLACE INTO phases (id, run_id, repo, name, kind, status, error, duration_ms, payload, attempt, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		p.ID, p.RunID, p.Repo, p.Name, p.Kind, p.Status, p.Error, p.DurationMs, payloadStr, p.Attempt, p.CreatedAt,
+		`INSERT OR REPLACE INTO phases (id, run_id, repo, name, kind, status, error, duration_ms, payload, attempt, fix_cycle, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		p.ID, p.RunID, p.Repo, p.Name, p.Kind, p.Status, p.Error, p.DurationMs, payloadStr, p.Attempt, p.FixCycle, p.CreatedAt,
 	)
 	if err != nil {
 		return err
@@ -1179,7 +1190,7 @@ func (s *Store) GetRun(runID string) (*RunRecord, error) {
 
 func (s *Store) ListPhasesForRun(runID string) ([]PhaseRecord, error) {
 	rows, err := s.db.Query(
-		`SELECT id, run_id, repo, name, kind, status, error, duration_ms, payload, attempt, created_at FROM phases WHERE run_id = ? ORDER BY created_at ASC`,
+		`SELECT id, run_id, repo, name, kind, status, error, duration_ms, payload, attempt, fix_cycle, created_at FROM phases WHERE run_id = ? ORDER BY created_at ASC`,
 		runID,
 	)
 	if err != nil {
@@ -1192,7 +1203,7 @@ func (s *Store) ListPhasesForRun(runID string) ([]PhaseRecord, error) {
 		var p PhaseRecord
 		var payloadStr sql.NullString
 		var errStr sql.NullString
-		if err := rows.Scan(&p.ID, &p.RunID, &p.Repo, &p.Name, &p.Kind, &p.Status, &errStr, &p.DurationMs, &payloadStr, &p.Attempt, &p.CreatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.RunID, &p.Repo, &p.Name, &p.Kind, &p.Status, &errStr, &p.DurationMs, &payloadStr, &p.Attempt, &p.FixCycle, &p.CreatedAt); err != nil {
 			return nil, err
 		}
 		if errStr.Valid {

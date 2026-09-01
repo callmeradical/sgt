@@ -151,6 +151,7 @@ func (srv *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/clean-worktrees", srv.fleet.handleCleanWorktrees)
 	mux.HandleFunc("/api/run-cancel", srv.handleRunCancel)
 	mux.HandleFunc("/api/run-resume", srv.handleRunResume)
+	mux.HandleFunc("/api/run-fix", srv.handleRunFix)
 	mux.HandleFunc("/api/run-delete", srv.handleRunDelete)
 	mux.HandleFunc("/api/delivery-history", srv.handleDeliveryHistory)
 	mux.HandleFunc("/api/delivery-quarantine", srv.handleDeliveryQuarantine)
@@ -379,11 +380,32 @@ func (srv *Server) handleRunDetails(w http.ResponseWriter, r *http.Request) {
 		skips = []string{}
 	}
 
+	// fixRetriesLimit is the "M" in a corrective cycle's "Attempt N of M"
+	// label (a-failed-gate-is-corrected-in-place): the configured bound on
+	// corrective cycles for the repo this run's phases belong to. Best
+	// effort — a run whose project no longer loads, or one with no phases
+	// yet, still serves its other fields; it just falls back to the
+	// built-in default rather than failing the whole request.
+	fixRetriesLimit := 5
+	if run, err := srv.Store.GetRun(runID); err == nil && run != nil {
+		if proj, err := config.LoadProject(run.Project); err == nil {
+			repoName := ""
+			for _, p := range phases {
+				if p.Repo != "" {
+					repoName = p.Repo
+					break
+				}
+			}
+			fixRetriesLimit = proj.ResolvedFixRetries(repoName)
+		}
+	}
+
 	resp := map[string]interface{}{
-		"run_id":       runID,
-		"phases":       phases,
-		"envelopes":    envelopes,
-		"resume_skips": skips,
+		"run_id":            runID,
+		"phases":            phases,
+		"envelopes":         envelopes,
+		"resume_skips":      skips,
+		"fix_retries_limit": fixRetriesLimit,
 	}
 
 	writeJSON(w, http.StatusOK, resp)
