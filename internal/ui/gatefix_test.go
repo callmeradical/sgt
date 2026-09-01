@@ -447,3 +447,47 @@ func srvBlockedReason(t *testing.T, mux http.Handler, st *store.Store, intentID 
 	}
 	return ""
 }
+
+// lastFailedPhase must stay scoped to the repo a corrective loop is bound
+// to: runFixCycles fixes its worktree/RepoName once, for the loop's entire
+// lifetime (Review 043), so every cycle re-reading "the current failure"
+// with no repo filter could drift the loop's attention to a different
+// repo's more-recently-failed phase while still executing inside the first
+// repo's worktree. Passing a non-empty repoName must never return a more
+// recent failure belonging to a different repo.
+func TestLastFailedPhaseStaysScopedToTheGivenRepo(t *testing.T) {
+	st, err := store.Open(filepath.Join(t.TempDir(), "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	srv := NewServer(st, 0)
+
+	if err := st.CreateRun(&store.RunRecord{ID: "run-multi", Project: "p", TaskID: "run-multi", Status: "failed"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.RecordPhase(&store.PhaseRecord{ID: "p-a", RunID: "run-multi", Repo: "repo-a", Name: "test", Kind: "code", Status: "failed"}); err != nil {
+		t.Fatal(err)
+	}
+	// repo-b's failure is recorded after repo-a's, so an unscoped scan would
+	// report it as "the" most recent failure.
+	if err := st.RecordPhase(&store.PhaseRecord{ID: "p-b", RunID: "run-multi", Repo: "repo-b", Name: "test", Kind: "code", Status: "failed"}); err != nil {
+		t.Fatal(err)
+	}
+
+	got, ok := srv.lastFailedPhase("run-multi", "repo-a")
+	if !ok {
+		t.Fatal("expected a failure scoped to repo-a")
+	}
+	if got.Repo != "repo-a" {
+		t.Errorf("lastFailedPhase(runID, %q) returned repo %q, want repo-a untouched by repo-b's later failure", "repo-a", got.Repo)
+	}
+
+	// The empty-repoName form (used once, by handleRunFix, to discover which
+	// repo to bind a new corrective loop to) is unaffected: it still finds
+	// the true most recent failure across every repo.
+	unscoped, ok := srv.lastFailedPhase("run-multi", "")
+	if !ok || unscoped.Repo != "repo-b" {
+		t.Errorf("lastFailedPhase(runID, \"\") = %+v, want repo-b (the true most recent failure)", unscoped)
+	}
+}
