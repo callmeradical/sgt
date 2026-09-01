@@ -840,3 +840,30 @@ func TestRecordEnvelopeRedactsSummaryDataAndArtifacts(t *testing.T) {
 		t.Errorf("EnvelopeRecord.Artifacts unexpected: %+v", e.Artifacts)
 	}
 }
+
+// TestHasColumnRejectsSQLInjection guards against a regression of a real
+// vulnerability: hasColumn used to build its PRAGMA query with fmt.Sprintf,
+// concatenating the table argument directly into the SQL string. A table
+// name carrying a statement terminator could execute arbitrary SQL.
+func TestHasColumnRejectsSQLInjection(t *testing.T) {
+	tempDir := t.TempDir()
+	st, err := Open(filepath.Join(tempDir, "test.db"))
+	if err != nil {
+		t.Fatalf("failed to open store: %v", err)
+	}
+	defer st.Close()
+
+	malicious := "runs); DROP TABLE runs;--"
+	if has, err := st.hasColumn(malicious, "id"); err != nil {
+		t.Fatalf("hasColumn with a malicious table name errored instead of safely reporting not-found: %v", err)
+	} else if has {
+		t.Errorf("hasColumn reported a column found for a nonexistent table %q", malicious)
+	}
+
+	if has, err := st.hasColumn("runs", "id"); err != nil || !has {
+		t.Fatalf("runs.id should still exist after the injection attempt; has=%v err=%v", has, err)
+	}
+	if _, err := st.ListRunsForProject("test-proj", 10); err != nil {
+		t.Fatalf("runs table should still be queryable after the injection attempt: %v", err)
+	}
+}
