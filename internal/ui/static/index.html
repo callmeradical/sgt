@@ -57,6 +57,7 @@
     <!-- Dispatch Stage CTA & Global Actions -->
     <div class="flex items-center space-x-3">
       <div class="flex items-center space-x-2 text-[#8b949e] text-xs">
+        <button type="button" id="btn-open-manual" onclick="openManualDrawer(this)" aria-label="Manual" title="Sgt manual" class="min-w-[44px] min-h-[44px] flex items-center justify-center hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14] rounded"><i class="fa-solid fa-book"></i></button>
         <button type="button" id="btn-open-analytics" onclick="openAnalyticsDrawer(this)" aria-label="Work analytics" title="Work analytics" class="min-w-[44px] min-h-[44px] flex items-center justify-center hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14] rounded"><i class="fa-solid fa-chart-line"></i></button>
         <button type="button" id="btn-open-workers" onclick="openWorkersDrawer(this)" aria-label="Worktrees" title="Allocated worktrees (includes retained, non-running ones)" class="relative min-w-[44px] min-h-[44px] flex items-center justify-center hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14] rounded">
           <i class="fa-solid fa-folder-tree"></i>
@@ -2223,6 +2224,49 @@
         openDrawer('Work analytics', 'analytics', analyticsHTML(data), opener);
       } catch (err) {
         alert("Failed loading work analytics: " + err);
+      }
+    }
+
+    // ---- Manual drawer ---------------------------------------------------
+    // Same fetch-then-openDrawer shape as openWorkersDrawer/openAnalyticsDrawer.
+    // manualSlug and manualHTML are pure (data in, HTML string out) so they
+    // are unit-tested by executing them under real node, the same approach
+    // analyticsHTML/laneHTML use. Body text is rendered via escapeHTML inside
+    // a <pre> block — raw markdown as readable preformatted text, no
+    // markdown-to-HTML conversion, no new JS dependency.
+    function manualSlug(title) {
+      return 'manual-' + String(title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-+|-+$)/g, '');
+    }
+
+    function manualHTML(data) {
+      const sections = (data && data.sections) || [];
+      if (sections.length === 0) {
+        return '<div class="text-[#8b949e]">The manual has no sections.</div>';
+      }
+      const toc = sections.map(s => `
+        <a href="#${manualSlug(s.title)}" class="block text-[#58a6ff] hover:underline text-[10px]">${escapeHTML(s.title)}</a>`).join('');
+      const body = sections.map(s => `
+        <div id="${manualSlug(s.title)}" class="space-y-1">
+          <div class="text-xs font-bold text-white">${escapeHTML(s.title)}</div>
+          <pre class="whitespace-pre-wrap text-[10px] text-slate-300 font-mono">${escapeHTML(s.body)}</pre>
+        </div>`).join('');
+      return `
+        <div class="space-y-3">
+          <div class="space-y-1">
+            <div class="text-[9px] uppercase font-bold text-[#8b949e] tracking-wider">Table of contents</div>
+            <div class="space-y-0.5">${toc}</div>
+          </div>
+          <div class="space-y-3">${body}</div>
+        </div>`;
+    }
+
+    async function openManualDrawer(opener) {
+      try {
+        const res = await fetch('/api/manual');
+        const data = await res.json();
+        openDrawer('Manual', 'manual', manualHTML(data), opener);
+      } catch (err) {
+        alert("Failed loading manual: " + err);
       }
     }
 

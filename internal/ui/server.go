@@ -15,6 +15,7 @@ import (
 	"github.com/callmeradical/sgt/internal/changerequest"
 	"github.com/callmeradical/sgt/internal/config"
 	"github.com/callmeradical/sgt/internal/graphify"
+	"github.com/callmeradical/sgt/internal/manual"
 	"github.com/callmeradical/sgt/internal/naming"
 	"github.com/callmeradical/sgt/internal/redact"
 	"github.com/callmeradical/sgt/internal/runner"
@@ -133,6 +134,7 @@ func (srv *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/refine-project", srv.handleRefineProject)
 	mux.HandleFunc("/api/runs", srv.handleRuns)
 	mux.HandleFunc("/api/analytics", srv.handleAnalytics)
+	mux.HandleFunc("/api/manual", srv.handleManual)
 	mux.HandleFunc("/api/run-details", srv.handleRunDetails)
 	mux.HandleFunc("/api/validate-intent", srv.handleValidateIntent)
 	mux.HandleFunc("/api/discover-workflow", srv.handleDiscoverWorkflow)
@@ -330,6 +332,17 @@ func (srv *Server) handleAnalytics(w http.ResponseWriter, r *http.Request) {
 		Retention:     srv.retentionSummaryFor(project),
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// handleManual answers GET /api/manual with the parsed, live-substituted
+// manual sections — the same content sgt help answers from, via the same
+// manual.Sections() entry point. A plain read, like handleAnalytics: no
+// request body, no side effects, and unlike every other handler here it
+// never touches srv.Store at all.
+func (srv *Server) handleManual(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"sections": manual.Sections(),
+	})
 }
 
 func (srv *Server) handleRunDetails(w http.ResponseWriter, r *http.Request) {
