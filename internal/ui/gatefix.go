@@ -172,34 +172,50 @@ func (srv *Server) runFixCycles(ctx context.Context, cancel context.CancelFunc, 
 			continue
 		}
 
-		repos := srv.reposForRun(runID)
-		stages := resolveStages(proj, repos, run.Brief)
+		// Re-run only repoName's own stage, scoped to repoName alone -- never
+		// the run's full multi-repo DAG. A corrective cycle is bound to one
+		// repo for its entire lifetime (Review 043/044); re-running every
+		// repo's stage each cycle let the loop's attention silently drift to
+		// a repo it wasn't actually correcting. stageForRepo finds the one
+		// stage repoName belongs to and returns a copy scoped to just that
+		// repo, leaving every other repo in that stage (and every other
+		// stage entirely) untouched by this cycle.
+		stages := resolveStages(proj, srv.reposForRun(runID), run.Brief)
+		stage, ok := stageForRepo(stages, repoName)
+		if !ok {
+			// repoName isn't in any resolved stage -- should not happen,
+			// since the run's own failure was recorded against repoName.
+			// Treat it as this cycle's failure rather than running nothing
+			// silently.
+			continue
+		}
 
 		engine := dag.NewEngine(proj, srv.Store, router)
 		engine.Resume = true
 
-		cycleFailed := false
-		for i := range stages {
-			if err := engine.RunStage(ctx, runID, &stages[i]); err != nil {
-				cycleFailed = true
-				break
-			}
-		}
+		cycleFailed := engine.RunStage(ctx, runID, &stage) != nil
 
 		// Commit whatever the fix and re-run produced, pass or fail, for the
 		// same reason executeRun commits before reporting a dispatch's own
 		// failure: an uncommitted worktree is eligible for reclaim, and real
 		// agent work must survive that even when this cycle did not resolve
-		// the gate.
-		for _, r := range repos {
-			_, _, _ = dag.CommitRunOutput(context.Background(), runID, r, fmt.Sprintf("sgt: corrective fix cycle %d", cycle))
-		}
+		// the gate. Only repoName's worktree could have changed this cycle.
+		_, _, _ = dag.CommitRunOutput(context.Background(), runID, repoName, fmt.Sprintf("sgt: corrective fix cycle %d", cycle))
 
 		if !cycleFailed {
 			if ctx.Err() != nil {
 				srv.recordTerminalRun(runID, "cancelled")
 				return
 			}
+			// Known boundary: in a multi-stage DAG project where the
+			// original dispatch failed before a downstream stage ever ran
+			// (that stage's repos have no phases at all yet, not merely
+			// "already passed"), passing repoName's own stage concludes the
+			// whole run here rather than continuing on into that downstream
+			// stage. This is deliberate scope, not an oversight: a
+			// corrective cycle corrects one repo's own gate, nothing more.
+			// Reaching a downstream stage that depended on this fix is a
+			// separate action (a plain Resume, or its own corrective cycle).
 			srv.recordTerminalRun(runID, "passed")
 			return
 		}
@@ -207,6 +223,24 @@ func (srv *Server) runFixCycles(ctx context.Context, cancel context.CancelFunc, 
 
 	srv.recordTerminalRunWithReason(runID, "failed", fmt.Sprintf(
 		"corrective fix budget exhausted (%d/%d attempts); gate still failing", limit, limit))
+}
+
+// stageForRepo finds the one stage among stages that repoName belongs to,
+// and returns a copy scoped to repoName alone -- Name/After/Brief/TD kept
+// as the original stage's, Repos replaced with just [repoName] -- so running
+// it touches only repoName's worktree, never any other repo the original
+// stage bundled alongside it.
+func stageForRepo(stages []config.DAGStage, repoName string) (config.DAGStage, bool) {
+	for _, s := range stages {
+		for _, r := range s.Repos {
+			if r == repoName {
+				scoped := s
+				scoped.Repos = []string{repoName}
+				return scoped, true
+			}
+		}
+	}
+	return config.DAGStage{}, false
 }
 
 // lastFailedPhase returns the most recently recorded failed phase for runID.

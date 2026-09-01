@@ -7,6 +7,7 @@ package ui
 // carries which cycle it belongs to.
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -17,6 +18,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/callmeradical/sgt/internal/config"
+	"github.com/callmeradical/sgt/internal/dag"
+	"github.com/callmeradical/sgt/internal/handoff"
 	"github.com/callmeradical/sgt/internal/store"
 )
 
@@ -491,3 +495,135 @@ func TestLastFailedPhaseStaysScopedToTheGivenRepo(t *testing.T) {
 		t.Errorf("lastFailedPhase(runID, \"\") = %+v, want repo-b (the true most recent failure)", unscoped)
 	}
 }
+
+// phaseCountByRepo tallies runID's currently recorded phases per repo.
+func phaseCountByRepo(t *testing.T, st *store.Store, runID string) map[string]int {
+	t.Helper()
+	phases, err := st.ListPhasesForRun(runID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	counts := map[string]int{}
+	for _, p := range phases {
+		counts[p.Repo]++
+	}
+	return counts
+}
+
+// TestRunFixNeverAdvancesToADownstreamRepoThatHasNotRunYet is the real
+// regression case behind Review 043/044 and the follow-up decision (the
+// user, directly: "we dont want to run the full cycle each time. just the
+// repo stage") to keep a corrective cycle scoped to its bound repo's own
+// stage, never the run's full multi-stage DAG.
+//
+// Two DAG stages: stage-svc (repos: [svc]) then stage-other (repos:
+// [other], after: [stage-svc]). svc's gate fails on the very first
+// attempt, so executeRun aborts before stage-other ever runs at all -- not
+// "already passed and skipped by Resume" (which a single-stage fixture
+// can't distinguish, since phasePassed already skips an already-passed
+// repo regardless of how the stages are scoped), but genuinely never
+// attempted. Fixing svc's gate and letting the corrective cycle pass must
+// NOT then advance into stage-other within that same cycle: a corrective
+// cycle corrects one repo's gate, nothing more.
+func TestRunFixNeverAdvancesToADownstreamRepoThatHasNotRunYet(t *testing.T) {
+	base := t.TempDir()
+	cfgDir := filepath.Join(base, "config")
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("SGT_CONFIG", cfgDir)
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(base, "fleet"))
+
+	svcPath := filepath.Join(base, "svc")
+	otherPath := filepath.Join(base, "other")
+	initGitRepo(t, svcPath)
+	initGitRepo(t, otherPath)
+
+	agentPath := fakeSucceedingAgent(t, base)
+
+	projYAML := fmt.Sprintf(`name: o3
+defaults:
+  agent: %s
+  fix_retries: 2
+repos:
+  - name: svc
+    path: %s
+    factory:
+      pipeline: [test]
+      gates:
+        unit: "test -f .sgt/svc-ok"
+  - name: other
+    path: %s
+    factory:
+      pipeline: [test]
+      gates:
+        unit: "true"
+dag:
+  name: two-stage
+  stages:
+    - name: stage-svc
+      repos: [svc]
+    - name: stage-other
+      repos: [other]
+      after: [stage-svc]
+`, agentPath, svcPath, otherPath)
+	if err := os.WriteFile(filepath.Join(cfgDir, "o3.yaml"), []byte(projYAML), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	st, err := store.Open(filepath.Join(base, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+
+	srv := NewServer(st, 0)
+	mux := srv.Handler()
+
+	proj, err := config.LoadProject("o3")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const runID = "sgt-two-stage-test"
+	if err := st.CreateRun(&store.RunRecord{
+		ID: runID, Project: proj.Name, TaskID: runID, Type: "fix", ChangeID: "two-stage-change", Status: "running",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	router := handoff.NewRouter(filepath.Join(dag.FleetRoot(), runID, "handoff"))
+	engine := dag.NewEngine(proj, st, router)
+	ctx, cancel := context.WithCancel(context.Background())
+	srv.executeRun(ctx, cancel, engine, proj, runID, "two stage test", nil, "")
+
+	if got := runStatus(t, st, runID); got != "failed" {
+		t.Fatalf("run status after the initial dispatch = %q, want failed (svc's gate must fail before any marker exists)", got)
+	}
+	before := phaseCountByRepo(t, st, runID)
+	if before["other"] != 0 {
+		t.Fatalf("expected other's stage to have never run before svc's gate passed, got %d phase(s) for other", before["other"])
+	}
+	if before["svc"] == 0 {
+		t.Fatal("expected svc's own stage to have run (and failed)")
+	}
+
+	// The fix agent creates the marker svc's gate checks for, so the
+	// corrective cycle's re-attempt genuinely passes.
+	writeFixAgent(t, agentPath, "touch .sgt/svc-ok")
+
+	w := postJSON(t, mux, "/api/run-fix", fmt.Sprintf(`{"id":%q}`, runID))
+	if w.Code != http.StatusOK {
+		t.Fatalf("run-fix status = %d, want 200; body=%s", w.Code, w.Body.String())
+	}
+	status := waitForRunFixTerminal(t, st, runID)
+	if status != "passed" {
+		t.Fatalf("run status = %q, want passed once svc's marker makes its gate pass", status)
+	}
+
+	after := phaseCountByRepo(t, st, runID)
+	if after["other"] != 0 {
+		t.Errorf("other's phase count = %d after svc's corrective cycle passed, want 0: a corrective cycle bound to svc must never advance into a downstream repo's stage, even one that had never run yet", after["other"])
+	}
+}
+
