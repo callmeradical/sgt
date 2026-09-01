@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/callmeradical/sgt/internal/config"
 	"github.com/callmeradical/sgt/internal/dag"
 	"github.com/callmeradical/sgt/internal/export"
 	"github.com/callmeradical/sgt/internal/handoff"
+	"github.com/callmeradical/sgt/internal/manual"
 	"github.com/callmeradical/sgt/internal/mcp"
 	"github.com/callmeradical/sgt/internal/naming"
 	"github.com/callmeradical/sgt/internal/store"
@@ -40,21 +42,61 @@ func main() {
 	case "version":
 		fmt.Println("sgt v0.2.1 (Go Native Multi-Repo Software Factory Engine + Goose MCP Extension)")
 	case "--help", "-h", "help":
-		printUsage()
+		if len(os.Args) > 2 {
+			printHelpTopic(strings.Join(os.Args[2:], " "))
+		} else {
+			printUsage()
+		}
 	default:
 		printUsage()
 		os.Exit(1)
 	}
 }
 
+// printUsage prints the manual's table of contents ahead of the existing
+// subcommand list, so a bare `sgt help`/`sgt`/`sgt --help` shows more than a
+// user who does not yet know a topic to ask for would otherwise see.
 func printUsage() {
 	fmt.Println("Sgt - Multi-Repo Software Factory Orchestrator")
+	fmt.Println()
+	printSectionTitles()
 	fmt.Println("\nUsage:")
-	fmt.Println("  sgt run <project>    Run a multi-repo factory pipeline DAG")
-	fmt.Println("  sgt status           Show recent factory runs and phase states")
-	fmt.Println("  sgt ui               Start embedded Web UI dashboard (http://127.0.0.1:8484)")
-	fmt.Println("  sgt mcp              Start MCP JSON-RPC stdio server for Goose / Claude")
-	fmt.Println("  sgt version          Print version info")
+	fmt.Print(manual.CommandList())
+}
+
+// printSectionTitles prints the manual's section titles as a table of
+// contents. Shared by printUsage (no-argument sgt help) and
+// printHelpTopic's zero-match case, so a user always lands on the same list
+// of "somewhere to go next."
+func printSectionTitles() {
+	fmt.Println("Manual sections (run `sgt help \"<title>\"` for one):")
+	for _, s := range manual.Sections() {
+		fmt.Println("  " + s.Title)
+	}
+}
+
+// printHelpTopic answers `sgt help <query>` by searching the manual:
+//   - no match: state plainly that the manual does not cover the query,
+//     and list the available section titles instead of fabricating an
+//     answer.
+//   - one match: print that section's title and full body.
+//   - two or more matches: print each matching title with a pointer to ask
+//     again more specifically, rather than dumping every matched section's
+//     full body at once.
+func printHelpTopic(query string) {
+	matches := manual.Search(query)
+	switch len(matches) {
+	case 0:
+		fmt.Printf("The manual does not cover %q.\n\n", query)
+		printSectionTitles()
+	case 1:
+		fmt.Printf("## %s\n\n%s\n", matches[0].Title, matches[0].Body)
+	default:
+		fmt.Printf("%q matches more than one section:\n\n", query)
+		for _, s := range matches {
+			fmt.Printf("  %s — run `sgt help %q` for the full section\n", s.Title, s.Title)
+		}
+	}
 }
 
 func startMCP() {
