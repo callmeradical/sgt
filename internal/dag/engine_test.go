@@ -1408,3 +1408,52 @@ func TestRunStageReviewPhaseWithBlockingFindingFailsTheStage(t *testing.T) {
 		t.Fatal("expected RunStage to fail on a blocking review finding, got nil")
 	}
 }
+
+// A dispatched worktree must start from the operator's own local repo state,
+// not a stale origin/main snapshot that only updates on an explicit
+// fetch/push. Sgt is single-user and local-first: commits an operator makes
+// directly to their local default branch are real, current work the moment
+// they land, whether or not that operator has pushed yet. A dispatch that
+// silently starts from a stale remote-tracking ref can hand an agent code
+// that is missing the operator's own just-made local fixes.
+func TestPrepareWorktreeStartsFromLocalMainNotStaleOriginMain(t *testing.T) {
+	ctx := context.Background()
+	remote := filepath.Join(t.TempDir(), "remote")
+	newGitRepo(t, remote)
+
+	src := filepath.Join(t.TempDir(), "svc")
+	git(t, filepath.Dir(src), "clone", "-q", remote, src)
+
+	// The clone's origin/main tracking ref now points at the remote's one
+	// seed commit. Two local-only commits land on main after that — real
+	// work the operator has not pushed, exactly like an uncommitted-to-origin
+	// local session.
+	git(t, src, "checkout", "-q", "main")
+	for _, msg := range []string{"local fix 1", "local fix 2"} {
+		if err := os.WriteFile(filepath.Join(src, msg+".txt"), []byte(msg+"\n"), 0644); err != nil {
+			t.Fatal(err)
+		}
+		git(t, src, "add", ".")
+		git(t, src, "commit", "-q", "-m", msg)
+	}
+	wantHead := gitOutput(ctx, src, "rev-parse", "main")
+	staleOriginHead := gitOutput(ctx, src, "rev-parse", "origin/main")
+	if wantHead == staleOriginHead {
+		t.Fatal("test setup did not actually diverge local main from origin/main")
+	}
+
+	t.Setenv("SGT_FLEET_DIR", t.TempDir())
+	proj := &config.Project{Name: "p", Repos: map[string]config.Repo{"svc": {Path: src}}}
+	eng := newEngine(t, proj)
+	createTestRun(t, eng, proj.Name, "run-local-main-1", "running")
+
+	wt, _, err := eng.prepareWorktree(ctx, src, "run-local-main-1", "svc")
+	if err != nil {
+		t.Fatalf("prepareWorktree: %v", err)
+	}
+
+	got := gitOutput(ctx, wt, "rev-parse", "HEAD")
+	if got != wantHead {
+		t.Errorf("worktree started from %q, want local main's tip %q (started from stale origin/main %q instead)", got, wantHead, staleOriginHead)
+	}
+}

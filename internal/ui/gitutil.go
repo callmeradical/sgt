@@ -67,10 +67,20 @@ func defaultBase(dir, recorded string) string {
 	if recorded != "" {
 		return recorded
 	}
+	// Local main/master is preferred over any origin/* remote-tracking ref,
+	// for the same reason internal/dag/engine.go's resolveDefaultBranch
+	// prefers it: a remote-tracking ref only reflects a commit after an
+	// explicit fetch/push, while a commit to the operator's own local main
+	// is real, current work the instant it lands.
+	for _, c := range []string{"main", "master"} {
+		if gitOut(dir, "rev-parse", "--verify", c) != "" {
+			return c
+		}
+	}
 	if ref := gitOut(dir, "symbolic-ref", "refs/remotes/origin/HEAD"); ref != "" {
 		return strings.TrimPrefix(ref, "refs/remotes/")
 	}
-	for _, c := range []string{"origin/main", "origin/master", "main", "master"} {
+	for _, c := range []string{"origin/main", "origin/master"} {
 		if gitOut(dir, "rev-parse", "--verify", c) != "" {
 			return c
 		}

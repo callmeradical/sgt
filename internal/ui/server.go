@@ -15,6 +15,7 @@ import (
 	"github.com/callmeradical/sgt/internal/changerequest"
 	"github.com/callmeradical/sgt/internal/config"
 	"github.com/callmeradical/sgt/internal/graphify"
+	"github.com/callmeradical/sgt/internal/manual"
 	"github.com/callmeradical/sgt/internal/naming"
 	"github.com/callmeradical/sgt/internal/redact"
 	"github.com/callmeradical/sgt/internal/runner"
@@ -133,6 +134,7 @@ func (srv *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/refine-project", srv.handleRefineProject)
 	mux.HandleFunc("/api/runs", srv.handleRuns)
 	mux.HandleFunc("/api/analytics", srv.handleAnalytics)
+	mux.HandleFunc("/api/manual", srv.handleManual)
 	mux.HandleFunc("/api/run-details", srv.handleRunDetails)
 	mux.HandleFunc("/api/validate-intent", srv.handleValidateIntent)
 	mux.HandleFunc("/api/discover-workflow", srv.handleDiscoverWorkflow)
@@ -149,6 +151,7 @@ func (srv *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/clean-worktrees", srv.fleet.handleCleanWorktrees)
 	mux.HandleFunc("/api/run-cancel", srv.handleRunCancel)
 	mux.HandleFunc("/api/run-resume", srv.handleRunResume)
+	mux.HandleFunc("/api/run-fix", srv.handleRunFix)
 	mux.HandleFunc("/api/run-delete", srv.handleRunDelete)
 	mux.HandleFunc("/api/delivery-history", srv.handleDeliveryHistory)
 	mux.HandleFunc("/api/delivery-quarantine", srv.handleDeliveryQuarantine)
@@ -331,6 +334,17 @@ func (srv *Server) handleAnalytics(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
+// handleManual answers GET /api/manual with the parsed, live-substituted
+// manual sections — the same content sgt help answers from, via the same
+// manual.Sections() entry point. A plain read, like handleAnalytics: no
+// request body, no side effects, and unlike every other handler here it
+// never touches srv.Store at all.
+func (srv *Server) handleManual(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"sections": manual.Sections(),
+	})
+}
+
 func (srv *Server) handleRunDetails(w http.ResponseWriter, r *http.Request) {
 	runID := r.URL.Query().Get("id")
 	if runID == "" {
@@ -366,11 +380,34 @@ func (srv *Server) handleRunDetails(w http.ResponseWriter, r *http.Request) {
 		skips = []string{}
 	}
 
+	// fixRetriesLimit is the "M" in a corrective cycle's "Attempt N of M"
+	// label (a-failed-gate-is-corrected-in-place): the configured bound on
+	// corrective cycles for the repo a fix cycle would bind to. This must
+	// resolve the same repo handleRunFix itself would pick (lastFailedPhase
+	// with no repo filter — the most recently failed phase across every repo
+	// the run touched), not an unrelated heuristic like "the first repo with
+	// any recorded phase", or the displayed bound could name a different
+	// repo's setting than the one a fix cycle actually uses. Best effort — a
+	// run whose project no longer loads, or one with no failed phase yet,
+	// still serves its other fields; it just falls back to the built-in
+	// default rather than failing the whole request.
+	fixRetriesLimit := 5
+	if run, err := srv.Store.GetRun(runID); err == nil && run != nil {
+		if proj, err := config.LoadProject(run.Project); err == nil {
+			repoName := ""
+			if failure, ok := srv.lastFailedPhase(runID, ""); ok {
+				repoName = failure.Repo
+			}
+			fixRetriesLimit = proj.ResolvedFixRetries(repoName)
+		}
+	}
+
 	resp := map[string]interface{}{
-		"run_id":       runID,
-		"phases":       phases,
-		"envelopes":    envelopes,
-		"resume_skips": skips,
+		"run_id":            runID,
+		"phases":            phases,
+		"envelopes":         envelopes,
+		"resume_skips":      skips,
+		"fix_retries_limit": fixRetriesLimit,
 	}
 
 	writeJSON(w, http.StatusOK, resp)
