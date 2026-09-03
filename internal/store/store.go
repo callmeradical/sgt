@@ -521,11 +521,17 @@ func (s *Store) migrateAddColumns() error {
 // other, which is what makes the key optional.
 const requestIDIndex = `CREATE UNIQUE INDEX IF NOT EXISTS idx_runs_request_id ON runs(request_id)`
 
+// phasesRunIDIndex makes fetching phases for a specific run faster.
+const phasesRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_phases_run_id ON phases(run_id)`
+
 // migrateAddIndexes creates the indexes the code depends on for correctness
 // rather than for speed. IF NOT EXISTS makes it idempotent across reopens.
 func (s *Store) migrateAddIndexes() error {
 	if _, err := s.db.Exec(requestIDIndex); err != nil {
 		return fmt.Errorf("creating the unique index on runs.request_id: %w", err)
+	}
+	if _, err := s.db.Exec(phasesRunIDIndex); err != nil {
+		return fmt.Errorf("creating the index on phases.run_id: %w", err)
 	}
 	return nil
 }
