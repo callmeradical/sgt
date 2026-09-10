@@ -524,14 +524,32 @@ const requestIDIndex = `CREATE UNIQUE INDEX IF NOT EXISTS idx_runs_request_id ON
 // phasesRunIDIndex makes fetching phases for a specific run faster.
 const phasesRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_phases_run_id ON phases(run_id)`
 
+// envelopesRunIDIndex makes fetching and deleting envelopes for a specific run faster.
+const envelopesRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_envelopes_run_id ON envelopes(run_id)`
+
+// artifactsRunIDIndex makes fetching artifacts for a specific run faster.
+const artifactsRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_artifacts_run_id ON artifacts(run_id)`
+
+// deliveriesEnvelopeIDIndex makes fetching and deleting deliveries for a specific envelope faster.
+const deliveriesEnvelopeIDIndex = `CREATE INDEX IF NOT EXISTS idx_deliveries_envelope_id ON deliveries(envelope_id)`
+
+// bulletsIntentIDIndex makes fetching bullets for a specific intent faster.
+const bulletsIntentIDIndex = `CREATE INDEX IF NOT EXISTS idx_bullets_intent_id ON bullets(intent_id)`
+
 // migrateAddIndexes creates the indexes the code depends on for correctness
 // rather than for speed. IF NOT EXISTS makes it idempotent across reopens.
 func (s *Store) migrateAddIndexes() error {
-	if _, err := s.db.Exec(requestIDIndex); err != nil {
-		return fmt.Errorf("creating the unique index on runs.request_id: %w", err)
-	}
-	if _, err := s.db.Exec(phasesRunIDIndex); err != nil {
-		return fmt.Errorf("creating the index on phases.run_id: %w", err)
+	for _, stmt := range []string{
+		requestIDIndex,
+		phasesRunIDIndex,
+		envelopesRunIDIndex,
+		artifactsRunIDIndex,
+		deliveriesEnvelopeIDIndex,
+		bulletsIntentIDIndex,
+	} {
+		if _, err := s.db.Exec(stmt); err != nil {
+			return fmt.Errorf("creating index: %w (statement: %s)", err, stmt)
+		}
 	}
 	return nil
 }
