@@ -524,6 +524,9 @@ const requestIDIndex = `CREATE UNIQUE INDEX IF NOT EXISTS idx_runs_request_id ON
 // phasesRunIDIndex makes fetching phases for a specific run faster.
 const phasesRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_phases_run_id ON phases(run_id)`
 
+// deliveriesEnvelopeIDIndex prevents full table scans on read queries and cascading deletes.
+const deliveriesEnvelopeIDIndex = `CREATE INDEX IF NOT EXISTS idx_deliveries_envelope_id ON deliveries(envelope_id)`
+
 // migrateAddIndexes creates the indexes the code depends on for correctness
 // rather than for speed. IF NOT EXISTS makes it idempotent across reopens.
 func (s *Store) migrateAddIndexes() error {
@@ -532,6 +535,9 @@ func (s *Store) migrateAddIndexes() error {
 	}
 	if _, err := s.db.Exec(phasesRunIDIndex); err != nil {
 		return fmt.Errorf("creating the index on phases.run_id: %w", err)
+	}
+	if _, err := s.db.Exec(deliveriesEnvelopeIDIndex); err != nil {
+		return fmt.Errorf("creating the index on deliveries.envelope_id: %w", err)
 	}
 	return nil
 }
