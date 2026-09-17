@@ -723,6 +723,7 @@ func TestDeriveChangeIDIsKebabCaseAndCapped(t *testing.T) {
 
 // resolveChange must not need the CLI on the two paths that do not scaffold.
 func TestResolveChangeDoesNotRequireTheCLIForExistingChanges(t *testing.T) {
+	t.Setenv("SGT_FLEET_DIR", t.TempDir())
 	repo := t.TempDir()
 	dir := filepath.Join(repo, "openspec", "changes", "already-planned")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -755,11 +756,19 @@ func TestResolveChangeDoesNotRequireTheCLIForExistingChanges(t *testing.T) {
 
 // Scaffolding is the one part of O3 that needs the binary, so this test skips
 // when it is absent rather than making the CLI a dependency of the suite.
+//
+// Regression coverage for issue #21 ("Dispatch dirties source checkout and
+// reports an unpushed commit as pushed"): scaffolding a brand-new change
+// must never write into repo (the operator's live checkout) — only into
+// sgt's own staging area under SGT_FLEET_DIR, which RunStage later copies
+// into the run's isolated worktree.
 func TestResolveChangeScaffoldsFromTheBrief(t *testing.T) {
 	if _, err := exec.LookPath("openspec"); err != nil {
 		t.Skip("openspec CLI not on PATH; scaffolding path not exercised")
 	}
 
+	fleetRoot := t.TempDir()
+	t.Setenv("SGT_FLEET_DIR", fleetRoot)
 	repo := t.TempDir()
 	ref, err := resolveChange(repo, "", "Add Stripe Webhooks")
 	if err != nil {
@@ -771,21 +780,28 @@ func TestResolveChangeScaffoldsFromTheBrief(t *testing.T) {
 	if !ref.Created {
 		t.Error("ref.Created = false for a change sgt just scaffolded")
 	}
-	want := filepath.Join(repo, "openspec", "changes", "add-stripe-webhooks")
+	want := filepath.Join(fleetRoot, "scaffold", "openspec", "changes", "add-stripe-webhooks")
 	if ref.Dir != want {
 		t.Errorf("ref.Dir = %q, want %q", ref.Dir, want)
 	}
 	if info, err := os.Stat(ref.Dir); err != nil || !info.IsDir() {
 		t.Errorf("scaffolded dir %s is not on disk (err=%v)", ref.Dir, err)
 	}
+	if _, err := os.Stat(filepath.Join(repo, "openspec")); !os.IsNotExist(err) {
+		t.Errorf("scaffolding wrote into the operator's checkout %s (err=%v); it must stay untouched until a worktree commits the change", repo, err)
+	}
 
-	// Scaffolding the same brief twice reuses the change instead of failing.
+	// Scaffolding the same brief twice reuses the staged change instead of
+	// failing or re-scaffolding into the operator's checkout.
 	again, err := resolveChange(repo, "", "add stripe webhooks")
 	if err != nil {
 		t.Fatalf("second resolveChange failed: %v", err)
 	}
-	if again.ID != ref.ID || again.Created {
-		t.Errorf("second resolve = %+v, want the same id with Created=false", again)
+	if again.ID != ref.ID || again.Created || again.Dir != ref.Dir {
+		t.Errorf("second resolve = %+v, want the same staged id/dir with Created=false", again)
+	}
+	if _, err := os.Stat(filepath.Join(repo, "openspec")); !os.IsNotExist(err) {
+		t.Errorf("reusing the staged change wrote into the operator's checkout %s (err=%v)", repo, err)
 	}
 }
 

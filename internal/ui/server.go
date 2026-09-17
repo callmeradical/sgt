@@ -14,6 +14,7 @@ import (
 
 	"github.com/callmeradical/sgt/internal/changerequest"
 	"github.com/callmeradical/sgt/internal/config"
+	"github.com/callmeradical/sgt/internal/dag"
 	"github.com/callmeradical/sgt/internal/graphify"
 	"github.com/callmeradical/sgt/internal/naming"
 	"github.com/callmeradical/sgt/internal/redact"
@@ -410,12 +411,12 @@ func (srv *Server) handleCreatePR(w http.ResponseWriter, r *http.Request) {
 	if proj != nil && len(proj.Repos) > 0 {
 		if req.Repo != "" {
 			if rCfg, exists := proj.Repos[req.Repo]; exists {
-				repoPath = rCfg.Path
+				repoPath = expandHome(rCfg.Path)
 			}
 		}
 		if repoPath == "" {
 			for _, rCfg := range proj.Repos {
-				repoPath = rCfg.Path
+				repoPath = expandHome(rCfg.Path)
 				break
 			}
 		}
@@ -425,7 +426,7 @@ func (srv *Server) handleCreatePR(w http.ResponseWriter, r *http.Request) {
 	rawRemote := ""
 	if repoPath != "" {
 		remoteBase = resolveGitRemoteURL(repoPath)
-		rawRemote = rawOriginRemote(expandHome(repoPath))
+		rawRemote = rawOriginRemote(repoPath)
 	}
 
 	run, err := srv.Store.GetRun(req.RunID)
@@ -475,7 +476,18 @@ func (srv *Server) handleCreatePR(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		provider := changerequest.Providers[providerName]
-		url, cerr := provider.Create(r.Context(), repoPath, run.BaseBranch, branch, req.Title, req.Body)
+		// Run gh in the run's own isolated worktree, never the operator's
+		// live checkout (AGENTS.md: "the operator's checkout is never
+		// mutated"). The worktree always has this branch checked out;
+		// repoPath usually does not, and gh's own auto-push behavior for a
+		// branch that is not checked out in cmd.Dir is not a guarantee this
+		// codebase controls. Falls back to repoPath only if the worktree is
+		// somehow already gone (e.g. reclaimed by fleet cleanup).
+		gitDir := repoPath
+		if wt := dag.FleetDir(req.RunID, req.Repo); isDir(wt) {
+			gitDir = wt
+		}
+		url, cerr := provider.Create(r.Context(), gitDir, run.BaseBranch, branch, req.Title, req.Body)
 		if cerr == nil {
 			prURL = url
 			for _, b := range intentBullets {
