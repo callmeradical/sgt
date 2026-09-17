@@ -862,10 +862,11 @@
     // Phase status vocabulary. Every branch maps to a real status value; an
     // unrecognised status is displayed verbatim rather than mislabelled.
     const PHASE_LOOK = {
-      passed:  { cls: 'text-[#3fb950]', icon: 'fa-solid fa-circle-check',  label: 'Passed' },
-      failed:  { cls: 'text-rose-400',  icon: 'fa-solid fa-circle-xmark',  label: 'Failed' },
-      running: { cls: 'text-[#58a6ff]', icon: 'fa-solid fa-spinner fa-spin', label: 'Running' },
-      pending: { cls: 'text-[#8b949e]', icon: 'fa-regular fa-clock',       label: 'Pending' }
+      passed:    { cls: 'text-[#3fb950]', icon: 'fa-solid fa-circle-check',  label: 'Passed' },
+      failed:    { cls: 'text-rose-400',  icon: 'fa-solid fa-circle-xmark',  label: 'Failed' },
+      running:   { cls: 'text-[#58a6ff]', icon: 'fa-solid fa-spinner fa-spin', label: 'Running' },
+      pending:   { cls: 'text-[#8b949e]', icon: 'fa-regular fa-clock',       label: 'Pending' },
+      cancelled: { cls: 'text-[#8b949e]', icon: 'fa-solid fa-ban',          label: 'Cancelled' }
     };
 
     // ---- Detail drawer -------------------------------------------------------
@@ -1451,10 +1452,11 @@
     // Node appearance by state. "pending" is a real state, not an absence: the node is
     // in the definition and has not run.
     const NODE_LOOK = {
-      passed:  { text: 'text-[#3fb950]', icon: 'fa-solid fa-circle-check' },
-      failed:  { text: 'text-rose-400',  icon: 'fa-solid fa-circle-xmark' },
-      running: { text: 'text-[#58a6ff]', icon: 'fa-solid fa-spinner fa-spin' },
-      pending: { text: 'text-[#6e7681]', icon: 'fa-regular fa-circle' },
+      passed:    { text: 'text-[#3fb950]', icon: 'fa-solid fa-circle-check' },
+      failed:    { text: 'text-rose-400',  icon: 'fa-solid fa-circle-xmark' },
+      running:   { text: 'text-[#58a6ff]', icon: 'fa-solid fa-spinner fa-spin' },
+      pending:   { text: 'text-[#6e7681]', icon: 'fa-regular fa-circle' },
+      cancelled: { text: 'text-[#6e7681]', icon: 'fa-solid fa-ban' },
     };
 
     // Fixed geometry. Positions are computed rather than measured so the SVG edge

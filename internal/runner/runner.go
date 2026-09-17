@@ -575,8 +575,28 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 		duration := time.Since(start).Milliseconds()
 
 		// Operator cancellation is not a phase failure. Let the run-level handler
-		// record "cancelled" rather than blaming the agent.
+		// record "cancelled" rather than blaming the agent — but this attempt's
+		// own phase record must not be left at the "running" sentinel written
+		// at the top of this function: a run cancelled mid-phase left it there
+		// forever, indistinguishable from a phase actually still executing
+		// (issue #20).
 		if ctx.Err() != nil {
+			attemptNumber := attempt + 1
+			attemptID := phaseID
+			if attempt > 0 {
+				attemptID = fmt.Sprintf("%s-attempt%d", phaseID, attemptNumber)
+			}
+			_ = pr.Store.RecordPhase(&store.PhaseRecord{
+				ID:         attemptID,
+				RunID:      pr.RunID,
+				Repo:       pr.RepoName,
+				Name:       phaseName,
+				Kind:       "agent",
+				Status:     "cancelled",
+				Error:      fmt.Sprintf("cancelled: %v", ctx.Err()),
+				DurationMs: duration,
+				Attempt:    attemptNumber,
+			})
 			return nil, "", ctx.Err()
 		}
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -31,7 +32,12 @@ func (srv *Server) handleRunCancel(w http.ResponseWriter, r *http.Request) {
 	// "passed" while its agents kept writing to disk.
 	stopped := srv.cancelRun(req.ID)
 
-	if err := srv.Store.UpdateRunStatus(req.ID, "cancelled"); err != nil {
+	// recordTerminalRun, not a bare status write: it also advances any bullet
+	// left "blocked" by an earlier attempt back to "pending" (issue #20). A
+	// run this process is not actively driving (stopped == false) has no
+	// live goroutine left to ever reach that reconciliation on its own, so
+	// the handler must not depend on one existing.
+	if err := srv.recordTerminalRun(req.ID, "cancelled"); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -125,6 +131,32 @@ func (srv *Server) handleRunResume(w http.ResponseWriter, r *http.Request) {
 	// run targeted rather than re-deriving it from configuration that may have
 	// changed since.
 	repos := srv.reposForRun(run.ID)
+
+	// Clear a stale "blocked" disposition on the bullets this resume targets
+	// before anything else, synchronously, in this handler — never inside
+	// the goroutine below. RenderIntentBrief (internal/store/brief.go) reads
+	// a bullet's live Status/BlockedReason directly, so the first prompt a
+	// resumed phase renders would otherwise tell the agent it is still
+	// blocked for a reason from the attempt that just ended, contradicting
+	// the fresh attempt actively in flight (issue #20). A bullet that is not
+	// "blocked" (e.g. already "pending", or a repo this resume does not
+	// target) is left untouched — this is a targeted reconciliation, not the
+	// whole-intent sweep recordTerminalRun does for a run's own outcome.
+	if run.IntentID != "" {
+		targeted := make(map[string]bool, len(repos))
+		for _, r := range repos {
+			targeted[r] = true
+		}
+		if bullets, berr := srv.Store.ListBulletsForIntent(run.IntentID); berr == nil {
+			for _, b := range bullets {
+				if b.Status == "blocked" && targeted[b.Repo] {
+					if aerr := srv.Store.AdvanceBulletStatus(b.ID, "pending", ""); aerr != nil {
+						log.Printf("sgt: resume: clearing blocked state for bullet %q: %v", b.ID, aerr)
+					}
+				}
+			}
+		}
+	}
 
 	router := handoff.NewRouter(filepath.Join(dag.FleetRoot(), run.ID, "handoff"))
 	engine := dag.NewEngine(proj, srv.Store, router)

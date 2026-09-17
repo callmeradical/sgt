@@ -595,19 +595,25 @@ func (srv *Server) executeRun(
 // The intent is not touched here. Its status is derived from the bullets by the
 // store, because an intent may span several bullets and several runs, so no one
 // run knows whether the intent is complete.
-func (srv *Server) recordTerminalRun(runID, status string) {
+// recordTerminalRun returns the UpdateRunStatus error, if any, so a caller
+// with an HTTP response to give (handleRunCancel) can report it truthfully
+// instead of claiming success for a write that never happened. A caller
+// with nothing to respond to (executeRun's setTerminal, a goroutine) is free
+// to ignore it — the failure is already logged either way.
+func (srv *Server) recordTerminalRun(runID, status string) error {
 	if err := srv.Store.UpdateRunStatus(runID, status); err != nil {
 		log.Printf("sgt: recording terminal status %s for run %s: %v", status, runID, err)
-		return
+		return err
 	}
 	bulletStatus, advances := bulletStatusForRunOutcome(status)
 	if !advances {
-		return
+		return nil
 	}
 	reason := srv.blockedReasonForRun(runID, bulletStatus)
 	if err := srv.Store.AdvanceBulletsForRun(runID, bulletStatus, reason); err != nil {
 		log.Printf("sgt: advancing the bullets of run %s to %s: %v", runID, bulletStatus, err)
 	}
+	return nil
 }
 
 // blockedReasonForRun resolves the reason a run's bullets carry when they

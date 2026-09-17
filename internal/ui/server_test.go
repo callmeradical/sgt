@@ -829,6 +829,54 @@ func TestResumeRestartsAFailedRun(t *testing.T) {
 	}
 }
 
+// Regression coverage for issue #20 ("reconcile phase and bullet state on
+// resume and cancellation"): resuming a failed run must clear the stale
+// "blocked" disposition (and its now-outdated reason) its bullet was left
+// with — synchronously, before the resumed run's first prompt is rendered.
+// RenderIntentBrief reads the bullet's live Status/BlockedReason directly,
+// so leaving it "blocked" would inject stale "you are blocked because X"
+// text into the very prompt telling the agent to try again.
+func TestResumeClearsAStaleBlockedBulletBeforeRestarting(t *testing.T) {
+	mux, st, _ := dispatchFixture(t)
+
+	const intentID = "intent-resume-1"
+	if err := st.CreateIntent(&store.IntentRecord{ID: intentID, Project: "o3", Statement: "s", Status: "in_progress"}); err != nil {
+		t.Fatal(err)
+	}
+	bulletID := "bullet-resume-1"
+	if err := st.CreateBullet(&store.BulletRecord{ID: bulletID, IntentID: intentID, Repo: "svc", Position: 1, Status: "blocked"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.AdvanceBulletStatus(bulletID, "blocked", "gates did not pass; no further automatic attempt available"); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.RecordPhase(&store.PhaseRecord{ID: "phase-resume-1", RunID: "sgt-orphan-2", Repo: "svc", Name: "build", Kind: "agent", Status: "failed"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.CreateRun(&store.RunRecord{
+		ID: "sgt-orphan-2", Project: "o3", TaskID: "sgt-orphan-2", IntentID: intentID,
+		Brief: "finish the work", Status: "failed",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	w := postJSON(t, mux, "/api/run-resume", `{"id":"sgt-orphan-2"}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", w.Code, w.Body.String())
+	}
+
+	got, err := st.GetBullet(bulletID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != "pending" {
+		t.Errorf("bullet status = %q immediately after resume, want pending — a resumed attempt is not blocked", got.Status)
+	}
+	if got.BlockedReason != "" {
+		t.Errorf("bullet blocked reason = %q, want empty — resume must not render this stale reason into the next prompt", got.BlockedReason)
+	}
+}
+
 // Resuming a run that already passed would re-run work for no reason and could
 // turn an earned pass into a fresh failure.
 func TestResumeRefusesARunThatAlreadyPassed(t *testing.T) {
