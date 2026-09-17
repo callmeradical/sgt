@@ -53,3 +53,35 @@ func (g *githubProvider) Status(ctx context.Context, repoPath, url string) (*Sta
 		MergedIntoBranch: parsed.BaseRefName,
 	}, nil
 }
+
+// FindByHead shells out to `gh pr list --head head --state all`, matching
+// any change request for that branch regardless of who opened it or
+// whether this codebase ever recorded its URL. --state all is required:
+// gh pr list defaults to open-only, which would silently miss a branch
+// whose change request already merged or closed.
+func (g *githubProvider) FindByHead(ctx context.Context, repoPath, head string) (*FoundRef, error) {
+	cmd := exec.CommandContext(ctx, "gh", "pr", "list",
+		"--head", head, "--state", "all", "--json", "url,state,baseRefName", "--limit", "1")
+	cmd.Dir = repoPath
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("gh pr list --head %s: %w", head, err)
+	}
+	var parsed []struct {
+		URL         string `json:"url"`
+		State       string `json:"state"`
+		BaseRefName string `json:"baseRefName"`
+	}
+	if err := json.Unmarshal(out, &parsed); err != nil {
+		return nil, fmt.Errorf("parsing gh pr list output for head %s: %w", head, err)
+	}
+	if len(parsed) == 0 {
+		return nil, nil
+	}
+	p := parsed[0]
+	return &FoundRef{
+		URL:              p.URL,
+		Merged:           p.State == "MERGED",
+		MergedIntoBranch: p.BaseRefName,
+	}, nil
+}
