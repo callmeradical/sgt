@@ -36,22 +36,27 @@ func TestMiseInstallLinksWikiDigestAndBuildsSgt(t *testing.T) {
 		t.Fatalf("creating stale oc-inject.js symlink: %v", err)
 	}
 
+	// The install script's own `go build` resolves GOPATH/GOMODCACHE/
+	// GOCACHE from HOME by default. Overriding HOME above (so this test
+	// doesn't touch the real ~/.local/bin) would otherwise make that
+	// build download and extract the entire module graph fresh into a
+	// throwaway location under the fake HOME on every run. Go marks
+	// extracted module directories read-only, which t.TempDir()'s
+	// automatic os.RemoveAll cleanup cannot remove -- the recurring
+	// flake this pins down (issue #16). Pointing these at the real,
+	// shared cache instead means the build reuses what's already there
+	// (this repo's own module graph, already built by every other test
+	// in this session) and never extracts anything new inside a temp
+	// dir in the first place — root-cause fix rather than a cleanup
+	// step working around it, and correct whether the cache is cold or
+	// warm, since the real cache is never itself inside a t.TempDir()
+	// subject to automatic removal.
 	cmd := exec.Command("bash", installScript)
 	cmd.Env = append(os.Environ(),
 		"HOME="+filepath.Join(testRoot, "home"),
 		"MISE_PROJECT_ROOT="+root,
 		"MISE_ORIGINAL_CWD="+root,
 		"SGT_INSTALL_DIR="+binDir,
-		// The install script's own `go build` resolves GOPATH/GOMODCACHE/
-		// GOCACHE from HOME by default. Overriding HOME above (so this test
-		// doesn't touch the real ~/.local/bin) would otherwise make that
-		// build download and extract the entire module graph fresh into a
-		// throwaway location under the fake HOME on every run. Go marks
-		// extracted module directories read-only, which t.TempDir()'s
-		// automatic os.RemoveAll cleanup cannot remove -- the recurring
-		// flake this pins down. Pointing these at the real, shared cache
-		// instead means the build reuses what's already there and leaves
-		// nothing new for cleanup to fail on.
 		"GOPATH="+goEnv(t, "GOPATH"),
 		"GOMODCACHE="+goEnv(t, "GOMODCACHE"),
 		"GOCACHE="+goEnv(t, "GOCACHE"),
