@@ -17,15 +17,17 @@ type fakeChangeRequestProvider struct {
 	statusFn func(ctx context.Context, repoPath, url string) (*changerequest.StatusResult, error)
 	findFn   func(ctx context.Context, repoPath, head string) (*changerequest.FoundRef, error)
 
-	createCalls int
-	lastBase    string
-	lastHead    string
+	createCalls  int
+	lastBase     string
+	lastHead     string
+	lastRepoPath string
 }
 
 func (f *fakeChangeRequestProvider) Create(ctx context.Context, repoPath, base, head, title, body string) (string, error) {
 	f.createCalls++
 	f.lastBase = base
 	f.lastHead = head
+	f.lastRepoPath = repoPath
 	if f.createFn != nil {
 		return f.createFn(ctx, repoPath, base, head, title, body)
 	}

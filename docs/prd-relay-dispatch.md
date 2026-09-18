@@ -125,11 +125,17 @@ Two surfaces, not competing with each other:
   `--remote <target>` where relay applies. This is the interface a
   human operator (or a shell script, or an agent driving a subprocess)
   uses without an MCP connection.
-- **New MCP tools** `sgt_dispatch` and `sgt_create_pr`, already scoped
-  in issue #5, mirroring the same HTTP handlers' request/response shape
-  exactly so the CLI and MCP surfaces cannot drift into two independent
-  contracts. This is the interface an MCP-connected agent uses natively
-  without shelling out at all.
+- **New MCP tools** `sgt_dispatch` and `sgt_create_pr`, specified in
+  `docs/prd-mcp-dispatch-and-create-pr-tools.md` (issue #5), mirroring
+  the same HTTP handlers' request/response shape exactly so the CLI and
+  MCP surfaces cannot drift into two independent contracts. This is the
+  interface an MCP-connected agent uses natively without shelling out
+  at all. Both that PRD and `docs/prd-cli-dispatch-subcommands.md`
+  (issue #10) depend on a shared `internal/sgtclient` package — one
+  typed function per endpoint — which is what actually enforces the
+  "cannot drift" requirement rather than leaving it as prose. Relay
+  dispatch's `--remote <target>` flag, once relay targets exist, is
+  additive to that same package/surface, not a competing one.
 
 Both surfaces should be thin: neither reimplements dispatch logic, both
 call the same HTTP handlers a browser-based dashboard client already

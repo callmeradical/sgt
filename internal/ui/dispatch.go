@@ -34,6 +34,7 @@ import (
 	"github.com/callmeradical/sgt/internal/redact"
 	"github.com/callmeradical/sgt/internal/runner"
 	"github.com/callmeradical/sgt/internal/store"
+	"github.com/callmeradical/sgt/internal/wiki"
 )
 
 // stageRunner is the one method executeRun needs from a stage-execution
@@ -62,6 +63,28 @@ func targetRepositories(proj *config.Project, requested []string) []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+// resolveStages returns the DAG stages a run executes: the project's own
+// configured stages, or a single synthetic "custom-dispatch" stage over
+// repos otherwise. Shared by executeRun and the corrective-fix loop
+// (gatefix.go) so a resumed run and a corrective cycle can never disagree
+// about which stages a run consists of.
+//
+// A resume (or a corrective cycle) recovers its repo list from phase
+// records, which is empty when the original run died before recording any,
+// so the sorted targetRepositories fallback has to apply here too — or a
+// resumed run could take a different merge order than the dispatch that
+// created it.
+func resolveStages(proj *config.Project, repos []string, brief string) []config.DAGStage {
+	if proj.DAG != nil && len(proj.DAG.Stages) > 0 {
+		return proj.DAG.Stages
+	}
+	return []config.DAGStage{{
+		Name:  "custom-dispatch",
+		Repos: targetRepositories(proj, repos),
+		Brief: brief,
+	}}
 }
 
 func (srv *Server) handleDispatch(w http.ResponseWriter, r *http.Request) {
@@ -469,21 +492,7 @@ func (srv *Server) executeRun(
 		srv.recordTerminalRun(taskID, status)
 	}
 
-	var stages []config.DAGStage
-	if proj.DAG != nil && len(proj.DAG.Stages) > 0 {
-		stages = proj.DAG.Stages
-	} else {
-		// One rule for resolving targets, shared with dispatch. A resume recovers
-		// its repo list from phase records, which is empty when the original run
-		// died before recording any, so the fallback has to apply here too — and it
-		// has to be the same sorted fallback, or a resumed run could take a
-		// different merge order than the dispatch that created it.
-		stages = []config.DAGStage{{
-			Name:  "custom-dispatch",
-			Repos: targetRepositories(proj, repos),
-			Brief: brief,
-		}}
-	}
+	stages := resolveStages(proj, repos, brief)
 
 	// Commit the agents' output. An uncommitted worktree is eligible for deletion
 	// by "clean worktrees", so leaving it uncommitted means real work can be
@@ -595,19 +604,70 @@ func (srv *Server) executeRun(
 // The intent is not touched here. Its status is derived from the bullets by the
 // store, because an intent may span several bullets and several runs, so no one
 // run knows whether the intent is complete.
+//
+// Because this is the single place a run's outcome becomes a fact, it is also
+// where that fact is rendered into the project's OKF wiki (recordWikiEntry),
+// for every terminal status, not only the ones that advance bullets.
 func (srv *Server) recordTerminalRun(runID, status string) {
+	var reason string
+	if bulletStatus, advances := bulletStatusForRunOutcome(status); advances {
+		reason = srv.blockedReasonForRun(runID, bulletStatus)
+	}
+	srv.recordTerminalRunWithReason(runID, status, reason)
+}
+
+// recordTerminalRunWithReason is recordTerminalRun with the blocked reason
+// supplied by the caller rather than derived from blockedReasonForRun's own
+// envelope-reading sources.
+//
+// It exists for the corrective-fix loop (a-failed-gate-is-corrected-in-
+// place): when a run's fix budget is exhausted, the reason a human sees must
+// say so explicitly ("corrective fix budget exhausted") rather than repeat
+// blockedReasonForRun's derivation of the *original* gate failure, which
+// would read as if no correction had ever been attempted. reason is ignored
+// for any status that does not advance bullets (bulletStatusForRunOutcome),
+// matching recordTerminalRun's own existing behaviour.
+func (srv *Server) recordTerminalRunWithReason(runID, status, reason string) {
 	if err := srv.Store.UpdateRunStatus(runID, status); err != nil {
 		log.Printf("sgt: recording terminal status %s for run %s: %v", status, runID, err)
 		return
 	}
-	bulletStatus, advances := bulletStatusForRunOutcome(status)
-	if !advances {
+
+	if bulletStatus, advances := bulletStatusForRunOutcome(status); advances {
+		if err := srv.Store.AdvanceBulletsForRun(runID, bulletStatus, reason); err != nil {
+			log.Printf("sgt: advancing the bullets of run %s to %s: %v", runID, bulletStatus, err)
+		}
+	} else {
+		reason = ""
+	}
+
+	srv.recordWikiEntry(runID, reason)
+}
+
+// recordWikiEntry renders runID's just-recorded terminal outcome into the
+// project's OKF wiki (internal/wiki), loading the run's bullets after
+// AdvanceBulletsForRun has completed so the page reflects their final
+// status. Called synchronously and inline, not from a goroutine, matching
+// captureArtifacts' own best-effort, synchronous posture: a wiki-write
+// problem is logged here, never surfaced to the caller, and never changes
+// the run's own terminal status, which recordTerminalRun already wrote
+// before this runs.
+func (srv *Server) recordWikiEntry(runID, blockedReason string) {
+	run, err := srv.Store.GetRun(runID)
+	if err != nil {
+		log.Printf("sgt: wiki: loading run %s: %v", runID, err)
 		return
 	}
-	reason := srv.blockedReasonForRun(runID, bulletStatus)
-	if err := srv.Store.AdvanceBulletsForRun(runID, bulletStatus, reason); err != nil {
-		log.Printf("sgt: advancing the bullets of run %s to %s: %v", runID, bulletStatus, err)
+
+	var bullets []store.BulletRecord
+	if run.IntentID != "" {
+		bullets, err = srv.Store.ListBulletsForIntent(run.IntentID)
+		if err != nil {
+			log.Printf("sgt: wiki: loading bullets for run %s: %v", runID, err)
+		}
 	}
+
+	wiki.RecordRun(wiki.Entry{Run: *run, Bullets: bullets, BlockedReason: blockedReason})
 }
 
 // blockedReasonForRun resolves the reason a run's bullets carry when they
