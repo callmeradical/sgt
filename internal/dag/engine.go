@@ -232,28 +232,42 @@ func copyChangeDir(src, dst string) error {
 }
 
 // resolveDefaultBranch determines a repository's real default branch —
-// origin/HEAD if a remote is configured, else a local main/master — without
-// ever consulting what the source checkout currently has checked out. That
-// independence is the whole point: the operator's own working copy is free
-// to sit on any branch without affecting where dispatched work starts from.
+// local main/master if either exists, else origin/HEAD if a remote is
+// configured — without ever consulting what the source checkout currently
+// has checked out. That independence is the whole point: the operator's own
+// working copy is free to sit on any branch without affecting where
+// dispatched work starts from.
 //
 // The guess chain mirrors internal/ui/gitutil.go's defaultBase, which resolves
 // the same question for display purposes after a run already recorded its
 // base branch. The two cannot import each other (ui depends on dag), so the
-// chain is duplicated rather than shared.
+// chain is duplicated rather than shared — keep them in sync by hand when
+// either changes.
 func resolveDefaultBranch(ctx context.Context, repoPath string) string {
-	if ref := gitOutput(ctx, repoPath, "symbolic-ref", "refs/remotes/origin/HEAD"); ref != "" {
-		return strings.TrimPrefix(ref, "refs/remotes/")
-	}
-	for _, candidate := range []string{"origin/main", "origin/master", "main", "master"} {
+	// A local branch is preferred over any origin/* remote-tracking ref. Sgt
+	// is single-user and local-first: a commit the operator makes to their
+	// own local main is real, current work the instant it lands, whether or
+	// not they have since pushed it — but origin/main only reflects that
+	// commit after an explicit fetch/push. Starting a dispatch from a stale
+	// remote-tracking ref can silently hand an agent code missing the
+	// operator's own just-made local fixes.
+	for _, candidate := range []string{"main", "master"} {
 		if gitOutput(ctx, repoPath, "rev-parse", "--verify", candidate) != "" {
 			return candidate
 		}
 	}
-	// No remote and no conventionally named local branch: fall back to
-	// whatever is checked out, same as the pre-fix behaviour, rather than
-	// refusing to dispatch. A failed gitOutput (e.g. a detached HEAD with no
-	// symbolic name) leaves this "", and the caller falls back to "HEAD".
+	if ref := gitOutput(ctx, repoPath, "symbolic-ref", "refs/remotes/origin/HEAD"); ref != "" {
+		return strings.TrimPrefix(ref, "refs/remotes/")
+	}
+	for _, candidate := range []string{"origin/main", "origin/master"} {
+		if gitOutput(ctx, repoPath, "rev-parse", "--verify", candidate) != "" {
+			return candidate
+		}
+	}
+	// No local main/master, no remote: fall back to whatever is checked out,
+	// same as the pre-fix behaviour, rather than refusing to dispatch. A
+	// failed gitOutput (e.g. a detached HEAD with no symbolic name) leaves
+	// this "", and the caller falls back to "HEAD".
 	return gitOutput(ctx, repoPath, "rev-parse", "--abbrev-ref", "HEAD")
 }
 
@@ -342,12 +356,67 @@ func SortedGateNames(repoCfg config.Repo) []string {
 // remember.
 func reviewPrompt(diff string, stage *config.DAGStage, repoName string) string {
 	return fmt.Sprintf(
-		"Review this diff for repo %s against its intent and OpenSpec change, if one is referenced. "+
+		"# Phase objective: review\n\n"+
+			"You are executing the \"review\" phase: judge the diff below, nothing else. "+
+			"Do not modify files, do not commit, do not push, and do not open a pull request "+
+			"— report findings only.\n\n"+
+			"Review this diff for repo %s against its intent and OpenSpec change, if one is referenced. "+
 			"Judge only what is in the diff and the referenced spec — you have not seen and must not assume "+
 			"the implementing agent's own reasoning. Report findings as JSON: "+
 			"{\"findings\":[{\"axis\":...,\"severity\":\"error\"|\"warning\"|\"info\",\"summary\":...,\"disposition\":...}]}.\n\nDiff:\n%s",
 		repoName, diff,
 	)
+}
+
+// phaseObjective is the boundary text prepended to a phase's rendered
+// prompt: which phase is active, what pipeline it belongs to, what it is
+// expected to produce, and what it must not do.
+//
+// Without this, every phase in a pipeline received the exact same
+// full-intent brief with nothing distinguishing "plan" from "build" — a
+// plan phase had every reason to just implement, commit, push, and open a
+// pull request itself, since nothing told it not to. Status therefore
+// described the wrong work: sgt recorded "plan: running" while the plan
+// agent had already delivered the whole change (issue #18).
+//
+// review and the "test" gate branch of RunStage never reach this — review
+// has its own boundary-scoped prompt (reviewPrompt above) and a
+// gate-configured "test" runs a deterministic command, never an agent.
+func phaseObjective(phase string, pipeline []string) string {
+	chain := strings.Join(pipeline, " -> ")
+	switch phase {
+	case "plan":
+		return fmt.Sprintf(
+			"# Phase objective: plan\n\n"+
+				"This repo's configured pipeline is: %s. You are executing ONLY the "+
+				"\"plan\" phase. Produce a plan for the approach — what will change, "+
+				"which files, and how it will be verified. Do not modify implementation "+
+				"files, do not commit, do not push a branch, and do not open a pull "+
+				"request. Later phases in this pipeline implement and verify the plan; "+
+				"completing them is not your responsibility here.\n\n",
+			chain,
+		)
+	case "build":
+		return fmt.Sprintf(
+			"# Phase objective: build\n\n"+
+				"This repo's configured pipeline is: %s. You are executing the "+
+				"\"build\" phase: implement the change described below. Commit your "+
+				"work if useful, but do not push this branch and do not open a pull "+
+				"request — delivery is a separate, explicitly human-approved action "+
+				"outside this pipeline (POST /api/create-pr), never something a phase "+
+				"does on its own.\n\n",
+			chain,
+		)
+	default:
+		return fmt.Sprintf(
+			"# Phase objective: %s\n\n"+
+				"This repo's configured pipeline is: %s. You are executing ONLY the "+
+				"%q phase. Perform this phase's own responsibility and nothing more — "+
+				"do not perform work belonging to another phase in this pipeline, and "+
+				"do not push a branch or open a pull request.\n\n",
+			phase, chain, phase,
+		)
+	}
 }
 
 // DefaultPipeline is the factory pipeline used for a repo that configures none.
@@ -505,6 +574,7 @@ func (e *Engine) RunStage(ctx context.Context, runID string, stage *config.DAGSt
 				if prompt == "" {
 					prompt = fmt.Sprintf("Execute %s phase for stage %s on %s", phase, stage.Name, repoName)
 				}
+				prompt = phaseObjective(phase, pipeline) + prompt
 				retries := e.Project.ResolvedRetries(repoName)
 				_, _, err := pr.RunAgentPhase(ctx, phase, prompt, retries)
 				if err != nil {

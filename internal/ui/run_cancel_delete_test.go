@@ -86,6 +86,40 @@ func TestCancellingARunThisProcessIsNotDrivingStillRecordsCancelled(t *testing.T
 	}
 }
 
+// Regression coverage for issue #20 ("reconcile phase and bullet state on
+// resume and cancellation"): cancelling a run this process is not actively
+// driving (no live goroutine to eventually notice ctx cancellation and run
+// setTerminal itself) must still clear a stale "blocked" bullet — the HTTP
+// handler cannot rely on a goroutine that does not exist to do that later.
+func TestCancellingARunThisProcessIsNotDrivingStillClearsAStaleBlockedBullet(t *testing.T) {
+	srv, st := terminalRunFixture(t, "blocked")
+	mux := srv.Handler()
+
+	bullets, err := st.ListBulletsForIntent("sgt-run-intent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.AdvanceBulletStatus(bullets[0].ID, "blocked", "gates did not pass; no further automatic attempt available"); err != nil {
+		t.Fatal(err)
+	}
+
+	w := postJSON(t, mux, "/api/run-cancel", `{"id":"sgt-run"}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", w.Code, w.Body.String())
+	}
+
+	got, err := st.GetBullet(bullets[0].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != "pending" {
+		t.Errorf("bullet status = %q after cancelling a not-actively-driven run, want pending", got.Status)
+	}
+	if got.BlockedReason != "" {
+		t.Errorf("bullet blocked reason = %q, want empty", got.BlockedReason)
+	}
+}
+
 // Scenario: "Deleting a run has the same effect before and after." The run
 // record must be gone afterward, and the response must name the deleted id.
 func TestDeletingARunRemovesItsRecord(t *testing.T) {

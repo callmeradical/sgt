@@ -113,7 +113,7 @@ The UI is embedded with `//go:embed static/*`, so changing
 
 Environment:
 
-- `SGT_AGENT_TIMEOUT` — per-attempt agent budget (default 10m)
+- `SGT_AGENT_TIMEOUT` — per-attempt agent budget (default: unbounded — see `internal/runner/runner.go`'s `DefaultAgentTimeout` doc comment; an agent that hangs is visible and cancellable, work discarded on a timer is silent)
 - `SGT_GATE_TIMEOUT` — per-gate budget (default 5m)
 - `SGT_FLEET_DIR` — worktree root; set in tests so they never touch the real path
 - `SGT_CONFIG` — project YAML directory

@@ -14,7 +14,9 @@ import (
 
 	"github.com/callmeradical/sgt/internal/changerequest"
 	"github.com/callmeradical/sgt/internal/config"
+	"github.com/callmeradical/sgt/internal/dag"
 	"github.com/callmeradical/sgt/internal/graphify"
+	"github.com/callmeradical/sgt/internal/manual"
 	"github.com/callmeradical/sgt/internal/naming"
 	"github.com/callmeradical/sgt/internal/redact"
 	"github.com/callmeradical/sgt/internal/runner"
@@ -133,6 +135,7 @@ func (srv *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/refine-project", srv.handleRefineProject)
 	mux.HandleFunc("/api/runs", srv.handleRuns)
 	mux.HandleFunc("/api/analytics", srv.handleAnalytics)
+	mux.HandleFunc("/api/manual", srv.handleManual)
 	mux.HandleFunc("/api/run-details", srv.handleRunDetails)
 	mux.HandleFunc("/api/validate-intent", srv.handleValidateIntent)
 	mux.HandleFunc("/api/discover-workflow", srv.handleDiscoverWorkflow)
@@ -149,6 +152,7 @@ func (srv *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/clean-worktrees", srv.fleet.handleCleanWorktrees)
 	mux.HandleFunc("/api/run-cancel", srv.handleRunCancel)
 	mux.HandleFunc("/api/run-resume", srv.handleRunResume)
+	mux.HandleFunc("/api/run-fix", srv.handleRunFix)
 	mux.HandleFunc("/api/run-delete", srv.handleRunDelete)
 	mux.HandleFunc("/api/delivery-history", srv.handleDeliveryHistory)
 	mux.HandleFunc("/api/delivery-quarantine", srv.handleDeliveryQuarantine)
@@ -319,6 +323,7 @@ type analyticsResponse struct {
 
 func (srv *Server) handleAnalytics(w http.ResponseWriter, r *http.Request) {
 	project := r.URL.Query().Get("project")
+	srv.reconcilePendingMergeStatus(r.Context(), project)
 	analytics, err := srv.Store.ComputeWorkAnalytics(project)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -329,6 +334,17 @@ func (srv *Server) handleAnalytics(w http.ResponseWriter, r *http.Request) {
 		Retention:     srv.retentionSummaryFor(project),
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// handleManual answers GET /api/manual with the parsed, live-substituted
+// manual sections — the same content sgt help answers from, via the same
+// manual.Sections() entry point. A plain read, like handleAnalytics: no
+// request body, no side effects, and unlike every other handler here it
+// never touches srv.Store at all.
+func (srv *Server) handleManual(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"sections": manual.Sections(),
+	})
 }
 
 func (srv *Server) handleRunDetails(w http.ResponseWriter, r *http.Request) {
@@ -366,11 +382,34 @@ func (srv *Server) handleRunDetails(w http.ResponseWriter, r *http.Request) {
 		skips = []string{}
 	}
 
+	// fixRetriesLimit is the "M" in a corrective cycle's "Attempt N of M"
+	// label (a-failed-gate-is-corrected-in-place): the configured bound on
+	// corrective cycles for the repo a fix cycle would bind to. This must
+	// resolve the same repo handleRunFix itself would pick (lastFailedPhase
+	// with no repo filter — the most recently failed phase across every repo
+	// the run touched), not an unrelated heuristic like "the first repo with
+	// any recorded phase", or the displayed bound could name a different
+	// repo's setting than the one a fix cycle actually uses. Best effort — a
+	// run whose project no longer loads, or one with no failed phase yet,
+	// still serves its other fields; it just falls back to the built-in
+	// default rather than failing the whole request.
+	fixRetriesLimit := 5
+	if run, err := srv.Store.GetRun(runID); err == nil && run != nil {
+		if proj, err := config.LoadProject(run.Project); err == nil {
+			repoName := ""
+			if failure, ok := srv.lastFailedPhase(runID, ""); ok {
+				repoName = failure.Repo
+			}
+			fixRetriesLimit = proj.ResolvedFixRetries(repoName)
+		}
+	}
+
 	resp := map[string]interface{}{
-		"run_id":       runID,
-		"phases":       phases,
-		"envelopes":    envelopes,
-		"resume_skips": skips,
+		"run_id":            runID,
+		"phases":            phases,
+		"envelopes":         envelopes,
+		"resume_skips":      skips,
+		"fix_retries_limit": fixRetriesLimit,
 	}
 
 	writeJSON(w, http.StatusOK, resp)
@@ -410,12 +449,12 @@ func (srv *Server) handleCreatePR(w http.ResponseWriter, r *http.Request) {
 	if proj != nil && len(proj.Repos) > 0 {
 		if req.Repo != "" {
 			if rCfg, exists := proj.Repos[req.Repo]; exists {
-				repoPath = rCfg.Path
+				repoPath = expandHome(rCfg.Path)
 			}
 		}
 		if repoPath == "" {
 			for _, rCfg := range proj.Repos {
-				repoPath = rCfg.Path
+				repoPath = expandHome(rCfg.Path)
 				break
 			}
 		}
@@ -425,7 +464,7 @@ func (srv *Server) handleCreatePR(w http.ResponseWriter, r *http.Request) {
 	rawRemote := ""
 	if repoPath != "" {
 		remoteBase = resolveGitRemoteURL(repoPath)
-		rawRemote = rawOriginRemote(expandHome(repoPath))
+		rawRemote = rawOriginRemote(repoPath)
 	}
 
 	run, err := srv.Store.GetRun(req.RunID)
@@ -475,7 +514,18 @@ func (srv *Server) handleCreatePR(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		provider := changerequest.Providers[providerName]
-		url, cerr := provider.Create(r.Context(), repoPath, run.BaseBranch, branch, req.Title, req.Body)
+		// Run gh in the run's own isolated worktree, never the operator's
+		// live checkout (AGENTS.md: "the operator's checkout is never
+		// mutated"). The worktree always has this branch checked out;
+		// repoPath usually does not, and gh's own auto-push behavior for a
+		// branch that is not checked out in cmd.Dir is not a guarantee this
+		// codebase controls. Falls back to repoPath only if the worktree is
+		// somehow already gone (e.g. reclaimed by fleet cleanup).
+		gitDir := repoPath
+		if wt := dag.FleetDir(req.RunID, req.Repo); isDir(wt) {
+			gitDir = wt
+		}
+		url, cerr := provider.Create(r.Context(), gitDir, run.BaseBranch, branch, req.Title, req.Body)
 		if cerr == nil {
 			prURL = url
 			for _, b := range intentBullets {
@@ -551,9 +601,17 @@ type mergeCheckResult struct {
 //     the expected and the actual branch
 //   - not yet merged -> left untouched at "sealed"
 //
-// A run with no sealed bullets carrying a PRURL triggers no provider call
-// at all — the loop below only reaches DetectProvider/Status for a bullet
-// that is both sealed and has one.
+// A green bullet with no recorded PRURL is also eligible (issue #22): its
+// change request may have been opened outside /api/create-pr entirely — a
+// manual `gh pr create` against the branch sgt's own engine pushed, e.g.
+// while that endpoint had its own bug (#8) — leaving sgt with real, merged
+// work it has no record of. Such a bullet is looked up by branch name via
+// FindByHead; a match seals it and records the discovered URL before the
+// same merged/blocked logic above runs against it.
+//
+// A run with no eligible bullets triggers no provider call at all — the
+// loop below only reaches DetectProvider/FindByHead/Status for a bullet
+// that is either sealed-with-a-URL or green-with-none.
 func (srv *Server) handleCheckMergeStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -576,7 +634,9 @@ func (srv *Server) handleCheckMergeStatus(w http.ResponseWriter, r *http.Request
 		if bullets, berr := srv.Store.ListBulletsForIntent(run.IntentID); berr == nil {
 			proj, _ := config.LoadProject(run.Project)
 			for _, b := range bullets {
-				if b.Status != "sealed" || b.PRURL == "" {
+				sealedWithURL := b.Status == "sealed" && b.PRURL != ""
+				greenWithoutURL := b.Status == "green" && b.PRURL == ""
+				if !sealedWithURL && !greenWithoutURL {
 					continue
 				}
 				results = append(results, srv.checkBulletMergeStatus(r.Context(), proj, run, b))
@@ -588,6 +648,73 @@ func (srv *Server) handleCheckMergeStatus(w http.ResponseWriter, r *http.Request
 		"run_id":  runID,
 		"results": results,
 	})
+}
+
+// reconcilePendingMergeStatus checks every sealed-with-a-URL bullet of
+// project against its change request's real state — the same eligibility
+// handleCheckMergeStatus already uses — before analytics for that project
+// is computed. Without this, a bullet whose PR merged on GitHub sat at
+// "sealed" until a human happened to open that specific run's pipeline
+// view, since handleCheckMergeStatus was the only thing that ever advanced
+// it (issue #11).
+//
+// This deliberately does NOT run for an unscoped request (project is ""
+// or "all"): sweeping every project's bullets on one shared aggregate-view
+// load would burst a provider call per eligible bullet across the whole
+// installation, on every request — the same unconditional cost
+// R7.5/observed-change-request-merge-state already rejected for a
+// background timer, just moved to a different trigger. A request naming
+// one specific project — what the dashboard's own Work Analytics panel
+// actually sends — is bounded to that project's own bullets.
+func (srv *Server) reconcilePendingMergeStatus(ctx context.Context, project string) {
+	if project == "" || project == "all" {
+		return
+	}
+	bullets, err := srv.Store.AllBulletsForAnalytics(project)
+	if err != nil || len(bullets) == 0 {
+		return
+	}
+
+	eligible := false
+	for _, b := range bullets {
+		if b.Status == "sealed" && b.PRURL != "" {
+			eligible = true
+			break
+		}
+	}
+	if !eligible {
+		return
+	}
+
+	runs, err := srv.Store.AllRunsForAnalytics(project)
+	if err != nil {
+		return
+	}
+	// The most recent run per intent (runs are already created_at ASC) is
+	// the reference checkBulletMergeStatus uses for BaseBranch — the same
+	// simplification handleCheckMergeStatus's own caller already makes:
+	// one named run stands in for its whole intent's bullets.
+	refRun := map[string]store.RunRecord{}
+	for _, r := range runs {
+		if r.IntentID != "" {
+			refRun[r.IntentID] = r
+		}
+	}
+
+	proj, err := config.LoadProject(project)
+	if err != nil {
+		return
+	}
+	for _, b := range bullets {
+		if b.Status != "sealed" || b.PRURL == "" {
+			continue
+		}
+		run, ok := refRun[b.IntentID]
+		if !ok {
+			continue
+		}
+		srv.checkBulletMergeStatus(ctx, proj, &run, b)
+	}
 }
 
 // checkBulletMergeStatus checks and, if warranted, advances one sealed
@@ -617,13 +744,40 @@ func (srv *Server) checkBulletMergeStatus(ctx context.Context, proj *config.Proj
 		res.Error = perr.Error()
 		return res
 	}
-	status, serr := changerequest.Providers[providerName].Status(ctx, repoPath, b.PRURL)
+	provider := changerequest.Providers[providerName]
+
+	prURL := b.PRURL
+	if prURL == "" {
+		// Green with no recorded PRURL (issue #22): look for a change
+		// request by branch name rather than assuming none exists.
+		branch := naming.BranchNameForRun(run.ID, run.Type, run.ChangeID)
+		found, ferr := provider.FindByHead(ctx, repoPath, branch)
+		if ferr != nil {
+			res.Error = ferr.Error()
+			return res
+		}
+		if found == nil {
+			return res // no change request exists yet for this branch: nothing to reconcile
+		}
+		if err := srv.Store.SetBulletPRURL(b.ID, found.URL); err != nil {
+			res.Error = err.Error()
+			return res
+		}
+		if err := srv.Store.AdvanceBulletStatus(b.ID, "sealed", ""); err != nil {
+			res.Error = err.Error()
+			return res
+		}
+		res.Status = "sealed"
+		prURL = found.URL
+	}
+
+	status, serr := provider.Status(ctx, repoPath, prURL)
 	if serr != nil {
 		res.Error = serr.Error()
 		return res
 	}
 	if !status.Merged {
-		return res // not yet merged: left untouched at "sealed"
+		return res // not yet merged: left at "sealed"
 	}
 
 	if status.MergedIntoBranch == run.BaseBranch {

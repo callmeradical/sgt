@@ -1,5 +1,7 @@
 package store
 
+import "strings"
+
 // ReconcileResult reports what ReconcileOrphanedRuns changed.
 //
 // It is a value type rather than a pair of ints so callers can check individual
@@ -40,7 +42,7 @@ func (s *Store) ReconcileOrphanedRuns() (ReconcileResult, error) {
 	// narrow: terminal statuses are not read, so no terminal run can be
 	// accidentally touched even if the caller ignores the result.
 	rows, err := s.db.Query(
-		`SELECT `+runColumns+` FROM runs WHERE status = 'running' ORDER BY created_at ASC`,
+		`SELECT ` + runColumns + ` FROM runs WHERE status = 'running' ORDER BY created_at ASC`,
 	)
 	if err != nil {
 		return ReconcileResult{}, err
@@ -64,6 +66,34 @@ func (s *Store) ReconcileOrphanedRuns() (ReconcileResult, error) {
 		return ReconcileResult{}, nil
 	}
 
+	// Bulk-fetch running phases for all orphans to avoid an N+1 query pattern.
+	var orphanIDs []string
+	var args []interface{}
+	for _, run := range orphans {
+		orphanIDs = append(orphanIDs, "?")
+		args = append(args, run.ID)
+	}
+
+	query := "SELECT id, run_id FROM phases WHERE status = 'running' AND run_id IN (" + strings.Join(orphanIDs, ",") + ") ORDER BY created_at ASC"
+	phRows, err := s.db.Query(query, args...)
+	if err != nil {
+		return ReconcileResult{}, err
+	}
+
+	phasesByRun := make(map[string][]string)
+	for phRows.Next() {
+		var id, runID string
+		if err := phRows.Scan(&id, &runID); err != nil {
+			phRows.Close()
+			return ReconcileResult{}, err
+		}
+		phasesByRun[runID] = append(phasesByRun[runID], id)
+	}
+	phRows.Close()
+	if err := phRows.Err(); err != nil {
+		return ReconcileResult{}, err
+	}
+
 	var result ReconcileResult
 
 	for _, run := range orphans {
@@ -74,11 +104,14 @@ func (s *Store) ReconcileOrphanedRuns() (ReconcileResult, error) {
 		result.RunsReconciled++
 
 		// Move every running phase that belongs to this run.
-		n, err := s.reconcileRunningPhasesOfRun(run.ID)
-		if err != nil {
-			return result, err
+		phaseIDs := phasesByRun[run.ID]
+		if len(phaseIDs) > 0 {
+			n, err := s.reconcileRunningPhases(run.ID, phaseIDs)
+			if err != nil {
+				return result, err
+			}
+			result.PhasesReconciled += n
 		}
-		result.PhasesReconciled += n
 	}
 
 	return result, nil
@@ -105,37 +138,17 @@ func (s *Store) reconcileRun(runID string) error {
 	})
 }
 
-// reconcileRunningPhasesOfRun moves every running phase of runID to interrupted,
+// reconcileRunningPhases moves every phase in phaseIDs to interrupted,
 // appends a change for each, and returns how many it moved.
+//
+// We update phases iteratively rather than using a single bulk UPDATE
+// so we can append individual change records with their IDs. A bulk UPDATE
+// with no read-back would prevent per-phase change records, and a client
+// following the sequence would not know which phase moved.
 //
 // A phase stuck at running is neither passed nor re-run on resume — resume skips
 // only phases holding a passed record. Leaving it would silently drop work.
-func (s *Store) reconcileRunningPhasesOfRun(runID string) (int, error) {
-	// Read the running phases before updating, so we can append individual
-	// change records with their IDs. A bulk UPDATE with no read-back would
-	// prevent per-phase change records, and a client following the sequence
-	// would not know which phase moved.
-	phRows, err := s.db.Query(
-		`SELECT id FROM phases WHERE run_id = ? AND status = 'running' ORDER BY created_at ASC`,
-		runID,
-	)
-	if err != nil {
-		return 0, err
-	}
-	var phaseIDs []string
-	for phRows.Next() {
-		var id string
-		if err := phRows.Scan(&id); err != nil {
-			phRows.Close()
-			return 0, err
-		}
-		phaseIDs = append(phaseIDs, id)
-	}
-	phRows.Close()
-	if err := phRows.Err(); err != nil {
-		return 0, err
-	}
-
+func (s *Store) reconcileRunningPhases(runID string, phaseIDs []string) (int, error) {
 	for _, phaseID := range phaseIDs {
 		if _, err := s.db.Exec(
 			`UPDATE phases SET status = 'interrupted' WHERE id = ? AND status = 'running'`,

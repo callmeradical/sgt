@@ -16,8 +16,8 @@ or `wiki` after the user has requested execution of those procedures.
 
 | Question | Primary document |
 |---|---|
+| Any general question about installing, configuring, or using Sgt | `internal/manual/manual.md` — via `sgt help [topic]` or `GET /api/manual`; check this first |
 | Product and deployment model | `docs/architecture.md` |
-| Installation and first project | Not yet written for v2 — see `README.md`'s Quick start and `AGENTS.md`'s "Two ways in" section for the closest available guidance |
 | External and bundled skill sources | `docs/repo-scoped-skills.md` |
 | Direct/dispatch workflows and commands | `skills/dispatch/SKILL.md`, `skills/cross-repo-work/SKILL.md` |
 | Errors, stale runs, auth, gates, cleanup | `docs/troubleshooting.md` |
