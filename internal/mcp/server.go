@@ -17,8 +17,46 @@ import (
 	"github.com/callmeradical/sgt/internal/naming"
 	"github.com/callmeradical/sgt/internal/redact"
 	"github.com/callmeradical/sgt/internal/runner"
+	"github.com/callmeradical/sgt/internal/sgtclient"
 	"github.com/callmeradical/sgt/internal/store"
 )
+
+// resolveUIAddr resolves the running `sgt ui`'s base URL: SGT_UI_ADDR if
+// set, sgtclient.DefaultAddr otherwise. Addr resolution lives here, at the
+// call site — per design.md's "addr is always passed in, never resolved
+// inside the package" rule, sgtclient itself has no environment dependency.
+func resolveUIAddr() string {
+	if addr := os.Getenv("SGT_UI_ADDR"); addr != "" {
+		return addr
+	}
+	return sgtclient.DefaultAddr
+}
+
+// argString reads a string field out of args, matching the existing case
+// blocks' own args[...].(type) style (e.g. runID, _ := args["run_id"].(string)),
+// just named so sgt_dispatch/sgt_create_pr's several fields don't repeat it.
+func argString(args map[string]interface{}, key string) string {
+	s, _ := args[key].(string)
+	return s
+}
+
+// stringSlice converts args[key], a []interface{} of strings as MCP JSON
+// decodes it, into a []string. Any non-string element is skipped rather than
+// failing the whole request, matching sgt_emit_envelope's existing
+// args["artifacts"] handling.
+func stringSlice(args map[string]interface{}, key string) []string {
+	raw, ok := args[key].([]interface{})
+	if !ok {
+		return nil
+	}
+	var out []string
+	for _, v := range raw {
+		if s, ok := v.(string); ok {
+			out = append(out, s)
+		}
+	}
+	return out
+}
 
 type JSONRPCRequest struct {
 	JSONRPC string          `json:"jsonrpc"`
@@ -139,12 +177,64 @@ func Tools() []Tool {
 			},
 		},
 		{
-			Name:        "sgt_seal_pr",
-			Description: "Seal the verified worktree changes and open a GitHub / Gitea Pull Request.",
+			Name: "sgt_seal_pr",
+			Description: "Seal the verified worktree changes in your own current checkout and open a " +
+				"GitHub / Gitea Pull Request. For a coordinator-dispatched run's isolated worktree, use " +
+				"sgt_create_pr instead.",
 			InputSchema: map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{
 					"run_id":  map[string]string{"type": "string", "description": "Active run ID"},
+					"project": map[string]string{"type": "string", "description": "Project name"},
+					"repo":    map[string]string{"type": "string", "description": "Repository name"},
+					"title":   map[string]string{"type": "string", "description": "Pull Request title"},
+					"body":    map[string]string{"type": "string", "description": "Pull Request description/body"},
+				},
+				"required": []string{"run_id", "project", "repo"},
+			},
+		},
+		// sgt_dispatch and sgt_create_pr mirror POST /api/dispatch and
+		// POST /api/create-pr exactly (docs/prd-mcp-dispatch-and-create-pr-tools.md):
+		// both are real HTTP clients against a running `sgt ui`
+		// (internal/sgtclient), never a reimplementation of
+		// handleDispatch/handleCreatePR's own logic. This is what lets an
+		// MCP-connected operator agent drive dispatch end-to-end natively,
+		// closing the gap sgt_run_status/sgt_run_wait left: those two can
+		// only follow a run that already exists.
+		{
+			Name: "sgt_dispatch",
+			Description: "Start a dispatch: POST /api/dispatch against a running `sgt ui`, exactly as the " +
+				"coordinator UI does. Repeating the same request_id returns the original run and starts " +
+				"nothing. Omitting repos records a proposed plan awaiting approval and starts no run.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"project": map[string]string{"type": "string", "description": "Project name"},
+					"brief":   map[string]string{"type": "string", "description": "Intent brief describing the work"},
+					"repos": map[string]interface{}{
+						"type": "array", "items": map[string]string{"type": "string"},
+						"description": "Target repositories. Omit to record a proposed plan across every project repository instead of dispatching.",
+					},
+					"agent": map[string]string{"type": "string", "description": "Optional agent CLI override (e.g. claude, codex, goose)"},
+					"type": map[string]string{"type": "string",
+						"description": "Work type this dispatch is accountable to: one of feat, fix, refactor, docs, chore, test"},
+					"change_id": map[string]string{"type": "string",
+						"description": "Optional OpenSpec change id. When empty, a change is derived from the brief and scaffolded."},
+					"request_id": map[string]string{"type": "string",
+						"description": "Optional idempotency key. A repeat of a known key returns the original run and starts nothing."},
+				},
+				"required": []string{"project", "brief", "type"},
+			},
+		},
+		{
+			Name: "sgt_create_pr",
+			Description: "Open a Pull Request for a coordinator-dispatched run's isolated worktree: " +
+				"POST /api/create-pr against a running `sgt ui`. Requires the target bullet to be green; " +
+				"refuses otherwise. For work sitting in your own current checkout, use sgt_seal_pr instead.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"run_id":  map[string]string{"type": "string", "description": "The run whose worktree the PR is opened from"},
 					"project": map[string]string{"type": "string", "description": "Project name"},
 					"repo":    map[string]string{"type": "string", "description": "Repository name"},
 					"title":   map[string]string{"type": "string", "description": "Pull Request title"},
@@ -442,6 +532,36 @@ func (s *MCPServer) executeTool(name string, args map[string]interface{}) (strin
 			return "", err
 		}
 		return msg, nil
+
+	case "sgt_dispatch":
+		req := sgtclient.DispatchRequest{
+			Project:   argString(args, "project"),
+			Brief:     argString(args, "brief"),
+			Repos:     stringSlice(args, "repos"),
+			Agent:     argString(args, "agent"),
+			Type:      argString(args, "type"),
+			ChangeID:  argString(args, "change_id"),
+			RequestID: argString(args, "request_id"),
+		}
+		resp, err := sgtclient.Dispatch(resolveUIAddr(), req)
+		if err != nil {
+			return "", err
+		}
+		return encode(resp)
+
+	case "sgt_create_pr":
+		req := sgtclient.CreatePRRequest{
+			RunID:   argString(args, "run_id"),
+			Project: argString(args, "project"),
+			Repo:    argString(args, "repo"),
+			Title:   argString(args, "title"),
+			Body:    argString(args, "body"),
+		}
+		resp, err := sgtclient.CreatePR(resolveUIAddr(), req)
+		if err != nil {
+			return "", err
+		}
+		return encode(resp)
 
 	case "sgt_run_status":
 		runID, _ := args["run_id"].(string)
