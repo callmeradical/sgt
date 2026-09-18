@@ -1,4 +1,6 @@
-package mcp
+// Package mcp_test: see dispatch_tools_test.go's package comment for why
+// (this file shares its fixtures and needs the same import-cycle escape).
+package mcp_test
 
 import (
 	"bytes"
@@ -76,7 +78,7 @@ func TestDispatchViaHTTPAndViaSgtDispatchToolProduceIdenticalStoreState(t *testi
 	}
 
 	// Leg 2: the MCP tool, against the identical server.
-	mcpText, err := s.executeTool("sgt_dispatch", map[string]interface{}{
+	mcpText, err := s.ExecuteTool("sgt_dispatch", map[string]interface{}{
 		"project": "mcpo", "brief": "add stripe webhooks",
 		"repos": []interface{}{"svc"}, "type": "feat", "change_id": changeID, "request_id": "mcp-leg",
 	})
@@ -209,7 +211,7 @@ func TestCreatePRViaHTTPAndViaSgtCreatePRToolProduceIdenticalBulletState(t *test
 
 	// Leg 2: the MCP tool, sealing the second bullet (run-mcpcp-2), against
 	// the identical server.
-	mcpText, err := s.executeTool("sgt_create_pr", map[string]interface{}{
+	mcpText, err := s.ExecuteTool("sgt_create_pr", map[string]interface{}{
 		"run_id": runID2, "project": "mcpcp", "repo": "svc", "title": "t", "body": "b",
 	})
 	if err != nil {
@@ -289,7 +291,7 @@ func TestUnrecognizedTypeRefusalTextIsIdenticalViaHTTPAndSgtDispatch(t *testing.
 	// this server, and a rejected dispatch creates no run to collide with,
 	// but a fresh fixture keeps the legs from sharing any state at all.
 	s, _, _, _ := mcpDispatchFixture(t, "svc")
-	_, err := s.executeTool("sgt_dispatch", map[string]interface{}{
+	_, err := s.ExecuteTool("sgt_dispatch", map[string]interface{}{
 		"project": "mcpo", "brief": "add stripe webhooks", "type": "bogus",
 	})
 	if err == nil {
@@ -340,7 +342,7 @@ func TestUnknownChangeIDRefusalTextIsIdenticalViaHTTPAndSgtDispatch(t *testing.T
 	}
 	httpErrText := string(bytes.TrimRight(httpBody, "\n"))
 
-	_, err := s.executeTool("sgt_dispatch", map[string]interface{}{
+	_, err := s.ExecuteTool("sgt_dispatch", map[string]interface{}{
 		"project": "mcpo", "brief": "add stripe webhooks",
 		"repos": []interface{}{"svc"}, "type": "feat", "change_id": "no-such-change",
 	})
@@ -383,7 +385,7 @@ func TestNonGreenBulletRefusalTextIsIdenticalViaHTTPAndSgtCreatePR(t *testing.T)
 	httpErrText := string(bytes.TrimRight(httpBody, "\n"))
 
 	s, _, runID2, _, _ := mcpCreatePRFixture(t, "pending")
-	_, err := s.executeTool("sgt_create_pr", map[string]interface{}{
+	_, err := s.ExecuteTool("sgt_create_pr", map[string]interface{}{
 		"run_id": runID2, "project": "mcpcp", "repo": "svc", "title": "t", "body": "b",
 	})
 	if err == nil {

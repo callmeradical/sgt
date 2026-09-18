@@ -1,4 +1,5 @@
-package mcp
+// Package mcp_test: see dispatch_tools_test.go's package comment for why.
+package mcp_test
 
 // Shared helpers for dispatch_parity_test.go's CLI-subprocess leg: building
 // the real sgt binary once, running it as a real subprocess against a

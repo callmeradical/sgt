@@ -2,6 +2,7 @@ package runner
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"mime"
 	"os"
@@ -110,13 +111,31 @@ func captureArtifacts(st *store.Store, runID, phaseID, repo, dir string) {
 
 		srcPath := filepath.Join(dir, f.name)
 		destPath := filepath.Join(destDir, f.name)
-		data, err := os.ReadFile(srcPath)
+
+		srcFile, err := os.Open(srcPath)
 		if err != nil {
 			dropped = append(dropped, fmt.Sprintf("%s: reading source file: %v", f.name, err))
 			continue
 		}
-		if err := os.WriteFile(destPath, data, 0o644); err != nil {
-			dropped = append(dropped, fmt.Sprintf("%s: writing durable copy: %v", f.name, err))
+
+		destFile, err := os.OpenFile(destPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+		if err != nil {
+			srcFile.Close()
+			dropped = append(dropped, fmt.Sprintf("%s: creating durable copy: %v", f.name, err))
+			continue
+		}
+
+		_, copyErr := io.Copy(destFile, srcFile)
+
+		srcFile.Close()
+		closeErr := destFile.Close()
+
+		if copyErr != nil {
+			dropped = append(dropped, fmt.Sprintf("%s: copying file: %v", f.name, copyErr))
+			continue
+		}
+		if closeErr != nil {
+			dropped = append(dropped, fmt.Sprintf("%s: closing durable copy: %v", f.name, closeErr))
 			continue
 		}
 

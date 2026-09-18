@@ -8,89 +8,97 @@ which deliberately left this exact gap for a follow-up (flagged then as
 
 ## Summary
 
-`bin/sgt-*`, `_sgt-*.sh`, and the legacy `sgt-mcp` proxy no longer exist
-on `v2` — but `skills/dispatch/SKILL.md`, `skills/cross-repo-work/SKILL.md`,
+This PRD originally targeted nine files believed to still instruct an
+operator or agent to run deleted v1 commands. Re-checking the current
+repository (`callmeradical/sgt`) found that eight of those nine —
+`skills/dispatch/SKILL.md`, `skills/cross-repo-work/SKILL.md`,
 `skills/load-project/SKILL.md`, `skills/wiki/SKILL.md`,
 `skills/sgt-help/SKILL.md`, `.agents/skills/to-tickets/SKILL.md`,
-`docs/troubleshooting.md`, and `schema/project.yaml.example` still instruct
-an operator or agent to run those now-deleted commands
-(`sgt-watch --sync <task-id>`, `sgt-dispatch`, `sgt-notify`,
-`sgt-td-create`, `sgt-graphify`, and others). This PRD rewrites those files
-to describe v2's actual surface — the HTTP API (`POST /api/dispatch`,
-`/api/run-resume`, `/api/bullets`, `/api/create-pr`) and the MCP tools
-(`sgt_get_brief`, `sgt_run_gates`, `sgt_run_status`,
-`sgt_run_wait`) — instead.
+`docs/troubleshooting.md`, and `schema/project.yaml.example` — already
+describe v2's actual surface; whatever produced this repository already
+fixed them. `tests/instruction-policy-test.sh`, the ninth, no longer
+exists at all — the file this PRD would have updated is gone.
+
+One file the original version of this PRD did not name still has the
+problem: `docs/schema.md` — cited by `docs/README.md` as "the canonical
+v2 schema reference" — describes several project-YAML fields in terms of
+deleted v1 commands, including one field (`url`) that does not exist in
+`config.Repo` at all. This PRD now targets that file only.
 
 ## Problem
 
-Anyone or anything (human operator, or an agent following these skills as
-written) that follows the current text on `v2` is told to run commands that
-do not exist in the checkout it's reading them from. This is not a
-cosmetic inconsistency: `AGENTS.md` decision D7 explicitly forbids v2 from
-depending on v1, and these files are the operational instructions a
-dispatched agent or a human operator actually reads to know what to do —
-exactly the surface where that gap is most consequential.
+`docs/schema.md` presents three fields' behavior as still driven by v1
+binaries that no longer exist:
 
-Compounding this: `tests/instruction-policy-test.sh` currently *requires*
-several of the v1-specific strings this PRD would remove (for example,
-`require_text "skills/dispatch/SKILL.md" 'sgt-watch --sync <task-id>'`).
-That test enforces today's (v1-describing) content is unchanged; rewriting
-the skills without also updating the test's assertions would either fail
-the test or require silently weakening it. This PRD's implementation must
-treat the test's assertions as also needing to change to match the new,
-v2-correct required text — not as a pre-existing constraint the rewrite
-has to route around.
+- The `name` field's format constraint is attributed to `sgt-graphify`.
+  The constraint's real owner today, if it is still enforced at all, is
+  `internal/graphify`'s native Go implementation (decision D9) — not a
+  deleted bash script.
+- The `url` field is documented as "Used by `sgt-sync` to clone if path
+  doesn't exist" — but `config.Repo` (`internal/config/config.go`) has no
+  `url`/`URL` field at all, and no code anywhere clones a missing repo
+  path. This describes a field and a behavior that do not exist in v2. A
+  missing or non-git path is refused, not cloned (`skills/dispatch/
+  SKILL.md`'s Step 2).
+- The `output` and `exclude_patterns` fields' descriptions name
+  `sgt-graphify` and "current Graphify CLIs that do not accept exclude
+  flags" — obsolete framing from before decision D9 made graph building
+  native Go (`internal/graphify/graphify.go`); the *behavior* described
+  (preserves symlinks, applies excludes before merging, stages outside a
+  source repo) is now implemented correctly, just not by anything named
+  `sgt-graphify`.
+- Separately, `docs/schema.md` states "`sgt-dispatch` still classifies
+  review routing" — routing is real and current, but the classifier is
+  v2's own dispatch/review code, not the deleted v1 binary.
+
+This is not cosmetic: `docs/schema.md` is documented elsewhere as the
+canonical reference for what these fields do, so a reader has no way to
+know its command citations are dead without independently checking the
+source, which defeats the purpose of a canonical reference.
 
 ## Proposal
 
-Rewrite each of the following to describe v2's actual dispatch, review, and
-task-tracking model instead of v1 CLI commands:
+Rewrite `docs/schema.md`'s field descriptions to name the actual, current
+mechanism behind each one:
 
-- `skills/dispatch/SKILL.md` — replace `sgt-dispatch`/`sgt-watch` instructions
-  with the `POST /api/dispatch` / `/api/run-resume` / `/api/runs` flow.
-- `skills/cross-repo-work/SKILL.md` — replace any v1 multi-repo fleet
-  instructions with the Project → Intent → Bullet model already in
-  AGENTS.md.
-- `skills/load-project/SKILL.md` — replace v1 project-registration
-  instructions with v2's project YAML (`internal/config`) conventions.
-- `skills/wiki/SKILL.md` — audit for v1 references (`wiki-daily-digest`
-  itself was explicitly kept on `v2`; only remove references to deleted
-  fleet-dispatch commands, not the wiki tool itself).
-- `skills/sgt-help/SKILL.md` — update its command reference to v2's
-  actual commands/API surface.
-- `.agents/skills/to-tickets/SKILL.md` — replace `sgt-list`/`sgt-context`/
-  `sgt-td-*`/`sgt-dispatch` references with v2 equivalents, or note
-  explicitly where v2 has no equivalent yet (e.g., task-tracking export is
-  read-only per D4 — this skill cannot assume a v2 command that creates
-  tasks in an external tracker).
-- `docs/troubleshooting.md` — remove v1-specific troubleshooting steps
-  (`sgt-watch <task>`, the Bash 3.2 Docker test suite) that no longer apply.
-- `schema/project.yaml.example` — remove comments referencing `sgt-graphify`/
-  `sgt-sync`/`sgt-dag-run`/`sgt-watch`; document the fields `internal/config`
-  actually reads today.
-- `tests/instruction-policy-test.sh` — update its `require_text`/
-  `reject_text` assertions to match the new content, in the same change,
-  so the test continues to enforce the (now v2-correct) required text
-  rather than being weakened or left checking for deleted commands.
+- `name`: cite `internal/graphify` (D9) if the format constraint is still
+  enforced there; if it is not currently enforced anywhere, say so rather
+  than attributing it to code that no longer exists.
+- `url`: remove this row, or replace it with an accurate statement that
+  `config.Repo` has no such field and v2 does not clone a missing repo
+  path — whichever the implementer judges clearer; either way, stop
+  describing a fictional field and behavior as real.
+- `output` / `exclude_patterns`: describe the native `internal/graphify`
+  behavior (decision D9) without naming `sgt-graphify` or any external
+  CLI.
+- The review-routing sentence: name v2's actual dispatch/review mechanism
+  instead of `sgt-dispatch`.
 
 ## Out of scope
 
+- **The eight files the original version of this PRD named that are
+  already correct** (`skills/dispatch/SKILL.md`,
+  `skills/cross-repo-work/SKILL.md`, `skills/load-project/SKILL.md`,
+  `skills/wiki/SKILL.md`, `skills/sgt-help/SKILL.md`,
+  `.agents/skills/to-tickets/SKILL.md`, `docs/troubleshooting.md`,
+  `schema/project.yaml.example`). No further action needed on them.
+- **`tests/instruction-policy-test.sh`.** No longer exists; there is
+  nothing to update.
 - **Rewriting historical/dated documents** (`docs/audit-2026-07.md`,
   `docs/adr-oc-inject-deletion.md`, `docs/dead-code-2026-07.md`, PRDs,
-  openspec archived changes, research docs). These are historical record;
-  editing them to remove v1 references would be revisionist, matching the
-  decision already made during the v1-removal work.
-- **`AGENTS.md` itself.** Already correctly describes v2 (confirmed during
-  the v1-removal work); this PRD does not revisit it.
-- **Adding new v2 capabilities to close a gap a rewritten skill reveals**
-  (for example, if `to-tickets` needs a v2 command that doesn't exist yet).
-  Where v2 has no equivalent, the rewritten skill says so explicitly and
-  stops there — closing that capability gap is separate, future scope.
+  `docs/architecture.md`'s v1-vs-v2 comparison, openspec archived
+  changes, research docs). These correctly use v1 command names in
+  historical or comparative context, not as current instructions; editing
+  them would be revisionist.
+- **`AGENTS.md` itself.** Its own v1 command references are explicit
+  prohibitions ("Do **not** call `sgt-dispatch`..."), which is already
+  correct; this PRD does not revisit it.
+- **Adding a new v2 capability to close a gap this rewrite reveals** (for
+  example, if `name`'s constraint turns out to be unenforced anywhere and
+  someone decides it should be). Documenting the current, actual state
+  honestly is this PRD's job; deciding to add missing enforcement is
+  separate, future scope.
 
 ## Open questions
 
-- Should these become one OpenSpec change or several (e.g., one per skill
-  file, one for `docs/troubleshooting.md` + `schema/project.yaml.example`,
-  one for the test)? Given they share one purpose (removing dead v1
-  references) but touch independent files with no ordering dependency
-  between them, left to OpenSpec's `design.md`/`tasks.md` to decide.
+None blocking.

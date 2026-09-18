@@ -171,6 +171,12 @@ type PhaseRunner struct {
 	AgentCLI string
 	Model    string
 
+	// FixCycle stamps which corrective cycle (a-failed-gate-is-corrected-in-
+	// place) every phase this PhaseRunner records belongs to: 0 is a normal
+	// dispatch or plain Resume (every existing caller), 1 is the first
+	// corrective cycle, 2 the second, and so on.
+	FixCycle int
+
 	// Budgets per attempt. Zero means "resolve from the environment default".
 	AgentTimeout time.Duration
 	GateTimeout  time.Duration
@@ -326,6 +332,7 @@ func (pr *PhaseRunner) RunCodeGate(ctx context.Context, name, command string) (*
 		Error:      errStr,
 		DurationMs: duration,
 		Payload:    payload,
+		FixCycle:   pr.FixCycle,
 	}
 
 	_ = pr.Store.RecordPhase(phaseRec)
@@ -506,6 +513,7 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 		Status:     "running",
 		DurationMs: 0,
 		Attempt:    1,
+		FixCycle:   pr.FixCycle,
 	}
 	_ = pr.Store.RecordPhase(initialPhase)
 
@@ -718,6 +726,7 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 			DurationMs: duration,
 			Payload:    env.Payload,
 			Attempt:    attemptNumber,
+			FixCycle:   pr.FixCycle,
 		})
 		// Capture happens synchronously here, before this attempt's result is
 		// returned or the loop continues to a retry — well before any

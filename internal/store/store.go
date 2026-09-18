@@ -85,7 +85,13 @@ type PhaseRecord struct {
 	// Attempt is the 1-based sequence number for this phase invocation. The first
 	// attempt is 1; each retry increments by 1 with no gaps. A value of 0 means
 	// the record predates this field and the attempt count is unknown.
-	Attempt   int       `json:"attempt,omitempty"`
+	Attempt int `json:"attempt,omitempty"`
+	// FixCycle is which corrective cycle this phase belongs to
+	// (a-failed-gate-is-corrected-in-place): 0 is the run's own original
+	// attempt, 1 is the first corrective cycle, 2 the second, and so on. It is
+	// orthogonal to Attempt, which counts one phase's own retries within a
+	// single turn — FixCycle instead counts whole gate-fix-retest cycles.
+	FixCycle  int       `json:"fix_cycle,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -306,6 +312,7 @@ func (s *Store) migrate() error {
 		duration_ms INTEGER,
 		payload TEXT,
 		attempt INTEGER NOT NULL DEFAULT 0,
+		fix_cycle INTEGER NOT NULL DEFAULT 0,
 		created_at DATETIME NOT NULL,
 		FOREIGN KEY (run_id) REFERENCES runs(id)
 	);
@@ -435,6 +442,10 @@ func (s *Store) migrateAddColumns() error {
 		{"intents", "type", "ALTER TABLE intents ADD COLUMN type TEXT NOT NULL DEFAULT ''"},
 		// attempt is 1-based; 0 means "pre-dates this field" (unknown attempt count).
 		{"phases", "attempt", "ALTER TABLE phases ADD COLUMN attempt INTEGER NOT NULL DEFAULT 0"},
+		// fix_cycle is which corrective cycle a phase belongs to
+		// (a-failed-gate-is-corrected-in-place); existing rows predate the
+		// feature and are all the run's own original attempt, cycle 0.
+		{"phases", "fix_cycle", "ALTER TABLE phases ADD COLUMN fix_cycle INTEGER NOT NULL DEFAULT 0"},
 
 		// Envelope metadata added by R5.1/R5.2. DEFAULT '' so existing rows read
 		// back as empty rather than NULL, making the zero value the "no type
@@ -510,11 +521,41 @@ func (s *Store) migrateAddColumns() error {
 // other, which is what makes the key optional.
 const requestIDIndex = `CREATE UNIQUE INDEX IF NOT EXISTS idx_runs_request_id ON runs(request_id)`
 
+// phasesRunIDIndex makes fetching phases for a specific run faster.
+const phasesRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_phases_run_id ON phases(run_id)`
+
+// envelopesRunIDIndex makes fetching envelopes and cascading deletes faster.
+const envelopesRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_envelopes_run_id ON envelopes(run_id)`
+
+// deliveriesEnvelopeIDIndex makes fetching deliveries and cascading deletes faster.
+const deliveriesEnvelopeIDIndex = `CREATE INDEX IF NOT EXISTS idx_deliveries_envelope_id ON deliveries(envelope_id)`
+
+// bulletsIntentIDIndex makes fetching bullets for an intent faster.
+const bulletsIntentIDIndex = `CREATE INDEX IF NOT EXISTS idx_bullets_intent_id ON bullets(intent_id)`
+
+// artifactsRunIDIndex makes fetching artifacts for a specific run faster.
+const artifactsRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_artifacts_run_id ON artifacts(run_id)`
+
 // migrateAddIndexes creates the indexes the code depends on for correctness
 // rather than for speed. IF NOT EXISTS makes it idempotent across reopens.
 func (s *Store) migrateAddIndexes() error {
 	if _, err := s.db.Exec(requestIDIndex); err != nil {
 		return fmt.Errorf("creating the unique index on runs.request_id: %w", err)
+	}
+	if _, err := s.db.Exec(phasesRunIDIndex); err != nil {
+		return fmt.Errorf("creating the index on phases.run_id: %w", err)
+	}
+	if _, err := s.db.Exec(envelopesRunIDIndex); err != nil {
+		return fmt.Errorf("creating the index on envelopes.run_id: %w", err)
+	}
+	if _, err := s.db.Exec(deliveriesEnvelopeIDIndex); err != nil {
+		return fmt.Errorf("creating the index on deliveries.envelope_id: %w", err)
+	}
+	if _, err := s.db.Exec(bulletsIntentIDIndex); err != nil {
+		return fmt.Errorf("creating the index on bullets.intent_id: %w", err)
+	}
+	if _, err := s.db.Exec(artifactsRunIDIndex); err != nil {
+		return fmt.Errorf("creating the index on artifacts.run_id: %w", err)
 	}
 	return nil
 }
@@ -537,7 +578,7 @@ func (s *Store) hasTable(table string) (bool, error) {
 }
 
 func (s *Store) hasColumn(table, column string) (bool, error) {
-	rows, err := s.db.Query(fmt.Sprintf("PRAGMA table_info(%s)", table))
+	rows, err := s.db.Query("SELECT * FROM pragma_table_info(?)", table)
 	if err != nil {
 		return false, err
 	}
@@ -817,9 +858,9 @@ func (s *Store) RecordPhase(p *PhaseRecord) error {
 		payloadStr = string(p.Payload)
 	}
 	_, err := s.db.Exec(
-		`INSERT OR REPLACE INTO phases (id, run_id, repo, name, kind, status, error, duration_ms, payload, attempt, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		p.ID, p.RunID, p.Repo, p.Name, p.Kind, p.Status, p.Error, p.DurationMs, payloadStr, p.Attempt, p.CreatedAt,
+		`INSERT OR REPLACE INTO phases (id, run_id, repo, name, kind, status, error, duration_ms, payload, attempt, fix_cycle, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		p.ID, p.RunID, p.Repo, p.Name, p.Kind, p.Status, p.Error, p.DurationMs, payloadStr, p.Attempt, p.FixCycle, p.CreatedAt,
 	)
 	if err != nil {
 		return err
@@ -1179,7 +1220,7 @@ func (s *Store) GetRun(runID string) (*RunRecord, error) {
 
 func (s *Store) ListPhasesForRun(runID string) ([]PhaseRecord, error) {
 	rows, err := s.db.Query(
-		`SELECT id, run_id, repo, name, kind, status, error, duration_ms, payload, attempt, created_at FROM phases WHERE run_id = ? ORDER BY created_at ASC`,
+		`SELECT id, run_id, repo, name, kind, status, error, duration_ms, payload, attempt, fix_cycle, created_at FROM phases WHERE run_id = ? ORDER BY created_at ASC`,
 		runID,
 	)
 	if err != nil {
@@ -1192,7 +1233,7 @@ func (s *Store) ListPhasesForRun(runID string) ([]PhaseRecord, error) {
 		var p PhaseRecord
 		var payloadStr sql.NullString
 		var errStr sql.NullString
-		if err := rows.Scan(&p.ID, &p.RunID, &p.Repo, &p.Name, &p.Kind, &p.Status, &errStr, &p.DurationMs, &payloadStr, &p.Attempt, &p.CreatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.RunID, &p.Repo, &p.Name, &p.Kind, &p.Status, &errStr, &p.DurationMs, &payloadStr, &p.Attempt, &p.FixCycle, &p.CreatedAt); err != nil {
 			return nil, err
 		}
 		if errStr.Valid {
