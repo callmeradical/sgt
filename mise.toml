@@ -184,6 +184,15 @@ else
 fi
 """
 
+[tasks."spec-status"]
+description = "Cross-reference docs/prd-*.md against openspec/changes/ (active and archived): what's implemented, what's implemented but not archived, and what has no OpenSpec change yet"
+run = """
+#!/usr/bin/env bash
+set -euo pipefail
+REPO_DIR="$(git -C "${MISE_PROJECT_ROOT:-.}" rev-parse --show-toplevel)"
+"$REPO_DIR/scripts/spec-status.sh" --repo-root "$REPO_DIR"
+"""
+
 [tasks.update]
 description = "Pull latest changes from origin and reinstall symlinks"
 run = """

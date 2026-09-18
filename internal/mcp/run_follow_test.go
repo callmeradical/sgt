@@ -32,7 +32,7 @@ func mcpFixture(t *testing.T) (*MCPServer, *store.Store) {
 
 func callTool(t *testing.T, s *MCPServer, name string, args map[string]interface{}) map[string]interface{} {
 	t.Helper()
-	text, err := s.executeTool(name, args)
+	text, err := s.ExecuteTool(name, args)
 	if err != nil {
 		t.Fatalf("%s returned an error rather than a result: %v", name, err)
 	}
