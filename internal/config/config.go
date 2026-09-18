@@ -94,6 +94,11 @@ type ProjectDefaults struct {
 	Agent   string `yaml:"agent,omitempty" json:"agent"`     // e.g. "pi", "opencode", "claude"
 	Model   string `yaml:"model,omitempty" json:"model"`     // e.g. "anthropic/claude-3-7-sonnet"
 	Retries int    `yaml:"retries,omitempty" json:"retries"` // agent phase retry count (0 = one attempt, no retry)
+	// FixRetries is the corrective-cycle bound a failed gate may be re-attempted
+	// (a-failed-gate-is-corrected-in-place). 0 means "not set here" — resolved
+	// against the built-in default of 5 by ResolvedFixRetries, the same
+	// "zero anywhere means unset" rule Retries/ResolvedRetries already uses.
+	FixRetries int `yaml:"fix_retries,omitempty" json:"fix_retries"`
 }
 
 // Repo represents a single repository managed in the project.
@@ -110,6 +115,9 @@ type Repo struct {
 	// resolution rule is: if the repo's Retries is non-zero, use it; otherwise
 	// fall back to the project default.
 	Retries int `yaml:"retries,omitempty" json:"retries"`
+	// FixRetries overrides Defaults.FixRetries for this repository. Same
+	// "zero means not set here" resolution rule as Retries.
+	FixRetries int `yaml:"fix_retries,omitempty" json:"fix_retries"`
 }
 
 // FactoryConfig defines the intra-repo software factory pipeline and quality gates.
@@ -221,6 +229,27 @@ func (p *Project) ResolvedRetries(repoName string) int {
 		return repo.Retries
 	}
 	return p.Defaults.Retries
+}
+
+// ResolvedFixRetries returns the effective corrective-cycle bound for
+// repoName (a-failed-gate-is-corrected-in-place).
+//
+// Resolution mirrors ResolvedRetries exactly:
+//   - repo-level value if non-zero
+//   - project default if non-zero
+//   - the built-in default of 5
+//
+// Unlike ResolvedRetries, the final fallback is 5, not 0: starting even the
+// first corrective cycle is already an explicit, separate operator action
+// (POST /api/run-fix), so there is no "zero attempts" case to express here.
+func (p *Project) ResolvedFixRetries(repoName string) int {
+	if repo, ok := p.Repos[repoName]; ok && repo.FixRetries != 0 {
+		return repo.FixRetries
+	}
+	if p.Defaults.FixRetries != 0 {
+		return p.Defaults.FixRetries
+	}
+	return 5
 }
 
 func fileExists(p string) bool {

@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -35,34 +36,30 @@ func TestMiseInstallLinksWikiDigestAndBuildsSgt(t *testing.T) {
 		t.Fatalf("creating stale oc-inject.js symlink: %v", err)
 	}
 
-	// go build (invoked by the install script below) resolves GOMODCACHE from
-	// $HOME when unset, which this test overrides to a throwaway dir — so
-	// without this, a cold cache downloads modules into t.TempDir()'s own
-	// tree. The go toolchain extracts a module's cache entry read-only,
-	// directories included, which t.TempDir()'s own cleanup (plain
-	// os.RemoveAll) cannot remove: unlinking an entry needs write permission
-	// on its *parent* directory, and the extracted module directories don't
-	// have it. `go clean -modcache` knows how to fix that; registering it as
-	// a cleanup — after testRoot's own t.TempDir() call above, so it runs
-	// first (t.Cleanup is LIFO) — clears the tree before testRoot's cleanup
-	// ever has to touch it. GOMODCACHE stays pinned to this throwaway dir
-	// throughout, so the operator's real module cache is never touched.
-	goModCache := filepath.Join(testRoot, "gomodcache")
-	t.Cleanup(func() {
-		cleanCmd := exec.Command("go", "clean", "-modcache")
-		cleanCmd.Env = append(os.Environ(), "GOMODCACHE="+goModCache)
-		if out, err := cleanCmd.CombinedOutput(); err != nil {
-			t.Logf("cleaning isolated GOMODCACHE %s: %v\n%s", goModCache, err, out)
-		}
-	})
-
+	// The install script's own `go build` resolves GOPATH/GOMODCACHE/
+	// GOCACHE from HOME by default. Overriding HOME above (so this test
+	// doesn't touch the real ~/.local/bin) would otherwise make that
+	// build download and extract the entire module graph fresh into a
+	// throwaway location under the fake HOME on every run. Go marks
+	// extracted module directories read-only, which t.TempDir()'s
+	// automatic os.RemoveAll cleanup cannot remove -- the recurring
+	// flake this pins down (issue #16). Pointing these at the real,
+	// shared cache instead means the build reuses what's already there
+	// (this repo's own module graph, already built by every other test
+	// in this session) and never extracts anything new inside a temp
+	// dir in the first place — root-cause fix rather than a cleanup
+	// step working around it, and correct whether the cache is cold or
+	// warm, since the real cache is never itself inside a t.TempDir()
+	// subject to automatic removal.
 	cmd := exec.Command("bash", installScript)
 	cmd.Env = append(os.Environ(),
 		"HOME="+filepath.Join(testRoot, "home"),
 		"MISE_PROJECT_ROOT="+root,
 		"MISE_ORIGINAL_CWD="+root,
 		"SGT_INSTALL_DIR="+binDir,
-		"GOMODCACHE="+goModCache,
+		"GOPATH="+goEnv(t, "GOPATH"),
+		"GOMODCACHE="+goEnv(t, "GOMODCACHE"),
+		"GOCACHE="+goEnv(t, "GOCACHE"),
 	)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("mise run install failed: %v\n%s", err, out)
@@ -88,4 +85,17 @@ func TestMiseInstallLinksWikiDigestAndBuildsSgt(t *testing.T) {
 	if info.Mode()&0o111 == 0 {
 		t.Error("bin/sgt was built but is not executable")
 	}
+}
+
+// goEnv reads the real, ambient value of a go env var (e.g. GOMODCACHE) from
+// the environment this test process itself runs in -- not the fake HOME the
+// install script's subprocess runs under -- so that subprocess's own `go
+// build` can be pointed at the same, already-populated shared cache.
+func goEnv(t *testing.T, name string) string {
+	t.Helper()
+	out, err := exec.Command("go", "env", name).Output()
+	if err != nil {
+		t.Fatalf("go env %s: %v", name, err)
+	}
+	return strings.TrimSpace(string(out))
 }

@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -298,6 +299,74 @@ func TestStreamDeliversChangesAppendedWhileConnected(t *testing.T) {
 	}
 	if c.Channel != store.ChannelRun || c.EntityID != "sgt-live" {
 		t.Errorf("change = %s/%s, want run/sgt-live", c.Channel, c.EntityID)
+	}
+}
+
+// Regression coverage for issue #9 ("GET /api/stream cold-start snapshot
+// can replay stale history instead of current state"): a real, concurrent
+// HTTP stress test racing run creation against opening a fresh (no cursor)
+// stream connection. writeSnapshot's own doc comment already claims this is
+// safe by construction — the sequence is read before the run list, so a
+// change landing between the two reads is included in both the snapshot
+// and the replay that immediately follows, never neither — but that claim
+// had no test proving it under real concurrency. Many iterations, and
+// -race, because a race (if real) will not reproduce every time and may
+// not be a logical staleness bug at all but an unsynchronized access.
+func TestStreamColdStartSnapshotNeverMissesAWriteItsOwnSequenceClaims(t *testing.T) {
+	srv, st, _ := streamFixture(t)
+
+	const iterations = 30
+	for i := 0; i < iterations; i++ {
+		var wg sync.WaitGroup
+		for j := 0; j < 4; j++ {
+			wg.Add(1)
+			go func(i, j int) {
+				defer wg.Done()
+				id := fmt.Sprintf("sgt-race-%d-%d", i, j)
+				_ = st.CreateRun(&store.RunRecord{ID: id, Project: "p", TaskID: id, Status: "running"})
+			}(i, j)
+		}
+
+		events, cancel := openStream(t, srv, "")
+		ev := nextEvent(t, events)
+		cancel()
+		wg.Wait()
+
+		if ev.Event != "snapshot" {
+			t.Fatalf("event = %q, want snapshot", ev.Event)
+		}
+		var snap struct {
+			Seq  int64             `json:"seq"`
+			Runs []store.RunRecord `json:"runs"`
+		}
+		if err := json.Unmarshal([]byte(ev.Data), &snap); err != nil {
+			t.Fatal(err)
+		}
+		inSnapshot := map[string]bool{}
+		for _, r := range snap.Runs {
+			inSnapshot[r.ID] = true
+		}
+
+		// Every change up to and including the snapshot's own reported seq
+		// must already be reflected in its run list — that is exactly what
+		// "the sequence read before the run list" is supposed to guarantee.
+		// A run missing here, whose creation change has seq <= snap.Seq, is
+		// the stale-snapshot defect issue #9 describes.
+		changes, err := st.ListChangesSince(0, 10000)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, c := range changes {
+			if c.Channel != store.ChannelRun || c.Seq > snap.Seq {
+				continue
+			}
+			if !strings.HasPrefix(c.EntityID, fmt.Sprintf("sgt-race-%d-", i)) {
+				continue // a run from an earlier iteration may have aged out of the streamSnapshotRuns cap; not this test's concern
+			}
+			if !inSnapshot[c.EntityID] {
+				t.Errorf("iteration %d: run %q has seq %d <= snapshot seq %d but is missing from the snapshot's run list", i, c.EntityID, c.Seq, snap.Seq)
+			}
+		}
 	}
 }
 

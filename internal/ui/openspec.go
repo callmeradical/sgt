@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/callmeradical/sgt/internal/config"
+	"github.com/callmeradical/sgt/internal/dag"
 )
 
 // Decision O3 of docs/prd-sgt-v2.md: a dispatch must resolve to an OpenSpec
@@ -52,6 +53,26 @@ func changesDir(repoPath string) string {
 
 func changeDirFor(repoPath, id string) string {
 	return filepath.Join(changesDir(repoPath), id)
+}
+
+// scaffoldStagingRoot is where a brand-new change is scaffolded when no
+// worktree exists yet to hold it.
+//
+// Change resolution runs before any worktree exists (decision O3), so a
+// freshly scaffolded change has nowhere durable of its own yet: scaffolding
+// it directly into the operator's live checkout (repoPath) would leave an
+// untracked openspec/ directory there permanently, since nothing in this
+// codebase ever commits to or cleans up the operator's own checkout — that
+// is the "operator's checkout is never mutated" rule and was previously
+// violated here. Staging under the fleet root instead keeps the scaffold on
+// sgt's own turf until RunStage copies it into the run's isolated worktree,
+// where it belongs and where it is actually committed.
+//
+// A change already committed to the real repo (found via changeDirFor
+// against repoPath, unaffected by this) is never staged here — only a
+// change this dispatch itself is about to create.
+func scaffoldStagingRoot() string {
+	return filepath.Join(dag.FleetRoot(), "scaffold")
 }
 
 // validateChangeID rejects anything that is not a single path segment. A change
@@ -150,19 +171,36 @@ func resolveChange(repoPath, changeID, brief string) (ChangeRef, error) {
 	dir := changeDirFor(abs, id)
 	// A brief that derives an id which already exists reuses that change rather
 	// than failing: the same stated intent dispatched twice is the same change.
+	// This is the real, committed copy in the target repo, so it is reused as-is.
 	if isDir(dir) {
 		return ChangeRef{ID: id, Dir: dir}, nil
 	}
-	if err := scaffoldChange(abs, id); err != nil {
+
+	// A prior dispatch may have already scaffolded this exact id into staging
+	// (e.g. a retried dispatch for the same brief) without it having been
+	// committed into the real repo yet. Reuse that rather than re-scaffolding.
+	stagingRoot := scaffoldStagingRoot()
+	stagingDir := changeDirFor(stagingRoot, id)
+	if isDir(stagingDir) {
+		return ChangeRef{ID: id, Dir: stagingDir}, nil
+	}
+
+	// Scaffold into staging, never into the operator's live checkout (abs) —
+	// see scaffoldStagingRoot. RunStage copies this into the run's isolated
+	// worktree before the first agent phase, which is where it is committed.
+	if err := os.MkdirAll(stagingRoot, 0755); err != nil {
+		return ChangeRef{}, fmt.Errorf("creating OpenSpec scaffold staging dir %s: %w", stagingRoot, err)
+	}
+	if err := scaffoldChange(stagingRoot, id); err != nil {
 		return ChangeRef{}, err
 	}
 	// Trust the directory, not the exit code: the run record must not claim a
 	// change whose directory is absent.
-	if !isDir(dir) {
+	if !isDir(stagingDir) {
 		return ChangeRef{}, fmt.Errorf(
-			"`openspec new change %s` reported success but %s does not exist", id, dir)
+			"`openspec new change %s` reported success but %s does not exist", id, stagingDir)
 	}
-	return ChangeRef{ID: id, Dir: dir, Created: true}, nil
+	return ChangeRef{ID: id, Dir: stagingDir, Created: true}, nil
 }
 
 // scaffoldChange is the only part of change resolution that needs the openspec
