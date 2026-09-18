@@ -37,6 +37,14 @@ func main() {
 		startUI()
 	case "mcp":
 		startMCP()
+	case "dispatch":
+		runDispatchCommand(os.Args[2:])
+	case "runs":
+		runRunsCommand(os.Args[2:])
+	case "run-details":
+		runRunDetailsCommand(os.Args[2:])
+	case "create-pr":
+		runCreatePRCommand(os.Args[2:])
 	case "version":
 		fmt.Println("sgt v0.2.1 (Go Native Multi-Repo Software Factory Engine + Goose MCP Extension)")
 	case "--help", "-h", "help":
@@ -54,6 +62,10 @@ func printUsage() {
 	fmt.Println("  sgt status           Show recent factory runs and phase states")
 	fmt.Println("  sgt ui               Start embedded Web UI dashboard (http://127.0.0.1:8484)")
 	fmt.Println("  sgt mcp              Start MCP JSON-RPC stdio server for Goose / Claude")
+	fmt.Println("  sgt dispatch         Dispatch work via a running `sgt ui` (POST /api/dispatch)")
+	fmt.Println("  sgt runs             List runs via a running `sgt ui` (GET /api/runs)")
+	fmt.Println("  sgt run-details      Show phases/envelopes for a run (GET /api/run-details)")
+	fmt.Println("  sgt create-pr        Seal a bullet and open its PR (POST /api/create-pr)")
 	fmt.Println("  sgt version          Print version info")
 }
 

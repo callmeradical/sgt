@@ -22,8 +22,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
+
+	"github.com/callmeradical/sgt/internal/store"
 )
 
 // DefaultAddr is sgt ui's own default (NewServer's port <= 0 fallback).
@@ -139,6 +142,52 @@ type CreatePRResponse struct {
 func CreatePR(addr string, req CreatePRRequest) (*CreatePRResponse, error) {
 	var out CreatePRResponse
 	if err := doJSON(http.MethodPost, addr, "/api/create-pr", req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// RunsResponseItem mirrors runPayload (internal/ui/bulletstate.go) exactly:
+// the embedded store.RunRecord plus Resumable. Importing internal/store here
+// is fine — store has no dependency on sgtclient or ui, so there is no
+// cycle — and means every RunRecord field stays available with no
+// hand-copied field list to drift from the real one.
+type RunsResponseItem struct {
+	store.RunRecord
+	Resumable bool `json:"resumable"`
+}
+
+// Runs calls GET /api/runs against a running `sgt ui` at addr. project is
+// forwarded to the server untouched: an empty value omits the query param
+// entirely (handleRuns' own "combine every project" default), matching
+// handleRuns' project/all scoping convention exactly — Runs draws no
+// distinction of its own between "" and "all", the server does.
+func Runs(addr, project string) ([]RunsResponseItem, error) {
+	path := "/api/runs"
+	if project != "" {
+		path += "?project=" + url.QueryEscape(project)
+	}
+	var out []RunsResponseItem
+	if err := doJSON(http.MethodGet, addr, path, nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// RunDetailsResponse mirrors handleRunDetails' response map
+// (internal/ui/server.go) exactly.
+type RunDetailsResponse struct {
+	RunID       string                 `json:"run_id"`
+	Phases      []store.PhaseRecord    `json:"phases"`
+	Envelopes   []store.EnvelopeRecord `json:"envelopes"`
+	ResumeSkips []string               `json:"resume_skips"`
+}
+
+// RunDetails calls GET /api/run-details against a running `sgt ui` at addr.
+func RunDetails(addr, runID string) (*RunDetailsResponse, error) {
+	var out RunDetailsResponse
+	path := "/api/run-details?id=" + url.QueryEscape(runID)
+	if err := doJSON(http.MethodGet, addr, path, nil, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
