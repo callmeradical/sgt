@@ -1222,8 +1222,62 @@ func TestRunStageWithNoIntentIDStillReceivesStageBrief(t *testing.T) {
 	}
 
 	prompt := readPromptFile(t, runID, "svc", "plan")
-	if prompt != stage.Brief {
-		t.Errorf("prompt = %q, want exactly stage.Brief %q", prompt, stage.Brief)
+	if !strings.HasSuffix(prompt, stage.Brief) {
+		t.Errorf("prompt = %q, want it to end with stage.Brief %q", prompt, stage.Brief)
+	}
+	if !strings.Contains(prompt, "plan") {
+		t.Errorf("prompt = %q, want it to name the active phase even with no intent id (issue #18)", prompt)
+	}
+}
+
+// Regression coverage for issue #18 ("give each agent phase a
+// phase-specific objective"): a plan -> build pipeline must not render the
+// same phase-blind prompt to both phases. Each phase's prompt must name
+// that phase and its own boundary — a plan phase told not to implement,
+// commit, push, or open a pull request, and a build phase that is not
+// told those same restrictions, since implementing is exactly its job.
+func TestRunStagePlanPromptForbidsImplementingAndDelivering(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
+
+	repoDir := filepath.Join(tempDir, "svc")
+	newGitRepo(t, repoDir)
+	fakeAgentPath := fakeAgentThatSucceeds(t, tempDir)
+
+	proj := &config.Project{
+		Name:     "phase-objective-proj",
+		Defaults: config.ProjectDefaults{Agent: fakeAgentPath},
+		Repos: map[string]config.Repo{
+			"svc": {Path: repoDir, Factory: &config.FactoryConfig{Pipeline: []string{"plan", "build"}}},
+		},
+	}
+
+	eng := newEngine(t, proj)
+	runID := "run-phase-objective-1"
+	createTestRun(t, eng, proj.Name, runID, "running")
+
+	stage := &config.DAGStage{Name: "s", Repos: []string{"svc"}, Brief: "add webhook retries"}
+	if err := eng.RunStage(context.Background(), runID, stage); err != nil {
+		t.Fatalf("engine failed to run stage: %v", err)
+	}
+
+	planPrompt := readPromptFile(t, runID, "svc", "plan")
+	buildPrompt := readPromptFile(t, runID, "svc", "build")
+
+	if !strings.Contains(planPrompt, "plan") {
+		t.Errorf("plan prompt = %q, want it to name the active phase", planPrompt)
+	}
+	for _, forbidden := range []string{"do not", "not commit", "not push", "not open a pull request"} {
+		if !strings.Contains(strings.ToLower(planPrompt), forbidden) {
+			t.Errorf("plan prompt = %q, want it to explicitly forbid %q-type actions", planPrompt, forbidden)
+		}
+	}
+
+	if planPrompt == buildPrompt {
+		t.Error("plan and build received the identical prompt — nothing distinguishes what each phase may do")
+	}
+	if strings.Contains(strings.ToLower(buildPrompt), "do not modify implementation files") {
+		t.Errorf("build prompt = %q, want no restriction against implementing — that is build's job", buildPrompt)
 	}
 }
 

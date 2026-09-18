@@ -356,12 +356,67 @@ func SortedGateNames(repoCfg config.Repo) []string {
 // remember.
 func reviewPrompt(diff string, stage *config.DAGStage, repoName string) string {
 	return fmt.Sprintf(
-		"Review this diff for repo %s against its intent and OpenSpec change, if one is referenced. "+
+		"# Phase objective: review\n\n"+
+			"You are executing the \"review\" phase: judge the diff below, nothing else. "+
+			"Do not modify files, do not commit, do not push, and do not open a pull request "+
+			"— report findings only.\n\n"+
+			"Review this diff for repo %s against its intent and OpenSpec change, if one is referenced. "+
 			"Judge only what is in the diff and the referenced spec — you have not seen and must not assume "+
 			"the implementing agent's own reasoning. Report findings as JSON: "+
 			"{\"findings\":[{\"axis\":...,\"severity\":\"error\"|\"warning\"|\"info\",\"summary\":...,\"disposition\":...}]}.\n\nDiff:\n%s",
 		repoName, diff,
 	)
+}
+
+// phaseObjective is the boundary text prepended to a phase's rendered
+// prompt: which phase is active, what pipeline it belongs to, what it is
+// expected to produce, and what it must not do.
+//
+// Without this, every phase in a pipeline received the exact same
+// full-intent brief with nothing distinguishing "plan" from "build" — a
+// plan phase had every reason to just implement, commit, push, and open a
+// pull request itself, since nothing told it not to. Status therefore
+// described the wrong work: sgt recorded "plan: running" while the plan
+// agent had already delivered the whole change (issue #18).
+//
+// review and the "test" gate branch of RunStage never reach this — review
+// has its own boundary-scoped prompt (reviewPrompt above) and a
+// gate-configured "test" runs a deterministic command, never an agent.
+func phaseObjective(phase string, pipeline []string) string {
+	chain := strings.Join(pipeline, " -> ")
+	switch phase {
+	case "plan":
+		return fmt.Sprintf(
+			"# Phase objective: plan\n\n"+
+				"This repo's configured pipeline is: %s. You are executing ONLY the "+
+				"\"plan\" phase. Produce a plan for the approach — what will change, "+
+				"which files, and how it will be verified. Do not modify implementation "+
+				"files, do not commit, do not push a branch, and do not open a pull "+
+				"request. Later phases in this pipeline implement and verify the plan; "+
+				"completing them is not your responsibility here.\n\n",
+			chain,
+		)
+	case "build":
+		return fmt.Sprintf(
+			"# Phase objective: build\n\n"+
+				"This repo's configured pipeline is: %s. You are executing the "+
+				"\"build\" phase: implement the change described below. Commit your "+
+				"work if useful, but do not push this branch and do not open a pull "+
+				"request — delivery is a separate, explicitly human-approved action "+
+				"outside this pipeline (POST /api/create-pr), never something a phase "+
+				"does on its own.\n\n",
+			chain,
+		)
+	default:
+		return fmt.Sprintf(
+			"# Phase objective: %s\n\n"+
+				"This repo's configured pipeline is: %s. You are executing ONLY the "+
+				"%q phase. Perform this phase's own responsibility and nothing more — "+
+				"do not perform work belonging to another phase in this pipeline, and "+
+				"do not push a branch or open a pull request.\n\n",
+			phase, chain, phase,
+		)
+	}
 }
 
 // DefaultPipeline is the factory pipeline used for a repo that configures none.
@@ -519,6 +574,7 @@ func (e *Engine) RunStage(ctx context.Context, runID string, stage *config.DAGSt
 				if prompt == "" {
 					prompt = fmt.Sprintf("Execute %s phase for stage %s on %s", phase, stage.Name, repoName)
 				}
+				prompt = phaseObjective(phase, pipeline) + prompt
 				retries := e.Project.ResolvedRetries(repoName)
 				_, _, err := pr.RunAgentPhase(ctx, phase, prompt, retries)
 				if err != nil {
