@@ -15,6 +15,7 @@ import (
 type fakeChangeRequestProvider struct {
 	createFn func(ctx context.Context, repoPath, base, head, title, body string) (string, error)
 	statusFn func(ctx context.Context, repoPath, url string) (*changerequest.StatusResult, error)
+	findFn   func(ctx context.Context, repoPath, head string) (*changerequest.FoundRef, error)
 
 	createCalls  int
 	lastBase     string
@@ -38,6 +39,13 @@ func (f *fakeChangeRequestProvider) Status(ctx context.Context, repoPath, url st
 		return f.statusFn(ctx, repoPath, url)
 	}
 	return &changerequest.StatusResult{}, nil
+}
+
+func (f *fakeChangeRequestProvider) FindByHead(ctx context.Context, repoPath, head string) (*changerequest.FoundRef, error) {
+	if f.findFn != nil {
+		return f.findFn(ctx, repoPath, head)
+	}
+	return nil, nil
 }
 
 // installFakeGitHubProvider swaps changerequest.Providers["github"] for fake

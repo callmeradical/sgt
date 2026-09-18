@@ -600,9 +600,17 @@ type mergeCheckResult struct {
 //     the expected and the actual branch
 //   - not yet merged -> left untouched at "sealed"
 //
-// A run with no sealed bullets carrying a PRURL triggers no provider call
-// at all — the loop below only reaches DetectProvider/Status for a bullet
-// that is both sealed and has one.
+// A green bullet with no recorded PRURL is also eligible (issue #22): its
+// change request may have been opened outside /api/create-pr entirely — a
+// manual `gh pr create` against the branch sgt's own engine pushed, e.g.
+// while that endpoint had its own bug (#8) — leaving sgt with real, merged
+// work it has no record of. Such a bullet is looked up by branch name via
+// FindByHead; a match seals it and records the discovered URL before the
+// same merged/blocked logic above runs against it.
+//
+// A run with no eligible bullets triggers no provider call at all — the
+// loop below only reaches DetectProvider/FindByHead/Status for a bullet
+// that is either sealed-with-a-URL or green-with-none.
 func (srv *Server) handleCheckMergeStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -625,7 +633,9 @@ func (srv *Server) handleCheckMergeStatus(w http.ResponseWriter, r *http.Request
 		if bullets, berr := srv.Store.ListBulletsForIntent(run.IntentID); berr == nil {
 			proj, _ := config.LoadProject(run.Project)
 			for _, b := range bullets {
-				if b.Status != "sealed" || b.PRURL == "" {
+				sealedWithURL := b.Status == "sealed" && b.PRURL != ""
+				greenWithoutURL := b.Status == "green" && b.PRURL == ""
+				if !sealedWithURL && !greenWithoutURL {
 					continue
 				}
 				results = append(results, srv.checkBulletMergeStatus(r.Context(), proj, run, b))
@@ -666,13 +676,40 @@ func (srv *Server) checkBulletMergeStatus(ctx context.Context, proj *config.Proj
 		res.Error = perr.Error()
 		return res
 	}
-	status, serr := changerequest.Providers[providerName].Status(ctx, repoPath, b.PRURL)
+	provider := changerequest.Providers[providerName]
+
+	prURL := b.PRURL
+	if prURL == "" {
+		// Green with no recorded PRURL (issue #22): look for a change
+		// request by branch name rather than assuming none exists.
+		branch := naming.BranchNameForRun(run.ID, run.Type, run.ChangeID)
+		found, ferr := provider.FindByHead(ctx, repoPath, branch)
+		if ferr != nil {
+			res.Error = ferr.Error()
+			return res
+		}
+		if found == nil {
+			return res // no change request exists yet for this branch: nothing to reconcile
+		}
+		if err := srv.Store.SetBulletPRURL(b.ID, found.URL); err != nil {
+			res.Error = err.Error()
+			return res
+		}
+		if err := srv.Store.AdvanceBulletStatus(b.ID, "sealed", ""); err != nil {
+			res.Error = err.Error()
+			return res
+		}
+		res.Status = "sealed"
+		prURL = found.URL
+	}
+
+	status, serr := provider.Status(ctx, repoPath, prURL)
 	if serr != nil {
 		res.Error = serr.Error()
 		return res
 	}
 	if !status.Merged {
-		return res // not yet merged: left untouched at "sealed"
+		return res // not yet merged: left at "sealed"
 	}
 
 	if status.MergedIntoBranch == run.BaseBranch {

@@ -54,6 +54,14 @@ func (f *fakeChangeRequestProvider) Status(ctx context.Context, repoPath, url st
 	return &changerequest.StatusResult{}, nil
 }
 
+// FindByHead is unused by this file's tests (they always create fresh
+// bullets with no PR to discover) but is required by the interface
+// (added by fix/merged-dispatched-pull-request-leaves-bullet-green,
+// issue #22) — nil, nil matches every other fake's own default.
+func (f *fakeChangeRequestProvider) FindByHead(ctx context.Context, repoPath, head string) (*changerequest.FoundRef, error) {
+	return nil, nil
+}
+
 // installFakeGitHubProvider swaps changerequest.Providers["github"] for fake
 // and restores the real one when the test ends.
 func installFakeGitHubProvider(t *testing.T, fake *fakeChangeRequestProvider) {

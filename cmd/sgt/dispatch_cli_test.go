@@ -491,6 +491,13 @@ func (f *fakeChangeRequestProviderCLI) Status(ctx context.Context, repoPath, url
 	return &changerequest.StatusResult{}, nil
 }
 
+// FindByHead is unused by this file's tests but required by the
+// interface (added by fix/merged-dispatched-pull-request-leaves-bullet-green,
+// issue #22) — nil, nil matches every other fake's own default.
+func (f *fakeChangeRequestProviderCLI) FindByHead(ctx context.Context, repoPath, head string) (*changerequest.FoundRef, error) {
+	return nil, nil
+}
+
 // Any subcommand run against an address nothing is listening on must exit
 // nonzero with the actionable "not reachable... start it with `sgt ui`"
 // message on stderr.

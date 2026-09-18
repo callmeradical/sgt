@@ -25,12 +25,30 @@ type Provider interface {
 	// merged, and if so, which branch it actually merged into — the
 	// caller (not this package) decides what a base mismatch means.
 	Status(ctx context.Context, repoPath, url string) (*StatusResult, error)
+
+	// FindByHead looks up any existing change request for head, regardless
+	// of who opened it. A bullet's PR is not always one this codebase
+	// itself recorded — e.g. opened manually against a branch sgt's own
+	// engine created, while /api/create-pr had a bug, or by automation
+	// outside sgt entirely — and such a bullet has no URL for Status to
+	// check. Returns nil, nil when none exists; that is the ordinary case
+	// for a branch nobody has opened a change request for yet, not an
+	// error.
+	FindByHead(ctx context.Context, repoPath, head string) (*FoundRef, error)
 }
 
 // StatusResult is url's current state. Merged is false for every state
 // except an actual merge; MergedIntoBranch is only meaningful when Merged
 // is true.
 type StatusResult struct {
+	Merged           bool
+	MergedIntoBranch string
+}
+
+// FoundRef is a change request FindByHead located by branch name rather
+// than by a URL the caller already had on file.
+type FoundRef struct {
+	URL              string
 	Merged           bool
 	MergedIntoBranch string
 }
