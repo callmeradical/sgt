@@ -58,7 +58,7 @@ func TestSealPRInvokesGHAgainstTheRunsActualBranch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := s.executeTool("sgt_seal_pr", map[string]interface{}{
+	if _, err := s.ExecuteTool("sgt_seal_pr", map[string]interface{}{
 		"run_id": runID, "project": projPath, "repo": "svc", "title": "t", "body": "b",
 	}); err != nil {
 		t.Fatalf("sgt_seal_pr returned an error: %v", err)

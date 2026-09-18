@@ -149,6 +149,39 @@ func TestAFailedRunBlocksItsBulletsWithASynthesizedReason(t *testing.T) {
 	}
 }
 
+// Regression coverage for issue #20 ("reconcile phase and bullet state on
+// resume and cancellation"): cancelling a run must not leave its bullets at
+// a stale "blocked" disposition from an earlier failed attempt. Cancellation
+// is not a verdict — nothing failed a gate this time — so it must not read
+// as one, and unlike a real failure it carries no reason.
+func TestACancelledRunClearsAStaleBlockedBulletToPending(t *testing.T) {
+	srv, st := terminalRunFixture(t, "blocked")
+
+	bullets, err := st.ListBulletsForIntent("sgt-run-intent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.AdvanceBulletStatus(bullets[0].ID, "blocked", "gates did not pass; no further automatic attempt available"); err != nil {
+		t.Fatal(err)
+	}
+
+	srv.recordTerminalRun("sgt-run", "cancelled")
+
+	if got := runStatus(t, st, "sgt-run"); got != "cancelled" {
+		t.Fatalf("run status = %q, want cancelled", got)
+	}
+	got, err := st.GetBullet(bullets[0].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != "pending" {
+		t.Errorf("bullet status = %q after cancellation, want pending — cancellation is not a verdict, it must not read as still blocked", got.Status)
+	}
+	if got.BlockedReason != "" {
+		t.Errorf("bullet blocked reason = %q, want empty — a stale reason from the earlier failed attempt must not survive", got.BlockedReason)
+	}
+}
+
 // D5(b): when the agent's own envelope named why it could not proceed, that
 // reason is recorded on the bullet verbatim, not the synthesized fallback.
 func TestAFailedRunBlocksItsBulletsWithTheAgentReportedReason(t *testing.T) {
@@ -332,6 +365,12 @@ func TestNonBlockingReviewFindingsDoNotSupplyABlockedReason(t *testing.T) {
 // An operator stopping a run has concluded nothing about the work. Recording
 // failed would assert a judgment the operator did not make. This is the case a
 // "not passed means failed" mapping gets wrong.
+//
+// A bullet already at "pending" (this fixture) has nothing to reconcile, so
+// it is genuinely left untouched (no write, no updated_at bump) — but
+// "cancelled" is not a no-op mapping in general: a bullet stuck "blocked"
+// from an earlier attempt IS advanced back to "pending", see
+// TestACancelledRunClearsAStaleBlockedBulletToPending (issue #20).
 func TestACancelledRunLeavesItsBulletsUntouched(t *testing.T) {
 	srv, st := terminalRunFixture(t, "pending", "pending")
 
@@ -422,6 +461,11 @@ func TestADispatchedRunAdvancesItsBulletsThroughTheTerminalPath(t *testing.T) {
 	}
 
 	intentID := resp.TaskID + "-intent"
+	// waitForTerminalRun only observes the run's own status; recordTerminalRun's
+	// bullet advance is a second, separate write right after it. Without this,
+	// the assertions below race that second write (pre-existing hazard the
+	// dispatch_idempotency_test.go helper itself already documents).
+	waitForBulletStatus(t, st, intentID, "blocked")
 	bullets, err := st.ListBulletsForIntent(intentID)
 	if err != nil {
 		t.Fatal(err)

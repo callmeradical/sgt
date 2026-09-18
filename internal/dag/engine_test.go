@@ -1222,8 +1222,62 @@ func TestRunStageWithNoIntentIDStillReceivesStageBrief(t *testing.T) {
 	}
 
 	prompt := readPromptFile(t, runID, "svc", "plan")
-	if prompt != stage.Brief {
-		t.Errorf("prompt = %q, want exactly stage.Brief %q", prompt, stage.Brief)
+	if !strings.HasSuffix(prompt, stage.Brief) {
+		t.Errorf("prompt = %q, want it to end with stage.Brief %q", prompt, stage.Brief)
+	}
+	if !strings.Contains(prompt, "plan") {
+		t.Errorf("prompt = %q, want it to name the active phase even with no intent id (issue #18)", prompt)
+	}
+}
+
+// Regression coverage for issue #18 ("give each agent phase a
+// phase-specific objective"): a plan -> build pipeline must not render the
+// same phase-blind prompt to both phases. Each phase's prompt must name
+// that phase and its own boundary — a plan phase told not to implement,
+// commit, push, or open a pull request, and a build phase that is not
+// told those same restrictions, since implementing is exactly its job.
+func TestRunStagePlanPromptForbidsImplementingAndDelivering(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(tempDir, "fleet"))
+
+	repoDir := filepath.Join(tempDir, "svc")
+	newGitRepo(t, repoDir)
+	fakeAgentPath := fakeAgentThatSucceeds(t, tempDir)
+
+	proj := &config.Project{
+		Name:     "phase-objective-proj",
+		Defaults: config.ProjectDefaults{Agent: fakeAgentPath},
+		Repos: map[string]config.Repo{
+			"svc": {Path: repoDir, Factory: &config.FactoryConfig{Pipeline: []string{"plan", "build"}}},
+		},
+	}
+
+	eng := newEngine(t, proj)
+	runID := "run-phase-objective-1"
+	createTestRun(t, eng, proj.Name, runID, "running")
+
+	stage := &config.DAGStage{Name: "s", Repos: []string{"svc"}, Brief: "add webhook retries"}
+	if err := eng.RunStage(context.Background(), runID, stage); err != nil {
+		t.Fatalf("engine failed to run stage: %v", err)
+	}
+
+	planPrompt := readPromptFile(t, runID, "svc", "plan")
+	buildPrompt := readPromptFile(t, runID, "svc", "build")
+
+	if !strings.Contains(planPrompt, "plan") {
+		t.Errorf("plan prompt = %q, want it to name the active phase", planPrompt)
+	}
+	for _, forbidden := range []string{"do not", "not commit", "not push", "not open a pull request"} {
+		if !strings.Contains(strings.ToLower(planPrompt), forbidden) {
+			t.Errorf("plan prompt = %q, want it to explicitly forbid %q-type actions", planPrompt, forbidden)
+		}
+	}
+
+	if planPrompt == buildPrompt {
+		t.Error("plan and build received the identical prompt — nothing distinguishes what each phase may do")
+	}
+	if strings.Contains(strings.ToLower(buildPrompt), "do not modify implementation files") {
+		t.Errorf("build prompt = %q, want no restriction against implementing — that is build's job", buildPrompt)
 	}
 }
 
@@ -1406,5 +1460,54 @@ func TestRunStageReviewPhaseWithBlockingFindingFailsTheStage(t *testing.T) {
 	err := eng.RunStage(context.Background(), runID, &config.DAGStage{Name: "s", Repos: []string{"svc"}})
 	if err == nil {
 		t.Fatal("expected RunStage to fail on a blocking review finding, got nil")
+	}
+}
+
+// A dispatched worktree must start from the operator's own local repo state,
+// not a stale origin/main snapshot that only updates on an explicit
+// fetch/push. Sgt is single-user and local-first: commits an operator makes
+// directly to their local default branch are real, current work the moment
+// they land, whether or not that operator has pushed yet. A dispatch that
+// silently starts from a stale remote-tracking ref can hand an agent code
+// that is missing the operator's own just-made local fixes.
+func TestPrepareWorktreeStartsFromLocalMainNotStaleOriginMain(t *testing.T) {
+	ctx := context.Background()
+	remote := filepath.Join(t.TempDir(), "remote")
+	newGitRepo(t, remote)
+
+	src := filepath.Join(t.TempDir(), "svc")
+	git(t, filepath.Dir(src), "clone", "-q", remote, src)
+
+	// The clone's origin/main tracking ref now points at the remote's one
+	// seed commit. Two local-only commits land on main after that — real
+	// work the operator has not pushed, exactly like an uncommitted-to-origin
+	// local session.
+	git(t, src, "checkout", "-q", "main")
+	for _, msg := range []string{"local fix 1", "local fix 2"} {
+		if err := os.WriteFile(filepath.Join(src, msg+".txt"), []byte(msg+"\n"), 0644); err != nil {
+			t.Fatal(err)
+		}
+		git(t, src, "add", ".")
+		git(t, src, "commit", "-q", "-m", msg)
+	}
+	wantHead := gitOutput(ctx, src, "rev-parse", "main")
+	staleOriginHead := gitOutput(ctx, src, "rev-parse", "origin/main")
+	if wantHead == staleOriginHead {
+		t.Fatal("test setup did not actually diverge local main from origin/main")
+	}
+
+	t.Setenv("SGT_FLEET_DIR", t.TempDir())
+	proj := &config.Project{Name: "p", Repos: map[string]config.Repo{"svc": {Path: src}}}
+	eng := newEngine(t, proj)
+	createTestRun(t, eng, proj.Name, "run-local-main-1", "running")
+
+	wt, _, err := eng.prepareWorktree(ctx, src, "run-local-main-1", "svc")
+	if err != nil {
+		t.Fatalf("prepareWorktree: %v", err)
+	}
+
+	got := gitOutput(ctx, wt, "rev-parse", "HEAD")
+	if got != wantHead {
+		t.Errorf("worktree started from %q, want local main's tip %q (started from stale origin/main %q instead)", got, wantHead, staleOriginHead)
 	}
 }

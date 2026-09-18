@@ -84,7 +84,7 @@ func TestMCPGraphQueryAgainstABuiltGraphReturnsAnswer(t *testing.T) {
 		t.Fatalf("BuildProjectGraph: %v", err)
 	}
 
-	out, err := s.executeTool("sgt_graph_query", map[string]interface{}{
+	out, err := s.ExecuteTool("sgt_graph_query", map[string]interface{}{
 		"project":  projPath,
 		"question": "add()",
 	})
@@ -95,7 +95,7 @@ func TestMCPGraphQueryAgainstABuiltGraphReturnsAnswer(t *testing.T) {
 		t.Errorf("query output = %q, want it to mention add()", out)
 	}
 
-	explainOut, err := s.executeTool("sgt_graph_explain", map[string]interface{}{
+	explainOut, err := s.ExecuteTool("sgt_graph_explain", map[string]interface{}{
 		"project": projPath,
 		"node":    "add()",
 	})
@@ -106,7 +106,7 @@ func TestMCPGraphQueryAgainstABuiltGraphReturnsAnswer(t *testing.T) {
 		t.Errorf("explain output = %q, want graphify explain's own format", explainOut)
 	}
 
-	affectedOut, err := s.executeTool("sgt_graph_affected", map[string]interface{}{
+	affectedOut, err := s.ExecuteTool("sgt_graph_affected", map[string]interface{}{
 		"project": projPath,
 		"node":    "add()",
 	})
@@ -135,7 +135,7 @@ func TestMCPGraphToolsWithNoGraphBuiltReturnClearError(t *testing.T) {
 		{"sgt_graph_explain", map[string]interface{}{"project": projPath, "node": "x"}},
 		{"sgt_graph_affected", map[string]interface{}{"project": projPath, "node": "x"}},
 	} {
-		_, err := s.executeTool(tc.tool, tc.args)
+		_, err := s.ExecuteTool(tc.tool, tc.args)
 		if err == nil {
 			t.Errorf("%s: expected an error for a project with no graph built, got none", tc.tool)
 			continue

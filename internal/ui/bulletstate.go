@@ -75,6 +75,14 @@ func bulletStatusForRunOutcome(runStatus string) (string, bool) {
 		return "green", true
 	case "failed":
 		return "blocked", true
+	case "cancelled":
+		// Cancellation is not a verdict — no gate failed, a human or the
+		// operator simply stopped the work — so it must never leave a
+		// bullet reading "blocked" with a reason from a possibly-unrelated
+		// earlier attempt (issue #20). "pending" carries no reason, matching
+		// blockedReasonForRun's own rule that a reason means something only
+		// for "blocked".
+		return "pending", true
 	default:
 		return "", false
 	}
