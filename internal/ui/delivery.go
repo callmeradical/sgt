@@ -69,7 +69,17 @@ func (dr *deliveryReporter) describeDelivery(proj *config.Project, runID string)
 		if n := gitOut(wt, "rev-list", "--count", "HEAD", "^"+defaultBase(wt, baseBranch)); n != "" {
 			fmt.Sscanf(n, "%d", &rep.Commits)
 		}
-		rep.Pushed = gitOut(wt, "rev-parse", "--verify", "origin/"+branch) != ""
+		// Verifying that origin/<branch> merely exists is not enough: that
+		// ref only proves the branch was pushed at some point, not that HEAD
+		// is the commit that made it there. A later local commit (e.g. from
+		// a second CommitRunOutput pass) would leave the ref in place while
+		// HEAD moves past it, and the old check would still report Pushed —
+		// exactly the false "pushed: true" this report exists to prevent.
+		// Ahead-count against the remote-tracking ref is what git can
+		// actually prove HEAD's relationship to origin.
+		if ahead := gitOut(wt, "rev-list", "--count", "origin/"+branch+"..HEAD"); ahead != "" {
+			rep.Pushed = ahead == "0"
+		}
 		rep.RemoteBase = resolveGitRemoteURL(expandHome(rCfg.Path))
 		if rep.RemoteBase != "" && rep.Pushed {
 			rep.CompareURL = fmt.Sprintf("%s/compare/%s?expand=1", rep.RemoteBase, branch)
