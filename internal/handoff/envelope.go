@@ -3,6 +3,7 @@ package handoff
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 )
@@ -153,11 +154,26 @@ func (r *Router) InjectHandoffToWorktree(upstreamRepo, downstreamWorktree string
 		}
 		srcFile := filepath.Join(srcDir, entry.Name())
 		destFile := filepath.Join(destDir, entry.Name())
-		content, err := os.ReadFile(srcFile)
+
+		err := func() error {
+			src, err := os.Open(srcFile)
+			if err != nil {
+				return err
+			}
+			defer src.Close()
+
+			dst, err := os.OpenFile(destFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+			if err != nil {
+				return err
+			}
+			defer dst.Close()
+
+			if _, err := io.Copy(dst, src); err != nil {
+				return err
+			}
+			return nil
+		}()
 		if err != nil {
-			return err
-		}
-		if err := os.WriteFile(destFile, content, 0644); err != nil {
 			return err
 		}
 	}

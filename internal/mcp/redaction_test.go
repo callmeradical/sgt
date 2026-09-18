@@ -21,7 +21,7 @@ func TestEmitEnvelopeRedactsAgentSuppliedContent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	text, err := s.executeTool("sgt_emit_envelope", map[string]interface{}{
+	text, err := s.ExecuteTool("sgt_emit_envelope", map[string]interface{}{
 		"run_id":  "run-1",
 		"repo":    "svc",
 		"stage":   "build",
