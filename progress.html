@@ -2395,5 +2395,236 @@ a{color:var(--muted)}
   <p class="meta">Rewritten by the critic after each review or discovery. Refreshes every 60 seconds.</p>
 </footer>
 
+<header>
+  <h1>Sgt v2</h1>
+  <p>Independent review. Written by the critic, not the builder.</p>
+  <p class="meta">
+    Review 040 · 2026-09-17 · branch <code>feat/cli-dispatch-subcommands</code> · commit
+    <code>88e8e9a</code> ("feat: CLI dispatch subcommands (dispatch, runs, run-details, create-pr)"), parent
+    <code>00d6861</code> ("plan: OpenSpec change for CLI dispatch subcommands", docs/OpenSpec only), stacked on
+    the already-merged <code>feat/mcp-dispatch-and-create-pr-tools</code> (PR #72, Reviews 038/039: MEETS SPEC) ·
+    reviewed against <code>docs/prd-cli-dispatch-subcommands.md</code> (Decisions, binding) plus the shared
+    Quality bar in <code>docs/prd-mcp-dispatch-and-create-pr-tools.md</code> and
+    <code>openspec/changes/cli-dispatch-subcommands/{proposal,design,tasks}.md</code> +
+    <code>specs/cli-dispatch-subcommands/spec.md</code> · build/vet/test run directly against this commit on
+    macOS/arm64 and inside the <code>sgt-linux-test</code> Linux/arm64 container
+  </p>
+</header>
+
+<section>
+  <h2>Current status</h2>
+  <div class="grid">
+    <div class="card"><div class="label">Build</div><div class="value"><span class="status">clean</span></div><div class="small"><code>go build ./...</code>, no output, both platforms</div></div>
+    <div class="card"><div class="label">Vet</div><div class="value"><span class="status">clean</span></div><div class="small"><code>go vet ./internal/...</code> and <code>go vet ./cmd/...</code>, no output, both platforms</div></div>
+    <div class="card"><div class="label">Tests (internal)</div><div class="value"><span class="status">clean under the prescribed skip list</span></div><div class="small">All 14 packages pass on macOS (<code>internal/mcp</code> 14.2s, <code>internal/sgtclient</code> 2.2s, <code>internal/ui</code> 41.9s); same command re-run inside <code>sgt-linux-test</code>: also clean for every package the skip list leaves in scope</div></div>
+    <div class="card"><div class="label">Tests (cmd/sgt)</div><div class="value"><span class="status">clean</span></div><div class="small"><code>go test ./cmd/... -count=1 -v</code>: all 7 new subcommand tests plus the 6 pre-existing ones pass, on both macOS and inside <code>sgt-linux-test</code></div></div>
+    <div class="card"><div class="label">Task 3 TODO markers</div><div class="value"><span class="status">zero remain</span></div><div class="small"><code>grep -rn "TODO(cli-dispatch-subcommands)" internal/ cmd/</code> returns no hits, matching the builder's claim</div></div>
+    <div class="card"><div class="label">CLI leg is a real subprocess</div><div class="value"><span class="status">confirmed</span></div><div class="small">Read <code>internal/mcp/cli_parity_helpers_test.go</code> directly: <code>cliParityBinary</code> runs <code>exec.Command("go","build","-o",bin,"./cmd/sgt")</code> once (cached via <code>sync.Once</code>), and <code>runSgtCLI</code> runs that compiled binary with <code>exec.Command(bin, args...)</code> and <code>SGT_UI_ADDR</code> set — a real OS process against the real binary, not a fake and not an in-process call into <code>cmd/sgt</code>'s Go functions</div></div>
+    <div class="card"><div class="label">QB#1 cross-surface parity</div><div class="value"><span class="status">met, now genuinely three-way</span></div><div class="small">All 5 tests in <code>dispatch_parity_test.go</code> drive ONE real <code>httptest.Server</code> wrapping the real <code>ui.NewServer(...).Handler()</code> via HTTP POST/GET, the MCP tool, and the CLI subprocess, and assert on real <code>*store.Store</code> rows (<code>GetRun</code>, <code>ListBulletsForIntent</code>, <code>ListRecentRuns</code>) — re-ran each individually with <code>-v</code>, all pass on both platforms</div></div>
+    <div class="card"><div class="label">QB#2 negative-path parity</div><div class="value"><span class="status">now fully met across all three surfaces</span></div><div class="small">All three PRD-named refusals — <code>SealBulletForRun</code> non-green, O2 unrecognized-type, O3 unknown-change-id — each now have a completed CLI leg (<code>TestNonGreenBulletRefusalTextIsIdenticalViaHTTPAndSgtCreatePR</code>, <code>TestUnrecognizedTypeRefusalTextIsIdenticalViaHTTPAndSgtDispatch</code>, <code>TestUnknownChangeIDRefusalTextIsIdenticalViaHTTPAndSgtDispatch</code>), comparing the CLI subprocess's real stderr against the live HTTP handler's real response body — byte-identical string comparison, no hardcoded expected text</div></div>
+    <div class="card"><div class="label">QB#3 idempotency</div><div class="value"><span class="status warn">met at the HTTP/MCP layer only — no CLI-surface test shipped</span></div><div class="small">No test in this diff drives <code>sgt dispatch --request-id X</code> twice and checks <code>ListRecentRuns</code> directly. See gap below — verified by throwaway test that the underlying behavior is correct regardless</div></div>
+    <div class="card"><div class="label">QB#4 structural constraint</div><div class="value"><span class="status">met</span></div><div class="small"><code>grep -n "http.NewRequest" cmd/sgt/*.go | grep -v _test.go</code>: no hits. Read <code>cmd/sgt/dispatch_cli.go</code> in full: all four subcommands call exactly one <code>sgtclient.*</code> function each and re-marshal its return value; no local request/response construction</div></div>
+    <div class="card"><div class="label">QB#5 no regressions</div><div class="value"><span class="status">met</span></div><div class="small"><code>git diff 00d6861..88e8e9a --stat -- internal/ui</code> is empty. <code>internal/mcp</code>'s pre-existing (non-parity) tests and <code>internal/sgtclient</code>'s pre-existing <code>Dispatch</code>/<code>CreatePR</code> tests are unmodified in the diff (only additive code appended to <code>sgtclient.go</code>) and pass</div></div>
+    <div class="card"><div class="label">Runs/RunDetails field match</div><div class="value"><span class="status">confirmed field-for-field</span></div><div class="small"><code>handleRuns</code> (<code>internal/ui/server.go:285</code>) calls <code>runPayloads(runs)</code> → <code>runPayload{store.RunRecord, Resumable bool}</code> (<code>bulletstate.go</code>), matching <code>sgtclient.RunsResponseItem</code> exactly. <code>handleRunDetails</code> (line 334) returns a map with keys <code>run_id/phases/envelopes/resume_skips</code>, matching <code>sgtclient.RunDetailsResponse</code>'s JSON tags exactly</div></div>
+    <div class="card"><div class="label"><code>sgt --help</code> lists all four</div><div class="value"><span class="status">confirmed</span></div><div class="small">Ran <code>sgt --help</code> directly: output includes <code>sgt dispatch</code>, <code>sgt runs</code>, <code>sgt run-details</code>, <code>sgt create-pr</code> alongside the existing five, and <code>TestHelpListsAllFourNewSubcommands</code> asserts the same</div></div>
+    <div class="card"><div class="label"><code>run-details</code> positional-arg deviation</div><div class="value"><span class="status">accurate, reasonable</span></div><div class="small">Confirmed <code>sgt run &lt;project&gt;</code> is genuinely positional today (<code>cmd/sgt/main.go:33</code>, <code>os.Args[2]</code>, no flag) — the builder's stated precedent for <code>run-details &lt;run-id&gt;</code> being positional rather than <code>--id</code> is real, not a convenient excuse</div></div>
+  </div>
+</section>
+
+<section>
+  <h2>Independent verification beyond the shipped suite</h2>
+  <p><strong>The one real gap: Quality bar #3 (idempotency against real store rows) has no CLI-surface test in
+  this diff.</strong> The CLI PRD's Quality bar section states plainly it is "identical" to the MCP PRD's, which
+  names idempotency as one of five ungameable criteria "both PRDs are held to." Neither
+  <code>openspec/changes/cli-dispatch-subcommands/tasks.md</code>'s Task 2 scenario checklist nor
+  <code>specs/cli-dispatch-subcommands/spec.md</code> lists a repeated-<code>--request-id</code> scenario for
+  <code>sgt dispatch</code>, and the shipped <code>cmd/sgt/dispatch_cli_test.go</code> and
+  <code>internal/mcp/dispatch_parity_test.go</code> both confirm this: grepping either file for
+  <code>request-id</code>/<code>RequestID</code>/idempotency finds nothing that repeats the same key twice through
+  the CLI and checks the store. (The parity file's happy-path dispatch test deliberately uses three <em>different</em>
+  <code>request_id</code>s — one per leg — specifically so the three dispatches don't collide; that test is not,
+  and was never meant to be, an idempotency test.) This is the same shape of gap Review 038 found in the MCP PRD's
+  own Task 3 (O3's refusal silently dropped by tasks.md's narrower checklist) — the OpenSpec decomposition for
+  this change narrowed the inherited Quality bar without flagging it, and the implementation faithfully followed
+  tasks.md rather than re-deriving the full shared Quality bar from the PRD directly.</p>
+  <p><strong>Verified the underlying mechanism is correct anyway.</strong> Wrote a throwaway test
+  (<code>cmd/sgt/zzz_throwaway_idempotency_test.go</code>, run once and deleted before this review was recorded —
+  <code>git status --short cmd/sgt/</code> confirms no residual file) that runs <code>sgt dispatch --request-id
+  same-key</code> twice against a real fixture server and queries <code>st.ListRecentRuns(50)</code> directly.
+  Result: exactly one run row after both calls, both calls exit 0. The CLI is a pure pass-through to
+  <code>sgtclient.Dispatch</code> → <code>POST /api/dispatch</code>, so this is expected — <code>handleDispatch</code>'s
+  own idempotency check (already proven at the HTTP and MCP layers by the first round's
+  <code>TestSgtDispatchCalledTwiceWithSameRequestIDProducesExactlyOneRunRow</code>) covers it — but the
+  PRD-mandated automated test proving that through the CLI specifically is missing.</p>
+  <p><strong>Task 3's specific claim, verified directly.</strong> Read <code>internal/mcp/dispatch_parity_test.go</code>
+  in full: all 5 tests (2 happy-path, 3 negative-path) genuinely add a third CLI leg, each calling
+  <code>cliParityBinary(t)</code> then <code>runSgtCLI(t, cliBin, addr, cliArgsForDispatch(...)/cliArgsForCreatePR(...)...)</code>
+  — traced <code>cli_parity_helpers_test.go</code> line by line: <code>cliParityBinary</code> shells out to
+  <code>go build -o &lt;tmp&gt;/sgt ./cmd/sgt</code> exactly once per test binary run, and <code>runSgtCLI</code>
+  is a plain <code>exec.Command(bin, args...)</code> with <code>cmd.Env</code> carrying <code>SGT_UI_ADDR</code> —
+  a real subprocess against a real compiled artifact, never a fake and never an in-process call into
+  <code>cmd/sgt</code>'s functions. Each of the three negative-path tests compares the CLI subprocess's real
+  <code>stderr</code> against the live HTTP leg's real response body with plain <code>!=</code> string comparison
+  — cross-leg, not against any hardcoded string.</p>
+  <p><strong>Minor, non-blocking observation on assertion strength.</strong>
+  <code>cmd/sgt/dispatch_cli_test.go</code>'s own <code>TestCreatePRSubcommandGreenSucceedsNonGreenRefusedWithExactText</code>
+  /"non-green refused" subtest checks the CLI's stderr with <code>strings.Contains(stderr, "pending") &&
+  strings.Contains(stderr, "not green")</code> rather than a byte-exact comparison against
+  <code>handleCreatePR</code>'s real refusal text. This is weaker than "exact refusal text" as the PRD's acceptance
+  criteria word it, but the gap is fully closed elsewhere in the same commit: the parity file's
+  <code>TestNonGreenBulletRefusalTextIsIdenticalViaHTTPAndSgtCreatePR</code> does do a byte-exact,
+  live-vs-live comparison for the identical refusal. Not counted as a defect since the PRD's actual requirement is
+  satisfied by the parity test; noting only because the weaker check exists in a file that could otherwise stand
+  alone.</p>
+  <p><strong>Linux/arm64 parity run inside <code>sgt-linux-test</code>.</strong> <code>go build ./...</code> and
+  <code>go vet ./internal/...</code> are clean. <code>go test ./cmd/... -count=1 -v</code> — the package this
+  review cares most about for OS-parity risk, since its tests build and run a real binary and touch real paths —
+  is fully green, all 13 tests (7 new, 6 pre-existing) passing identically to macOS. Running the full
+  <code>./internal/...</code> suite under the prescribed <code>-skip</code> inside the container surfaces
+  failures in <code>internal/ui</code>'s PTY-backed terminal tests (<code>TestStartingASessionSpawnsARealProcessAndReturnsItsIdentity</code>
+  and siblings, all failing identically with "decoding /api/terminal-start response: invalid character 'o' in
+  literal false") — but <code>internal/ui</code> has a confirmed zero-line diff between <code>00d6861</code> and
+  <code>88e8e9a</code>, and the identical suite is fully green on macOS, so this is a pre-existing,
+  environment-specific limitation of this particular long-running container's PTY allocation, not a regression
+  introduced by this commit and not reachable by anything the four new subcommands touch. All 5 of the
+  <code>internal/mcp</code> parity tests, individually re-run inside the container, pass.</p>
+</section>
+
+<section>
+  <h2>Verdict</h2>
+  <div class="item warn">
+    <p><strong>MEETS SPEC WITH CAVEATS.</strong> Quality bar #1 (cross-surface parity): <strong>pass</strong> —
+    now genuinely three-way (HTTP/MCP/CLI subprocess) against one real server, store-row-checked, no mocking.
+    Quality bar #2 (negative-path parity): <strong>pass</strong> — all three PRD-named refusals (non-green bullet,
+    unrecognized type, unknown change-id) now have a completed, byte-exact CLI leg. Quality bar #3 (idempotency
+    against real store rows): <strong>gap</strong> — the MCP/HTTP layers proved this in the prior round, but no
+    test in this diff exercises a repeated <code>--request-id</code> through <code>sgt dispatch</code> itself and
+    checks the store directly; confirmed by throwaway test that the underlying behavior is correct, so this is a
+    missing test, not a broken feature. Quality bar #4 (structural constraint): <strong>pass</strong> — zero
+    <code>http.NewRequest</code> in <code>cmd/sgt</code> outside <code>internal/sgtclient</code>, confirmed by
+    grep and by reading <code>dispatch_cli.go</code> in full. Quality bar #5 (no regressions): <strong>pass</strong>
+    — <code>internal/ui</code> has a zero-line diff and passes unmodified on macOS (the container's PTY-test
+    failures there are environment-specific and unrelated to this diff, see above). Task 3's "zero TODO markers
+    remain, each parity test's CLI leg is a real subprocess" claim is verified true by direct inspection, not
+    taken on faith. <code>sgt --help</code> genuinely lists all four subcommands. The <code>run-details</code>
+    positional-argument deviation is a faithful, verified reading of <code>sgt run</code>'s existing convention,
+    not a convenient excuse. <strong>One concrete, fixable defect</strong>: add a test that calls
+    <code>sgt dispatch --request-id &lt;same key&gt;</code> twice against a fixture server and asserts
+    <code>len(ListRecentRuns) == 1</code> directly — mirroring
+    <code>TestSgtDispatchCalledTwiceWithSameRequestIDProducesExactlyOneRunRow</code>'s shape one layer down, in
+    either <code>cmd/sgt/dispatch_cli_test.go</code> or as a fourth leg on the parity file's happy-path dispatch
+    test.</p>
+  </div>
+</section>
+
+<footer>
+  <p class="meta">Review 040 · findings above are reproduced from commands run directly against commit
+  <code>88e8e9a</code>: <code>git log --oneline -10</code> and <code>git show 88e8e9a --stat</code> were run
+  first, unassumed; every PRD/design/tasks/spec document named in the review brief was read in full;
+  <code>go build ./... &amp;&amp; go vet ./internal/... &amp;&amp; go test ./internal/...</code> under the
+  prescribed <code>-skip</code>, plus <code>go test ./cmd/... -count=1 -v</code>, were run directly on both
+  macOS/arm64 and inside the <code>sgt-linux-test</code> Linux/arm64 container; the TODO-marker grep was run
+  directly (zero hits); <code>internal/mcp/dispatch_parity_test.go</code> and
+  <code>internal/mcp/cli_parity_helpers_test.go</code> were read in full and every parity test re-run individually
+  with <code>-v</code> on both platforms; the structural QB#4 grep was run directly and <code>dispatch_cli.go</code>
+  read in full; <code>handleRuns</code>/<code>handleRunDetails</code> were read directly from
+  <code>internal/ui/server.go</code> and checked field-by-field against <code>sgtclient</code>'s structs;
+  <code>sgt --help</code> was actually run; the <code>run-details</code> positional-arg claim was checked against
+  <code>cmd/sgt/main.go</code>'s real <code>run</code> handling; the one gap found (CLI-surface idempotency) was
+  confirmed both by grep-for-absence and by writing, running, and deleting a throwaway test proving the underlying
+  mechanism still works. Reviews 039 and earlier were not re-examined; they stand as recorded above.</p>
+  <p class="meta">Rewritten by the critic after each review or discovery. Refreshes every 60 seconds.</p>
+</footer>
+
+<header>
+  <h1>Sgt v2</h1>
+  <p>Independent review. Written by the critic, not the builder.</p>
+  <p class="meta">
+    Review 041 · 2026-09-17 · branch <code>feat/cli-dispatch-subcommands</code> · commit
+    <code>62c7c33</code> ("test: prove sgt dispatch --request-id idempotency against real store rows"), on top of
+    <code>88e8e9a</code> (Review 040's target), on top of <code>00d6861</code>/the merged
+    <code>feat/mcp-dispatch-and-create-pr-tools</code> · re-verifies whether Review 040's single defect (missing
+    CLI-surface Quality bar #3 idempotency coverage) is now closed, and re-confirms the other 4 quality-bar
+    criteria at this new commit rather than assuming they still hold · build/vet/test run directly against this
+    commit on macOS/arm64 and inside the <code>sgt-linux-test</code> Linux/arm64 container
+  </p>
+</header>
+
+<section>
+  <h2>Current status</h2>
+  <div class="grid">
+    <div class="card"><div class="label">Diff scope</div><div class="value"><span class="status">test + docs only</span></div><div class="small"><code>git diff 88e8e9a..62c7c33 --stat</code>: <code>cmd/sgt/dispatch_cli_test.go</code> (+54), <code>openspec/changes/cli-dispatch-subcommands/tasks.md</code> (+5) — 2 files, 59 insertions, 0 deletions. Zero production code changed; <code>git diff 88e8e9a..62c7c33 -- internal/</code> is empty (0 lines) — nothing under <code>internal/</code>, including <code>internal/mcp/dispatch_parity_test.go</code>, touched by this commit</div></div>
+    <div class="card"><div class="label">Build</div><div class="value"><span class="status">clean</span></div><div class="small"><code>go build ./...</code>, no output, both platforms</div></div>
+    <div class="card"><div class="label">Vet</div><div class="value"><span class="status">clean</span></div><div class="small"><code>go vet ./internal/...</code>, no output, both platforms</div></div>
+    <div class="card"><div class="label">Tests (internal, prescribed skip list)</div><div class="value"><span class="status">clean, unaffected</span></div><div class="small">All 14 packages pass on macOS. Same command re-run inside <code>sgt-linux-test</code>: every package the skip list leaves in scope passes there too</div></div>
+    <div class="card"><div class="label">Tests (cmd/sgt, full -v)</div><div class="value"><span class="status">clean, new test included</span></div><div class="small"><code>go test ./cmd/... -count=1 -v</code>: all 8 subcommand tests (7 from Review 040 plus the new idempotency test) plus the 6 pre-existing ones pass, on both macOS and inside <code>sgt-linux-test</code></div></div>
+    <div class="card"><div class="label">QB#3 idempotency — the gap</div><div class="value"><span class="status">now closed</span></div><div class="small">Read <code>TestDispatchSubcommandCalledTwiceWithSameRequestIDProducesExactlyOneRunRow</code> (<code>cmd/sgt/dispatch_cli_test.go:288-335</code>) directly: <code>bin := sgtBinary(t)</code> builds the real compiled binary; <code>runCLI(t, bin, addr, args...)</code> is called TWICE with the identical <code>args</code> slice, including <code>--request-id retry-me</code> both times — two genuine <code>exec.Command(bin, ...)</code> subprocess invocations, not in-process calls and not a fake. Assertion is <code>st.ListRecentRuns(50)</code> queried directly against the real fixture store, <code>len(runs) != 1</code> — not inferred from both exits being nil. Also checks <code>second.TaskID == first.TaskID</code> (idempotent return of the original run)</div></div>
+    <div class="card"><div class="label">QB#1 cross-surface parity</div><div class="value"><span class="status">still met</span></div><div class="small">Unaffected by this diff (0-line change to <code>internal/mcp/</code>); re-ran all 5 parity tests individually with <code>-v</code> on both platforms, all pass</div></div>
+    <div class="card"><div class="label">QB#2 negative-path parity</div><div class="value"><span class="status">still met</span></div><div class="small">Unaffected by this diff; re-ran the three negative-path parity tests directly, all pass on both platforms</div></div>
+    <div class="card"><div class="label">QB#4 structural constraint</div><div class="value"><span class="status">still met</span></div><div class="small"><code>cmd/sgt/dispatch_cli.go</code> has a 0-line diff between <code>88e8e9a</code> and <code>62c7c33</code> — re-ran the grep anyway rather than assuming: <code>grep -n "http.NewRequest" cmd/sgt/*.go | grep -v _test.go</code> still returns nothing</div></div>
+    <div class="card"><div class="label">QB#5 no regressions</div><div class="value"><span class="status">still met</span></div><div class="small"><code>git diff 00d6861..62c7c33 --stat -- internal/ui</code> is empty across the whole change now, not just Review 040's slice. The <code>sgt-linux-test</code> container's pre-existing PTY-related <code>internal/ui</code> terminal-test failures reproduce identically at this commit too — same environment limitation flagged in Review 040, still unrelated to this diff (<code>internal/ui</code> untouched, and the suite is fully green on macOS)</div></div>
+    <div class="card"><div class="label">tasks.md doc fix</div><div class="value"><span class="status">accurate</span></div><div class="small">The new Task 2 scenario line explicitly names the inherited Quality bar #3 requirement and points at <code>ListRecentRuns</code>, matching what the shipped test actually does — not a cosmetic-only doc edit</div></div>
+    <div class="card"><div class="label">TODO markers / other Review 040 findings</div><div class="value"><span class="status">unchanged, re-confirmed</span></div><div class="small"><code>grep -rn "TODO(cli-dispatch-subcommands)" internal/ cmd/</code>: still zero hits</div></div>
+  </div>
+</section>
+
+<section>
+  <h2>Verdict — whole change (commits <code>00d6861</code>+<code>88e8e9a</code>+<code>62c7c33</code>) against all 5 quality-bar criteria</h2>
+  <div class="item ok">
+    <p><strong>MEETS SPEC.</strong> All five of the shared Quality bar's criteria now hold with no caveats for the
+    entire <code>cli-dispatch-subcommands</code> change, each independently re-verified at <code>62c7c33</code>
+    rather than assumed carried-over from Review 040:</p>
+    <p>1. <strong>Cross-surface parity</strong> — met: all 5 tests in <code>internal/mcp/dispatch_parity_test.go</code>
+    drive one real <code>httptest.Server</code> three ways (raw HTTP, MCP tool, real compiled <code>sgt</code>
+    binary as a subprocess) and assert on real store rows; re-confirmed unaffected by this commit and re-run
+    directly.<br>
+    2. <strong>Negative-path parity</strong> — met: all three PRD-named refusals (non-green bullet, unrecognized
+    type, unknown change-id) have a byte-exact, cross-leg-compared CLI leg; re-confirmed unaffected and re-run
+    directly.<br>
+    3. <strong>Idempotency against real store rows</strong> — met, gap closed: <code>TestDispatchSubcommandCalledTwiceWithSameRequestIDProducesExactlyOneRunRow</code>
+    genuinely runs the real compiled binary twice with the same <code>--request-id</code> and asserts
+    <code>len(st.ListRecentRuns(50)) == 1</code> directly against the store — verified by reading the test's
+    source, not the commit message, and by re-running it on both macOS and Linux/arm64.<br>
+    4. <strong>Structural constraint</strong> — met: <code>cmd/sgt</code> contains no local
+    <code>http.NewRequest</code>/<code>json.Marshal</code> for these four endpoints outside
+    <code>internal/sgtclient</code>; unaffected by this commit (0-line diff to <code>dispatch_cli.go</code>),
+    re-confirmed by grep.<br>
+    5. <strong>No regressions</strong> — met: <code>internal/ui</code> has a zero-line diff across the entire
+    change (<code>00d6861..62c7c33</code>); every pre-existing test in <code>internal/ui</code>,
+    <code>internal/mcp</code>, and <code>internal/sgtclient</code> remains unmodified and green on macOS;
+    <code>go build</code>/<code>go vet</code>/<code>go test ./internal/...</code> (prescribed skip list) and
+    <code>go test ./cmd/... -v</code> are both clean on macOS/arm64 and Linux/arm64, with the sole exception of
+    <code>sgt-linux-test</code>'s pre-existing, environment-specific PTY-allocation failures in
+    <code>internal/ui</code>'s terminal tests — reproduced identically at both <code>88e8e9a</code> and
+    <code>62c7c33</code>, confirming they are a property of that long-running container, not of any commit in this
+    change.</p>
+    <p>This commit's diff is test-and-docs-only (<code>cmd/sgt/dispatch_cli_test.go</code>,
+    <code>openspec/changes/cli-dispatch-subcommands/tasks.md</code>) — zero production code changed, confirming
+    Review 040's own conclusion that the underlying idempotency mechanism (a thin pass-through to
+    <code>handleDispatch</code>'s own, already-proven-correct check) was already correct and only the
+    automated CLI-surface test proving it was missing. No open defects remain against
+    <code>docs/prd-cli-dispatch-subcommands.md</code>, its OpenSpec change, or the shared Quality bar for this
+    change.</p>
+  </div>
+</section>
+
+<footer>
+  <p class="meta">Review 041 · findings above are reproduced from commands run directly against commit
+  <code>62c7c33</code>: <code>git log --oneline -12</code>, <code>git show 62c7c33 --stat</code>, and
+  <code>git diff 88e8e9a..62c7c33 --stat</code> were all run directly (not assumed from the commit message); the
+  new test function was read in full at its real line range and traced call-by-call
+  (<code>sgtBinary</code>/<code>runCLI</code> read directly to confirm both legs are genuine subprocess
+  invocations of a really-compiled binary); the tasks.md diff was read in full and checked against what the test
+  actually does; <code>go build ./... &amp;&amp; go vet ./internal/... &amp;&amp; go test ./internal/...</code>
+  under the prescribed <code>-skip</code>, plus <code>go test ./cmd/... -count=1 -v</code>, were run directly on
+  both macOS/arm64 and inside the <code>sgt-linux-test</code> Linux/arm64 container; the four previously-passing
+  quality-bar criteria were each independently re-confirmed at this new commit (0-line-diff checks for QB#1/#2/#4
+  against <code>internal/mcp</code> and <code>cmd/sgt/dispatch_cli.go</code>, a fresh <code>internal/ui</code>
+  0-line-diff check spanning the whole change for QB#5) rather than assumed to still hold; the TODO-marker grep
+  was re-run (zero hits, unchanged). Reviews 040 and earlier were not re-examined beyond what is restated here;
+  they stand as recorded above.</p>
+  <p class="meta">Rewritten by the critic after each review or discovery. Refreshes every 60 seconds.</p>
+</footer>
+
 </main></body>
 </html>
