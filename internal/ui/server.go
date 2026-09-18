@@ -323,6 +323,7 @@ type analyticsResponse struct {
 
 func (srv *Server) handleAnalytics(w http.ResponseWriter, r *http.Request) {
 	project := r.URL.Query().Get("project")
+	srv.reconcilePendingMergeStatus(r.Context(), project)
 	analytics, err := srv.Store.ComputeWorkAnalytics(project)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -647,6 +648,73 @@ func (srv *Server) handleCheckMergeStatus(w http.ResponseWriter, r *http.Request
 		"run_id":  runID,
 		"results": results,
 	})
+}
+
+// reconcilePendingMergeStatus checks every sealed-with-a-URL bullet of
+// project against its change request's real state — the same eligibility
+// handleCheckMergeStatus already uses — before analytics for that project
+// is computed. Without this, a bullet whose PR merged on GitHub sat at
+// "sealed" until a human happened to open that specific run's pipeline
+// view, since handleCheckMergeStatus was the only thing that ever advanced
+// it (issue #11).
+//
+// This deliberately does NOT run for an unscoped request (project is ""
+// or "all"): sweeping every project's bullets on one shared aggregate-view
+// load would burst a provider call per eligible bullet across the whole
+// installation, on every request — the same unconditional cost
+// R7.5/observed-change-request-merge-state already rejected for a
+// background timer, just moved to a different trigger. A request naming
+// one specific project — what the dashboard's own Work Analytics panel
+// actually sends — is bounded to that project's own bullets.
+func (srv *Server) reconcilePendingMergeStatus(ctx context.Context, project string) {
+	if project == "" || project == "all" {
+		return
+	}
+	bullets, err := srv.Store.AllBulletsForAnalytics(project)
+	if err != nil || len(bullets) == 0 {
+		return
+	}
+
+	eligible := false
+	for _, b := range bullets {
+		if b.Status == "sealed" && b.PRURL != "" {
+			eligible = true
+			break
+		}
+	}
+	if !eligible {
+		return
+	}
+
+	runs, err := srv.Store.AllRunsForAnalytics(project)
+	if err != nil {
+		return
+	}
+	// The most recent run per intent (runs are already created_at ASC) is
+	// the reference checkBulletMergeStatus uses for BaseBranch — the same
+	// simplification handleCheckMergeStatus's own caller already makes:
+	// one named run stands in for its whole intent's bullets.
+	refRun := map[string]store.RunRecord{}
+	for _, r := range runs {
+		if r.IntentID != "" {
+			refRun[r.IntentID] = r
+		}
+	}
+
+	proj, err := config.LoadProject(project)
+	if err != nil {
+		return
+	}
+	for _, b := range bullets {
+		if b.Status != "sealed" || b.PRURL == "" {
+			continue
+		}
+		run, ok := refRun[b.IntentID]
+		if !ok {
+			continue
+		}
+		srv.checkBulletMergeStatus(ctx, proj, &run, b)
+	}
 }
 
 // checkBulletMergeStatus checks and, if warranted, advances one sealed
