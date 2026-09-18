@@ -280,6 +280,60 @@ func TestDispatchSubcommandWithNoRepoRecordsProposedPlanAndStartsNoRun(t *testin
 	}
 }
 
+// Two `sgt dispatch` invocations with the same --request-id must produce
+// exactly one run row in the actual database — checked directly against the
+// store, not inferred from both subprocess invocations exiting 0. Mirrors
+// internal/mcp's TestSgtDispatchCalledTwiceWithSameRequestIDProducesExactlyOneRunRow
+// for the CLI surface (openspec/changes/cli-dispatch-subcommands/tasks.md).
+func TestDispatchSubcommandCalledTwiceWithSameRequestIDProducesExactlyOneRunRow(t *testing.T) {
+	bin := sgtBinary(t)
+	st, repoPaths, addr := cliDispatchFixture(t, "svc")
+	const changeID = "add-stripe-webhooks"
+	if err := os.MkdirAll(filepath.Join(repoPaths["svc"], "openspec", "changes", changeID), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	args := []string{
+		"dispatch",
+		"--project", "clio",
+		"--brief", "add stripe webhooks",
+		"--type", "feat",
+		"--repo", "svc",
+		"--change-id", changeID,
+		"--request-id", "retry-me",
+	}
+
+	firstOut, firstErr, err := runCLI(t, bin, addr, args...)
+	if err != nil {
+		t.Fatalf("first sgt dispatch failed: %v\nstdout=%s\nstderr=%s", err, firstOut, firstErr)
+	}
+	secondOut, secondErr, err := runCLI(t, bin, addr, args...)
+	if err != nil {
+		t.Fatalf("repeat sgt dispatch failed: %v\nstdout=%s\nstderr=%s", err, secondOut, secondErr)
+	}
+
+	var first, second sgtclient.DispatchResponse
+	if uerr := json.Unmarshal([]byte(firstOut), &first); uerr != nil {
+		t.Fatalf("decoding first stdout: %v; stdout=%s", uerr, firstOut)
+	}
+	if uerr := json.Unmarshal([]byte(secondOut), &second); uerr != nil {
+		t.Fatalf("decoding repeat stdout: %v; stdout=%s", uerr, secondOut)
+	}
+	if second.TaskID != first.TaskID {
+		t.Errorf("repeat task id = %q, want the original %q", second.TaskID, first.TaskID)
+	}
+
+	runs, err := st.ListRecentRuns(50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(runs) != 1 {
+		t.Fatalf("store holds %d runs for one request id, want 1: %+v", len(runs), runs)
+	}
+
+	waitForTerminalRunCLI(t, st, first.TaskID)
+}
+
 // sgt runs --project X and sgt runs (no flag) must return what handleRuns
 // would for the same scoping: a named project only, versus every run.
 func TestRunsSubcommandMatchesHandleRunsScoping(t *testing.T) {

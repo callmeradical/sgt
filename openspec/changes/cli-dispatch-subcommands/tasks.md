@@ -59,6 +59,11 @@ real artifact"):
   the equivalent raw HTTP POST would — assert on the server's store
   directly, not just the CLI's stdout.
 - `sgt dispatch` with no `--repo` at all records a proposed plan.
+- `sgt dispatch --request-id <same key>` invoked twice produces exactly
+  one run row — checked directly against the fixture's store
+  (`ListRecentRuns`), not inferred from two successful exits. The
+  inherited Quality bar (docs/prd-mcp-dispatch-and-create-pr-tools.md
+  #3) requires this for the CLI surface too, not only MCP.
 - `sgt runs --project X` and `sgt runs` (no flag) return what
   `handleRuns` would for the same scoping.
 - `sgt run-details <id>` returns phases/envelopes for a run seeded
