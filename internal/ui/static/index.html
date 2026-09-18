@@ -22,6 +22,24 @@
         transition-duration: 0.01ms !important;
       }
     }
+    /* Below lg, #master-rail is normally `hidden`. toggleMobileRail() adds this
+       class to show it as a full-screen overlay over the canvas instead of
+       pushing it — the id selector's specificity beats the plain `.hidden`
+       utility class regardless of source order. Scoped to below lg so this
+       never activates at lg and above, where the rail keeps its always-visible
+       desktop layout untouched. */
+    @media (max-width: 1023.98px) {
+      #master-rail.mobile-rail-open {
+        display: flex;
+        position: fixed;
+        top: 2.75rem;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 30;
+        width: 100%;
+      }
+    }
   </style>
 </head>
 <body class="bg-[#0b0e14] text-[#c9d1d9] h-screen overflow-hidden flex flex-col antialiased selection:bg-emerald-500/30 text-xs">
@@ -55,14 +73,34 @@
     </div>
 
     <!-- Dispatch Stage CTA & Global Actions -->
-    <div class="flex items-center space-x-3">
-      <div class="flex items-center space-x-2 text-[#8b949e] text-xs">
-        <button type="button" id="btn-open-analytics" onclick="openAnalyticsDrawer(this)" aria-label="Work analytics" title="Work analytics" class="min-w-[44px] min-h-[44px] flex items-center justify-center hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14] rounded"><i class="fa-solid fa-chart-line"></i></button>
-        <button type="button" id="btn-open-workers" onclick="openWorkersDrawer(this)" aria-label="Worktrees" title="Allocated worktrees (includes retained, non-running ones)" class="relative min-w-[44px] min-h-[44px] flex items-center justify-center hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14] rounded">
+    <div class="flex items-center space-x-3 min-w-0">
+      <!-- min-w-0 lets this row shrink instead of forcing the header wider;
+           overflow-x-auto is the safety net below lg once 5 buttons each
+           carrying a visible label (Review 046: they overflow the header
+           outright at real phone widths, pushing Refresh off-screen with no
+           way to reach it) no longer all fit side by side -- nothing is
+           ever unreachable, even on the narrowest real phone, though most
+           phones fit all of them without needing to scroll at all. -->
+      <div class="flex items-center space-x-2 text-[#8b949e] text-xs min-w-0 overflow-x-auto">
+        <!-- Below lg, #master-rail (the run list) is otherwise unreachable — see
+             design.md's "Mobile rail toggle". Matches #master-rail's own
+             lg breakpoint so the two states are always consistent: never
+             hidden with no way to reveal it, never a toggle with nothing to
+             toggle. -->
+        <button type="button" id="btn-toggle-rail" onclick="toggleMobileRail()"
+          aria-label="Pipeline runs" aria-expanded="false" aria-controls="master-rail"
+          title="Pipeline runs"
+          class="lg:hidden min-w-[44px] min-h-[44px] flex items-center justify-center hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14] rounded">
+          <i class="fa-solid fa-bars" aria-hidden="true"></i>
+        </button>
+        <button type="button" id="btn-open-manual" onclick="openManualDrawer(this)" aria-label="Manual" title="Sgt manual" class="min-w-[44px] min-h-[44px] flex items-center justify-center gap-1 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14] rounded"><i class="fa-solid fa-book"></i><span class="lg:hidden text-[10px] font-bold">Manual</span></button>
+        <button type="button" id="btn-open-analytics" onclick="openAnalyticsDrawer(this)" aria-label="Work analytics" title="Work analytics" class="min-w-[44px] min-h-[44px] flex items-center justify-center gap-1 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14] rounded"><i class="fa-solid fa-chart-line"></i><span class="lg:hidden text-[10px] font-bold">Analytics</span></button>
+        <button type="button" id="btn-open-workers" onclick="openWorkersDrawer(this)" aria-label="Worktrees" title="Allocated worktrees (includes retained, non-running ones)" class="relative min-w-[44px] min-h-[44px] flex items-center justify-center gap-1 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14] rounded">
           <i class="fa-solid fa-folder-tree"></i>
+          <span class="lg:hidden text-[10px] font-bold">Worktrees</span>
           <span id="stat-workers-active" class="absolute top-1 right-1.5 min-w-[13px] h-[13px] px-0.5 flex items-center justify-center rounded-full bg-[#1f6feb] text-white text-[9px] font-bold leading-none">0</span>
         </button>
-        <button onclick="fetchRuns(); fetchFleet();" aria-label="Refresh state" title="Refresh state" class="min-w-[44px] min-h-[44px] flex items-center justify-center hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14] rounded"><i class="fa-solid fa-rotate-right"></i></button>
+        <button onclick="fetchRuns(); fetchFleet();" aria-label="Refresh state" title="Refresh state" class="min-w-[44px] min-h-[44px] flex items-center justify-center gap-1 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14] rounded"><i class="fa-solid fa-rotate-right"></i><span class="lg:hidden text-[10px] font-bold">Refresh</span></button>
       </div>
     </div>
   </header>
@@ -140,8 +178,9 @@
               Activity <span id="activity-count" class="font-mono text-[#8b949e]">0</span>
             </button>
             <button id="btn-stop-run" onclick="cancelActiveRun()" aria-label="Stop run" title="Stop run"
-              class="min-w-[44px] min-h-[44px] flex items-center justify-center rounded text-[#8b949e] hover:text-rose-400 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14]">
+              class="min-w-[44px] min-h-[44px] flex items-center justify-center gap-1 rounded text-[#8b949e] hover:text-rose-400 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14]">
               <i class="fa-regular fa-circle-stop text-sm" aria-hidden="true"></i>
+              <span class="lg:hidden text-[10px] font-bold">Stop run</span>
             </button>
           </div>
         </div>
@@ -311,6 +350,28 @@
         lastFocusedBeforeModal.focus();
       }
       lastFocusedBeforeModal = null;
+    }
+
+    // Below lg, #master-rail is the only way to reach the run list (see
+    // design.md's "Mobile rail toggle"). toggleMobileRail() flips the CSS
+    // class that turns it into a full-screen overlay over the canvas (the
+    // #master-rail.mobile-rail-open rule in <style>, scoped to below lg so
+    // it never activates at lg and above). closeMobileRail() is also called
+    // after selecting a run from the rail — a run selection is the rail's
+    // whole purpose, so staying open afterward would just be another modal
+    // to dismiss.
+    function toggleMobileRail() {
+      const rail = document.getElementById('master-rail');
+      const btn = document.getElementById('btn-toggle-rail');
+      const opening = !rail.classList.contains('mobile-rail-open');
+      rail.classList.toggle('mobile-rail-open', opening);
+      if (btn) btn.setAttribute('aria-expanded', String(opening));
+    }
+
+    function closeMobileRail() {
+      document.getElementById('master-rail').classList.remove('mobile-rail-open');
+      const btn = document.getElementById('btn-toggle-rail');
+      if (btn) btn.setAttribute('aria-expanded', 'false');
     }
 
     function setConnectionError(isError) {
@@ -567,7 +628,7 @@
           if (!btn) {
             btn = document.createElement('button');
             btn.setAttribute('data-run-id', r.id);
-            btn.onclick = () => selectRun(r.id);
+            btn.onclick = () => { selectRun(r.id); closeMobileRail(); };
             listContainer.appendChild(btn);
           }
 
@@ -799,7 +860,7 @@
         } catch (mergeErr) {
           console.error("Failed checking merge status:", mergeErr);
         }
-        renderWorkflowGraph(current, data.phases || []);
+        renderWorkflowGraph(current, data.phases || [], data.fix_retries_limit);
         renderActivity(data.envelopes || []);
         fetchDeliveryHistory(runId);
         refreshRunDrawer(current);
@@ -1723,7 +1784,7 @@
         </section>`;
     }
 
-    async function renderWorkflowGraph(run, phases) {
+    async function renderWorkflowGraph(run, phases, fixRetriesLimit) {
       const host = document.getElementById('workflow-graph');
       const list = phases || [];
 
@@ -1755,8 +1816,8 @@
       }
 
       const artifacts = await fetchArtifactsForRun(run.id);
-      host.innerHTML = lanes.join('') + artifactsSectionHTML(artifacts);
-      lastGraphRender = { run, phases: list };
+      host.innerHTML = lanes.join('') + fixCyclesHTML(list, fixRetriesLimit) + artifactsSectionHTML(artifacts);
+      lastGraphRender = { run, phases: list, fixRetriesLimit };
     }
 
     // fetchArtifactsForRun answers this run's captured pipeline artifacts
@@ -1825,6 +1886,60 @@
       return `<a href="${href}" target="_blank" rel="noopener" class="text-[11px] text-[#58a6ff] underline decoration-dotted">${escapeHTML(a.filename)}</a>`;
     }
 
+    // fixCyclesHTML groups a run's phases whose fix_cycle is 1 or higher into
+    // labeled "Attempt N of M" child blocks, one per corrective cycle
+    // (a-failed-gate-is-corrected-in-place), distinct from the run's own
+    // original phase sequence (fix_cycle 0, rendered by the lanes above and
+    // not repeated here). limit is M, the configured corrective-cycle bound
+    // (GET /api/run-details' fix_retries_limit) — a run that never entered a
+    // corrective cycle has no cycle-1+ phases and this renders nothing.
+    //
+    // Within a block, each phase renders in its real recorded order
+    // (phases already arrive created_at-ascending from the store), connected
+    // by a "→" so the chain reads as the actual sequence the cycle
+    // traversed (e.g. fix → build → test) rather than an
+    // unconnected list — the gate it re-attempts is the chain's own last
+    // link, not a separate label.
+    function fixCyclesHTML(phases, limit) {
+      const list = (phases || []).filter(p => (p.fix_cycle || 0) > 0);
+      if (list.length === 0) return '';
+
+      const byCycle = new Map();
+      list.forEach(p => {
+        const cycle = p.fix_cycle;
+        if (!byCycle.has(cycle)) byCycle.set(cycle, []);
+        byCycle.get(cycle).push(p);
+      });
+
+      const cycles = [...byCycle.keys()].sort((a, b) => a - b);
+      const m = limit || cycles[cycles.length - 1];
+
+      const blocks = cycles.map(cycle => {
+        const cyclePhases = byCycle.get(cycle);
+        const chain = cyclePhases.map((p, i) => {
+          const look = PHASE_LOOK[p.status] || { cls: 'text-[#8b949e]', label: p.status };
+          const node = `<span class="${look.cls} font-mono" title="${escapeAttr(p.status)}">${escapeHTML(p.name)}</span>`;
+          return i === 0 ? node : `<span class="text-[#6e7681]"> → </span>${node}`;
+        }).join('');
+        return `
+          <div class="mb-2 last:mb-0 p-2 rounded border border-[#30363d] bg-[#0d1117]" aria-label="${escapeAttr('Attempt ' + cycle + ' of ' + m)}">
+            <div class="text-[9px] uppercase font-bold text-[#8b949e] tracking-wider mb-1.5">Attempt ${escapeHTML(cycle)} of ${escapeHTML(m)}</div>
+            <div class="flex items-center flex-wrap gap-1 text-[11px]">
+              <i class="fa-solid fa-rotate text-[9px] text-[#6e7681]" aria-hidden="true" title="Repeats the gate this cycle re-attempts"></i>
+              ${chain}
+            </div>
+          </div>`;
+      }).join('');
+
+      return `
+        <section class="mt-5 pt-3 border-t border-[#21262d]" aria-label="Corrective fix cycles">
+          <div class="flex items-center gap-1.5 mb-2 font-mono text-[11px] font-bold text-white">
+            <i class="fa-solid fa-wrench text-[#8b949e] text-[9px]" aria-hidden="true"></i>Corrective cycles
+          </div>
+          ${blocks}
+        </section>`;
+    }
+
     // bulletsForRun answers repo -> bullet for the intent behind runId, so the
     // workflow graph's Delivery group can render each bullet's real lifecycle
     // position instead of always showing every stage as not-reached. A run
@@ -1851,7 +1966,7 @@
       if (!lastGraphRender) return;
       clearTimeout(graphResizeTimer);
       graphResizeTimer = setTimeout(() => {
-        renderWorkflowGraph(lastGraphRender.run, lastGraphRender.phases);
+        renderWorkflowGraph(lastGraphRender.run, lastGraphRender.phases, lastGraphRender.fixRetriesLimit);
       }, 120);
     });
 
@@ -2169,6 +2284,49 @@
         openDrawer('Work analytics', 'analytics', analyticsHTML(data), opener);
       } catch (err) {
         alert("Failed loading work analytics: " + err);
+      }
+    }
+
+    // ---- Manual drawer ---------------------------------------------------
+    // Same fetch-then-openDrawer shape as openWorkersDrawer/openAnalyticsDrawer.
+    // manualSlug and manualHTML are pure (data in, HTML string out) so they
+    // are unit-tested by executing them under real node, the same approach
+    // analyticsHTML/laneHTML use. Body text is rendered via escapeHTML inside
+    // a <pre> block — raw markdown as readable preformatted text, no
+    // markdown-to-HTML conversion, no new JS dependency.
+    function manualSlug(title) {
+      return 'manual-' + String(title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-+|-+$)/g, '');
+    }
+
+    function manualHTML(data) {
+      const sections = (data && data.sections) || [];
+      if (sections.length === 0) {
+        return '<div class="text-[#8b949e]">The manual has no sections.</div>';
+      }
+      const toc = sections.map(s => `
+        <a href="#${manualSlug(s.title)}" class="block text-[#58a6ff] hover:underline text-[10px]">${escapeHTML(s.title)}</a>`).join('');
+      const body = sections.map(s => `
+        <div id="${manualSlug(s.title)}" class="space-y-1">
+          <div class="text-xs font-bold text-white">${escapeHTML(s.title)}</div>
+          <pre class="whitespace-pre-wrap text-[10px] text-slate-300 font-mono">${escapeHTML(s.body)}</pre>
+        </div>`).join('');
+      return `
+        <div class="space-y-3">
+          <div class="space-y-1">
+            <div class="text-[9px] uppercase font-bold text-[#8b949e] tracking-wider">Table of contents</div>
+            <div class="space-y-0.5">${toc}</div>
+          </div>
+          <div class="space-y-3">${body}</div>
+        </div>`;
+    }
+
+    async function openManualDrawer(opener) {
+      try {
+        const res = await fetch('/api/manual');
+        const data = await res.json();
+        openDrawer('Manual', 'manual', manualHTML(data), opener);
+      } catch (err) {
+        alert("Failed loading manual: " + err);
       }
     }
 
