@@ -145,6 +145,31 @@ func TestResolvedRetriesResolutionOrder(t *testing.T) {
 	}
 }
 
+// ResolvedFixRetries mirrors ResolvedRetries's resolution order, except its
+// final fallback is the built-in default of 5, not 0 (a-failed-gate-is-
+// corrected-in-place).
+func TestResolvedFixRetriesResolutionOrder(t *testing.T) {
+	proj := &Project{
+		Defaults: ProjectDefaults{FixRetries: 3},
+		Repos: map[string]Repo{
+			"with-override": {FixRetries: 7},
+			"no-override":   {},
+		},
+	}
+	if got := proj.ResolvedFixRetries("with-override"); got != 7 {
+		t.Errorf("repo with override: got %d, want 7", got)
+	}
+	if got := proj.ResolvedFixRetries("no-override"); got != 3 {
+		t.Errorf("repo using project default: got %d, want 3", got)
+	}
+	projNoDefault := &Project{
+		Repos: map[string]Repo{"svc": {}},
+	}
+	if got := projNoDefault.ResolvedFixRetries("svc"); got != 5 {
+		t.Errorf("no fix_retries configured anywhere: got %d, want the built-in default of 5", got)
+	}
+}
+
 // --- D9: project graphify configuration --------------------------------------
 
 // A project's graphify: block parses into typed fields, not just raw YAML.

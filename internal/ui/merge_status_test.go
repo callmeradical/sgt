@@ -169,24 +169,26 @@ func TestCheckMergeStatusLeavesAnOpenChangeRequestUntouchedAtSealed(t *testing.T
 	}
 }
 
-// Scenario: "A run with no sealed bullets triggers no provider call" —
-// a green bullet (not sealed) and a sealed bullet with no PRURL yet must
-// both be skipped without ever reaching the provider seam.
-func TestCheckMergeStatusWithNoSealedBulletsIsACheapNoOp(t *testing.T) {
+// Scenario: "A sealed bullet with no PRURL yet triggers no provider call" —
+// there is nothing to look up by URL and no branch-based fallback for a
+// bullet that already has a human-approved seal recorded (only a green
+// bullet with no PRURL gets the FindByHead fallback; see issue #22).
+func TestCheckMergeStatusForASealedBulletWithNoPRURLIsACheapNoOp(t *testing.T) {
 	srv, mux, runID, intentID := mergeStatusFixture(t, "main")
 
-	if err := srv.Store.CreateBullet(&store.BulletRecord{ID: "b-nomerge-1", IntentID: intentID, Repo: "svc", Position: 1, Status: "green"}); err != nil {
-		t.Fatal(err)
-	}
 	if err := srv.Store.CreateBullet(&store.BulletRecord{ID: "b-nomerge-2", IntentID: intentID, Repo: "svc2", Position: 2, Status: "sealed"}); err != nil {
 		t.Fatal(err)
 	}
 
-	statusCalls := 0
+	statusCalls, findCalls := 0, 0
 	installFakeGitHubProvider(t, &fakeChangeRequestProvider{
 		statusFn: func(ctx context.Context, repoPath, url string) (*changerequest.StatusResult, error) {
 			statusCalls++
 			return &changerequest.StatusResult{}, nil
+		},
+		findFn: func(ctx context.Context, repoPath, head string) (*changerequest.FoundRef, error) {
+			findCalls++
+			return nil, nil
 		},
 	})
 
@@ -194,8 +196,86 @@ func TestCheckMergeStatusWithNoSealedBulletsIsACheapNoOp(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200; body=%s", w.Code, w.Body.String())
 	}
-	if statusCalls != 0 {
-		t.Errorf("Status invoked %d time(s), want 0 — no sealed bullet carries a recorded PRURL", statusCalls)
+	if statusCalls != 0 || findCalls != 0 {
+		t.Errorf("Status invoked %d time(s), FindByHead invoked %d time(s), want 0 and 0 — a sealed bullet with no PRURL has nothing to check", statusCalls, findCalls)
+	}
+}
+
+// Regression coverage for issue #22 ("Merged dispatched pull request leaves
+// bullet green"): a green bullet with no recorded PRURL must be looked up
+// by branch name, not silently skipped forever just because sgt's own
+// /api/create-pr never ran for it.
+func TestCheckMergeStatusLooksUpAGreenBulletWithNoRecordedPRURLByBranch(t *testing.T) {
+	srv, mux, runID, intentID := mergeStatusFixture(t, "main")
+
+	if err := srv.Store.CreateBullet(&store.BulletRecord{ID: "b-green-1", IntentID: intentID, Repo: "svc", Position: 1, Status: "green"}); err != nil {
+		t.Fatal(err)
+	}
+
+	var gotHead string
+	installFakeGitHubProvider(t, &fakeChangeRequestProvider{
+		findFn: func(ctx context.Context, repoPath, head string) (*changerequest.FoundRef, error) {
+			gotHead = head
+			return nil, nil // no change request exists yet for this branch
+		},
+	})
+
+	w := postCheckMergeStatus(t, mux, runID)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", w.Code, w.Body.String())
+	}
+	if gotHead == "" {
+		t.Fatal("FindByHead was never called for the green bullet with no PRURL")
+	}
+
+	got, err := srv.Store.GetBullet("b-green-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != "green" || got.PRURL != "" {
+		t.Errorf("bullet = {status=%q, prurl=%q}, want unchanged {green, \"\"} — no change request was found", got.Status, got.PRURL)
+	}
+}
+
+// Regression coverage for issue #22: when a change request IS found for a
+// green bullet's branch and it has already merged into the run's recorded
+// base branch, the bullet must end up "merged" with the discovered URL
+// recorded — not stuck at an intermediate status just because sgt did not
+// open that change request itself.
+func TestCheckMergeStatusAdvancesAGreenBulletStraightToMergedWhenItsDiscoveredPRAlreadyMerged(t *testing.T) {
+	srv, mux, runID, intentID := mergeStatusFixture(t, "main")
+
+	if err := srv.Store.CreateBullet(&store.BulletRecord{ID: "b-green-2", IntentID: intentID, Repo: "svc", Position: 1, Status: "green"}); err != nil {
+		t.Fatal(err)
+	}
+
+	const discoveredURL = "https://github.com/example/repo/pull/101"
+	installFakeGitHubProvider(t, &fakeChangeRequestProvider{
+		findFn: func(ctx context.Context, repoPath, head string) (*changerequest.FoundRef, error) {
+			return &changerequest.FoundRef{URL: discoveredURL, Merged: true, MergedIntoBranch: "main"}, nil
+		},
+		statusFn: func(ctx context.Context, repoPath, url string) (*changerequest.StatusResult, error) {
+			if url != discoveredURL {
+				t.Errorf("Status called with %q, want the discovered URL %q", url, discoveredURL)
+			}
+			return &changerequest.StatusResult{Merged: true, MergedIntoBranch: "main"}, nil
+		},
+	})
+
+	w := postCheckMergeStatus(t, mux, runID)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", w.Code, w.Body.String())
+	}
+
+	got, err := srv.Store.GetBullet("b-green-2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != "merged" {
+		t.Errorf("bullet.Status = %q, want %q", got.Status, "merged")
+	}
+	if got.PRURL != discoveredURL {
+		t.Errorf("bullet.PRURL = %q, want the discovered URL %q recorded even though sgt never opened it", got.PRURL, discoveredURL)
 	}
 }
 
