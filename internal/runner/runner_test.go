@@ -357,6 +357,37 @@ func TestUnboundedAgentPhaseStillHonoursCancellation(t *testing.T) {
 	_ = st
 }
 
+// Regression coverage for issue #20 ("reconcile phase and bullet state on
+// resume and cancellation"): a phase killed by the run's own cancellation
+// must not stay recorded as "running" forever. RunAgentPhase wrote the
+// running sentinel at the start of the attempt and, on ctx.Err() != nil,
+// returned immediately without ever updating it.
+func TestCancellationDuringAnAgentPhaseRecordsItAsTerminalNotRunning(t *testing.T) {
+	dir := t.TempDir()
+	pr, st := newRunner(t, fakeAgent(t, dir, "slow-agent", "sleep 30"), 0)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() { time.Sleep(200 * time.Millisecond); cancel() }()
+
+	_, _, err := pr.RunAgentPhase(ctx, "build", "do the thing", 0)
+	if err == nil {
+		t.Fatal("RunAgentPhase returned nil error after cancellation, want a cancellation error")
+	}
+
+	phases, perr := st.ListPhasesForRun("run-1")
+	if perr != nil {
+		t.Fatal(perr)
+	}
+	if len(phases) == 0 {
+		t.Fatal("no phase record was written for the cancelled attempt")
+	}
+	for _, p := range phases {
+		if p.Status == "running" {
+			t.Errorf("phase %q (attempt %d) left at status %q after cancellation, want a terminal status", p.Name, p.Attempt, p.Status)
+		}
+	}
+}
+
 // --- R2.4: attempt number on phase records -----------------------------------
 
 // Each attempt must produce a phase record with an attempt number starting at 1

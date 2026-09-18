@@ -604,16 +604,22 @@ func (srv *Server) executeRun(
 // The intent is not touched here. Its status is derived from the bullets by the
 // store, because an intent may span several bullets and several runs, so no one
 // run knows whether the intent is complete.
+// recordTerminalRun returns the UpdateRunStatus error, if any, so a caller
+// with an HTTP response to give (handleRunCancel) can report it truthfully
+// instead of claiming success for a write that never happened. A caller
+// with nothing to respond to (executeRun's setTerminal, a goroutine, the
+// corrective-fix loop) is free to ignore it — the failure is already
+// logged either way.
 //
 // Because this is the single place a run's outcome becomes a fact, it is also
 // where that fact is rendered into the project's OKF wiki (recordWikiEntry),
 // for every terminal status, not only the ones that advance bullets.
-func (srv *Server) recordTerminalRun(runID, status string) {
+func (srv *Server) recordTerminalRun(runID, status string) error {
 	var reason string
 	if bulletStatus, advances := bulletStatusForRunOutcome(status); advances {
 		reason = srv.blockedReasonForRun(runID, bulletStatus)
 	}
-	srv.recordTerminalRunWithReason(runID, status, reason)
+	return srv.recordTerminalRunWithReason(runID, status, reason)
 }
 
 // recordTerminalRunWithReason is recordTerminalRun with the blocked reason
@@ -627,10 +633,13 @@ func (srv *Server) recordTerminalRun(runID, status string) {
 // would read as if no correction had ever been attempted. reason is ignored
 // for any status that does not advance bullets (bulletStatusForRunOutcome),
 // matching recordTerminalRun's own existing behaviour.
-func (srv *Server) recordTerminalRunWithReason(runID, status, reason string) {
+//
+// Returns the UpdateRunStatus error, if any — see recordTerminalRun's own
+// doc comment for why a caller might need it.
+func (srv *Server) recordTerminalRunWithReason(runID, status, reason string) error {
 	if err := srv.Store.UpdateRunStatus(runID, status); err != nil {
 		log.Printf("sgt: recording terminal status %s for run %s: %v", status, runID, err)
-		return
+		return err
 	}
 
 	if bulletStatus, advances := bulletStatusForRunOutcome(status); advances {
@@ -642,6 +651,7 @@ func (srv *Server) recordTerminalRunWithReason(runID, status, reason string) {
 	}
 
 	srv.recordWikiEntry(runID, reason)
+	return nil
 }
 
 // recordWikiEntry renders runID's just-recorded terminal outcome into the
