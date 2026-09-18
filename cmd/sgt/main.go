@@ -39,6 +39,14 @@ func main() {
 		startUI()
 	case "mcp":
 		startMCP()
+	case "dispatch":
+		runDispatchCommand(os.Args[2:])
+	case "runs":
+		runRunsCommand(os.Args[2:])
+	case "run-details":
+		runRunDetailsCommand(os.Args[2:])
+	case "create-pr":
+		runCreatePRCommand(os.Args[2:])
 	case "version":
 		fmt.Println("sgt v0.2.1 (Go Native Multi-Repo Software Factory Engine + Goose MCP Extension)")
 	case "--help", "-h", "help":

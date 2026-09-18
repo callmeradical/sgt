@@ -1,4 +1,11 @@
-package mcp
+// Package mcp_test, not mcp: this file imports internal/ui (to drive a
+// real ui.NewServer(...).Handler() fixture), and internal/ui now imports
+// internal/manual, which imports internal/mcp for its live tools section —
+// an internal (package mcp) test file sharing that import chain would be a
+// cycle. An external test package breaks it: mcp_test depends on mcp, not
+// the other way around, so mcp -> ui -> manual -> mcp only ever resolves
+// through the external test binary, never through the mcp package itself.
+package mcp_test
 
 import (
 	"context"
@@ -13,6 +20,7 @@ import (
 	"time"
 
 	"github.com/callmeradical/sgt/internal/changerequest"
+	"github.com/callmeradical/sgt/internal/mcp"
 	"github.com/callmeradical/sgt/internal/sgtclient"
 	"github.com/callmeradical/sgt/internal/store"
 	"github.com/callmeradical/sgt/internal/ui"
@@ -65,7 +73,7 @@ func installFakeGitHubProvider(t *testing.T, fake *fakeChangeRequestProvider) {
 // dispatchFixtureRepos makes: a dispatch's response and its run/intent/bullet
 // rows are written before the async goroutine ever reaches prepareWorktree's
 // git check, so a plain directory is enough for what this file asserts on.
-func mcpDispatchFixture(t *testing.T, repos ...string) (s *MCPServer, st *store.Store, repoPaths map[string]string, uiAddr string) {
+func mcpDispatchFixture(t *testing.T, repos ...string) (s *mcp.MCPServer, st *store.Store, repoPaths map[string]string, uiAddr string) {
 	t.Helper()
 
 	base := t.TempDir()
@@ -102,7 +110,7 @@ func mcpDispatchFixture(t *testing.T, repos ...string) (s *MCPServer, st *store.
 	t.Cleanup(httpSrv.Close)
 	t.Setenv("SGT_UI_ADDR", httpSrv.URL)
 
-	return NewMCPServer(st), st, repoPaths, httpSrv.URL
+	return mcp.NewMCPServer(st), st, repoPaths, httpSrv.URL
 }
 
 // mcpCreatePRFixture builds a server backed by a fresh store holding one
@@ -111,7 +119,7 @@ func mcpDispatchFixture(t *testing.T, repos ...string) (s *MCPServer, st *store.
 // mcpDispatchFixture is (real ui.Handler behind httptest.Server, SGT_UI_ADDR
 // pointed at it). The repo is a real git repository with a GitHub-shaped
 // origin remote, so a green bullet's request reaches changerequest.Providers.
-func mcpCreatePRFixture(t *testing.T, bulletStatus string) (s *MCPServer, st *store.Store, runID, repoPath, uiAddr string) {
+func mcpCreatePRFixture(t *testing.T, bulletStatus string) (s *mcp.MCPServer, st *store.Store, runID, repoPath, uiAddr string) {
 	t.Helper()
 
 	base := t.TempDir()
@@ -165,7 +173,7 @@ func mcpCreatePRFixture(t *testing.T, bulletStatus string) (s *MCPServer, st *st
 	t.Cleanup(httpSrv.Close)
 	t.Setenv("SGT_UI_ADDR", httpSrv.URL)
 
-	return NewMCPServer(st), st, runID, repoPath, httpSrv.URL
+	return mcp.NewMCPServer(st), st, runID, repoPath, httpSrv.URL
 }
 
 // waitForTerminalRunMCP blocks until a run leaves the running state, so a
@@ -193,7 +201,7 @@ func waitForTerminalRunMCP(t *testing.T, st *store.Store, runID string) {
 // tools/list never told it exists.
 func TestToolListIncludesSgtDispatchAndSgtCreatePR(t *testing.T) {
 	names := map[string]bool{}
-	for _, tool := range Tools() {
+	for _, tool := range mcp.Tools() {
 		names[tool.Name] = true
 	}
 	for _, want := range []string{"sgt_dispatch", "sgt_create_pr"} {
@@ -212,7 +220,7 @@ func TestSgtDispatchWithExplicitReposCreatesTheSameRowsAsHTTPWould(t *testing.T)
 		t.Fatal(err)
 	}
 
-	text, err := s.executeTool("sgt_dispatch", map[string]interface{}{
+	text, err := s.ExecuteTool("sgt_dispatch", map[string]interface{}{
 		"project": "mcpo", "brief": "add stripe webhooks",
 		"repos": []interface{}{"svc"}, "type": "feat", "change_id": changeID,
 	})
@@ -270,7 +278,7 @@ func TestSgtDispatchWithNoReposRecordsAProposedPlanAndStartsNoRun(t *testing.T) 
 		t.Fatal(err)
 	}
 
-	text, err := s.executeTool("sgt_dispatch", map[string]interface{}{
+	text, err := s.ExecuteTool("sgt_dispatch", map[string]interface{}{
 		"project": "mcpo", "brief": "add stripe webhooks", "type": "feat", "change_id": changeID,
 	})
 	if err != nil {
@@ -323,11 +331,11 @@ func TestSgtDispatchCalledTwiceWithSameRequestIDProducesExactlyOneRunRow(t *test
 		"repos": []interface{}{"svc"}, "type": "feat", "change_id": changeID, "request_id": "retry-me",
 	}
 
-	first, err := s.executeTool("sgt_dispatch", args)
+	first, err := s.ExecuteTool("sgt_dispatch", args)
 	if err != nil {
 		t.Fatalf("first sgt_dispatch returned an error: %v", err)
 	}
-	second, err := s.executeTool("sgt_dispatch", args)
+	second, err := s.ExecuteTool("sgt_dispatch", args)
 	if err != nil {
 		t.Fatalf("repeat sgt_dispatch returned an error: %v", err)
 	}
@@ -359,7 +367,7 @@ func TestSgtDispatchCalledTwiceWithSameRequestIDProducesExactlyOneRunRow(t *test
 func TestSgtDispatchWithAnUnrecognizedTypeIsRefusedWithValidateWorkTypesExactMessage(t *testing.T) {
 	s, _, _, _ := mcpDispatchFixture(t, "svc")
 
-	_, err := s.executeTool("sgt_dispatch", map[string]interface{}{
+	_, err := s.ExecuteTool("sgt_dispatch", map[string]interface{}{
 		"project": "mcpo", "brief": "add stripe webhooks", "type": "bogus",
 	})
 	if err == nil {
@@ -379,7 +387,7 @@ func TestSgtDispatchWithAnUnrecognizedTypeIsRefusedWithValidateWorkTypesExactMes
 func TestSgtDispatchWithUnknownChangeIDIsRefusedAndCreatesNoRun(t *testing.T) {
 	s, st, repoPaths, _ := mcpDispatchFixture(t, "svc")
 
-	_, err := s.executeTool("sgt_dispatch", map[string]interface{}{
+	_, err := s.ExecuteTool("sgt_dispatch", map[string]interface{}{
 		"project": "mcpo", "brief": "add stripe webhooks",
 		"repos": []interface{}{"svc"}, "type": "feat", "change_id": "no-such-change",
 	})
@@ -410,7 +418,7 @@ func TestSgtCreatePRAgainstGreenBulletSealsItAndCallsProvider(t *testing.T) {
 	fake := &fakeChangeRequestProvider{}
 	installFakeGitHubProvider(t, fake)
 
-	text, err := s.executeTool("sgt_create_pr", map[string]interface{}{
+	text, err := s.ExecuteTool("sgt_create_pr", map[string]interface{}{
 		"run_id": runID, "project": "mcpcp", "repo": "svc", "title": "t", "body": "b",
 	})
 	if err != nil {
@@ -451,7 +459,7 @@ func TestSgtCreatePRAgainstNonGreenBulletIsRefusedAndNeverInvokesGH(t *testing.T
 			fake := &fakeChangeRequestProvider{}
 			installFakeGitHubProvider(t, fake)
 
-			_, err := s.executeTool("sgt_create_pr", map[string]interface{}{
+			_, err := s.ExecuteTool("sgt_create_pr", map[string]interface{}{
 				"run_id": runID, "project": "mcpcp", "repo": "svc", "title": "t", "body": "b",
 			})
 			if err == nil {

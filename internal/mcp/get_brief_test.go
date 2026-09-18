@@ -74,7 +74,7 @@ func TestGetBriefRendersTheSharedBrief(t *testing.T) {
 		t.Fatalf("creating bullet: %v", err)
 	}
 
-	text, err := s.executeTool("sgt_get_brief", map[string]interface{}{
+	text, err := s.ExecuteTool("sgt_get_brief", map[string]interface{}{
 		"intent_id": "intent-mcp-1",
 		"repo":      "svc",
 	})
@@ -113,7 +113,7 @@ func TestGetBriefRefusesRepoWithNoMatchingBullet(t *testing.T) {
 		t.Fatalf("creating bullet: %v", err)
 	}
 
-	_, err := s.executeTool("sgt_get_brief", map[string]interface{}{
+	_, err := s.ExecuteTool("sgt_get_brief", map[string]interface{}{
 		"intent_id": "intent-mcp-2",
 		"repo":      "web",
 	})

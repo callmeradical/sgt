@@ -354,7 +354,7 @@ func (s *MCPServer) handleRequest(req *JSONRPCRequest) {
 			return
 		}
 
-		resText, err := s.executeTool(callParams.Name, callParams.Arguments)
+		resText, err := s.ExecuteTool(callParams.Name, callParams.Arguments)
 		if err != nil {
 			s.sendResult(req.ID, map[string]interface{}{
 				"isError": true,
@@ -377,7 +377,12 @@ func (s *MCPServer) handleRequest(req *JSONRPCRequest) {
 	}
 }
 
-func (s *MCPServer) executeTool(name string, args map[string]interface{}) (string, error) {
+// ExecuteTool runs one named MCP tool call. Exported so an external test
+// package (e.g. dispatch_tools_test.go, which must live in package mcp_test
+// to import internal/ui without an import cycle through internal/manual)
+// can invoke a tool directly, the same way ServeStdio's own JSON-RPC
+// dispatch does above.
+func (s *MCPServer) ExecuteTool(name string, args map[string]interface{}) (string, error) {
 	switch name {
 	case "sgt_status":
 		runs, err := s.Store.ListRecentRuns(10)

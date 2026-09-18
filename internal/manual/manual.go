@@ -41,6 +41,10 @@ var commandTable = []commandEntry{
 	{Usage: "sgt status", Description: "Show recent factory runs and phase states"},
 	{Usage: "sgt ui", Description: "Start embedded Web UI dashboard (http://127.0.0.1:8484)"},
 	{Usage: "sgt mcp", Description: "Start MCP JSON-RPC stdio server for Goose / Claude"},
+	{Usage: "sgt dispatch", Description: "Dispatch work via a running `sgt ui` (POST /api/dispatch)"},
+	{Usage: "sgt runs", Description: "List runs via a running `sgt ui` (GET /api/runs)"},
+	{Usage: "sgt run-details <run-id>", Description: "Show phases/envelopes for a run (GET /api/run-details)"},
+	{Usage: "sgt create-pr", Description: "Seal a bullet and open its PR (POST /api/create-pr)"},
 	{Usage: "sgt version", Description: "Print version info"},
 	{Usage: "sgt help [topic...]", Description: "Show the manual's table of contents, or search it for a topic"},
 }

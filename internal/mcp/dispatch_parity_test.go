@@ -1,4 +1,6 @@
-package mcp
+// Package mcp_test: see dispatch_tools_test.go's package comment for why
+// (this file shares its fixtures and needs the same import-cycle escape).
+package mcp_test
 
 import (
 	"bytes"
@@ -6,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/callmeradical/sgt/internal/sgtclient"
@@ -49,13 +52,11 @@ func postJSON(t *testing.T, addr, path string, body map[string]interface{}) (int
 	return resp.StatusCode, buf.Bytes()
 }
 
-// TODO(cli-dispatch-subcommands): add the CLI-subprocess leg of this parity
-// test once that change lands.
-//
-// A raw HTTP POST /api/dispatch and a call to the sgt_dispatch MCP tool,
-// against the SAME running server, for equivalent valid input, must produce
-// equivalent store state: one run, one intent, and one bullet per target
-// repo, in the same shape (status, repo, position) either way.
+// A raw HTTP POST /api/dispatch, a call to the sgt_dispatch MCP tool, and
+// the compiled sgt binary's `dispatch` subcommand — all three against the
+// SAME running server, for equivalent valid input — must produce equivalent
+// store state: one run, one intent, and one bullet per target repo, in the
+// same shape (status, repo, position) every way.
 func TestDispatchViaHTTPAndViaSgtDispatchToolProduceIdenticalStoreState(t *testing.T) {
 	s, st, repoPaths, addr := mcpDispatchFixture(t, "svc")
 	const changeID = "add-stripe-webhooks"
@@ -77,7 +78,7 @@ func TestDispatchViaHTTPAndViaSgtDispatchToolProduceIdenticalStoreState(t *testi
 	}
 
 	// Leg 2: the MCP tool, against the identical server.
-	mcpText, err := s.executeTool("sgt_dispatch", map[string]interface{}{
+	mcpText, err := s.ExecuteTool("sgt_dispatch", map[string]interface{}{
 		"project": "mcpo", "brief": "add stripe webhooks",
 		"repos": []interface{}{"svc"}, "type": "feat", "change_id": changeID, "request_id": "mcp-leg",
 	})
@@ -89,34 +90,50 @@ func TestDispatchViaHTTPAndViaSgtDispatchToolProduceIdenticalStoreState(t *testi
 		t.Fatalf("decoding MCP leg response: %v; text=%s", err, mcpText)
 	}
 
-	// Both legs must report the same shape, modulo the identifiers that are
-	// necessarily distinct because these are two separate dispatches against
-	// the same server (two different request_ids, by construction).
-	if httpResp.Status != "dispatched" || mcpResp.Status != "dispatched" {
-		t.Fatalf("Status = %q (HTTP) / %q (MCP), want dispatched/dispatched", httpResp.Status, mcpResp.Status)
+	// Leg 3: the compiled sgt binary's `dispatch` subcommand, run as a real
+	// subprocess against the identical server.
+	cliBin := cliParityBinary(t)
+	cliBody := map[string]interface{}{
+		"project": "mcpo", "brief": "add stripe webhooks",
+		"repos": []string{"svc"}, "type": "feat", "change_id": changeID, "request_id": "cli-leg",
 	}
-	if httpResp.Project != mcpResp.Project {
-		t.Errorf("Project = %q (HTTP) vs %q (MCP), want equal", httpResp.Project, mcpResp.Project)
+	cliStdout, cliStderr, cliErr := runSgtCLI(t, cliBin, addr, cliArgsForDispatch(cliBody)...)
+	if cliErr != nil {
+		t.Fatalf("sgt dispatch subprocess failed: %v; stdout=%s stderr=%s", cliErr, cliStdout, cliStderr)
 	}
-	if httpResp.ChangeID != mcpResp.ChangeID {
-		t.Errorf("ChangeID = %q (HTTP) vs %q (MCP), want equal", httpResp.ChangeID, mcpResp.ChangeID)
+	var cliResp sgtclient.DispatchResponse
+	if err := json.Unmarshal([]byte(cliStdout), &cliResp); err != nil {
+		t.Fatalf("decoding CLI leg response: %v; stdout=%s", err, cliStdout)
 	}
-	if httpResp.ChangeRepo != mcpResp.ChangeRepo {
-		t.Errorf("ChangeRepo = %q (HTTP) vs %q (MCP), want equal", httpResp.ChangeRepo, mcpResp.ChangeRepo)
+
+	// All three legs must report the same shape, modulo the identifiers that
+	// are necessarily distinct because these are three separate dispatches
+	// against the same server (three different request_ids, by construction).
+	if httpResp.Status != "dispatched" || mcpResp.Status != "dispatched" || cliResp.Status != "dispatched" {
+		t.Fatalf("Status = %q (HTTP) / %q (MCP) / %q (CLI), want dispatched/dispatched/dispatched", httpResp.Status, mcpResp.Status, cliResp.Status)
 	}
-	if httpResp.ChangeCreated != mcpResp.ChangeCreated {
-		t.Errorf("ChangeCreated = %v (HTTP) vs %v (MCP), want equal", httpResp.ChangeCreated, mcpResp.ChangeCreated)
+	if httpResp.Project != mcpResp.Project || mcpResp.Project != cliResp.Project {
+		t.Errorf("Project = %q (HTTP) / %q (MCP) / %q (CLI), want equal", httpResp.Project, mcpResp.Project, cliResp.Project)
 	}
-	if httpResp.TaskID == "" || mcpResp.TaskID == "" {
-		t.Fatal("both legs must report a non-empty task_id")
+	if httpResp.ChangeID != mcpResp.ChangeID || mcpResp.ChangeID != cliResp.ChangeID {
+		t.Errorf("ChangeID = %q (HTTP) / %q (MCP) / %q (CLI), want equal", httpResp.ChangeID, mcpResp.ChangeID, cliResp.ChangeID)
 	}
-	if httpResp.TaskID == mcpResp.TaskID {
-		t.Fatal("the two legs dispatched with different request_ids and must have produced two distinct runs")
+	if httpResp.ChangeRepo != mcpResp.ChangeRepo || mcpResp.ChangeRepo != cliResp.ChangeRepo {
+		t.Errorf("ChangeRepo = %q (HTTP) / %q (MCP) / %q (CLI), want equal", httpResp.ChangeRepo, mcpResp.ChangeRepo, cliResp.ChangeRepo)
+	}
+	if httpResp.ChangeCreated != mcpResp.ChangeCreated || mcpResp.ChangeCreated != cliResp.ChangeCreated {
+		t.Errorf("ChangeCreated = %v (HTTP) / %v (MCP) / %v (CLI), want equal", httpResp.ChangeCreated, mcpResp.ChangeCreated, cliResp.ChangeCreated)
+	}
+	if httpResp.TaskID == "" || mcpResp.TaskID == "" || cliResp.TaskID == "" {
+		t.Fatal("all three legs must report a non-empty task_id")
+	}
+	if httpResp.TaskID == mcpResp.TaskID || mcpResp.TaskID == cliResp.TaskID || httpResp.TaskID == cliResp.TaskID {
+		t.Fatal("the three legs dispatched with different request_ids and must have produced three distinct runs")
 	}
 
 	// Store state: each leg's run must resolve to its own intent with
 	// exactly one bullet, of the same shape.
-	for _, taskID := range []string{httpResp.TaskID, mcpResp.TaskID} {
+	for _, taskID := range []string{httpResp.TaskID, mcpResp.TaskID, cliResp.TaskID} {
 		run, err := st.GetRun(taskID)
 		if err != nil {
 			t.Fatalf("reading run %s: %v", taskID, err)
@@ -134,26 +151,24 @@ func TestDispatchViaHTTPAndViaSgtDispatchToolProduceIdenticalStoreState(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(runs) != 2 {
-		t.Fatalf("store holds %d runs after one dispatch per surface, want 2: %+v", len(runs), runs)
+	if len(runs) != 3 {
+		t.Fatalf("store holds %d runs after one dispatch per surface, want 3: %+v", len(runs), runs)
 	}
 
 	waitForTerminalRunMCP(t, st, httpResp.TaskID)
 	waitForTerminalRunMCP(t, st, mcpResp.TaskID)
+	waitForTerminalRunMCP(t, st, cliResp.TaskID)
 }
 
-// TODO(cli-dispatch-subcommands): add the CLI-subprocess leg of this parity
-// test once that change lands.
-//
-// A raw HTTP POST /api/create-pr and a call to the sgt_create_pr MCP tool,
-// each against its own green bullet but the SAME running server, must
-// produce identical resulting bullet state (sealed) and an equivalent
-// response shape.
+// A raw HTTP POST /api/create-pr, a call to the sgt_create_pr MCP tool, and
+// the compiled sgt binary's `create-pr` subcommand — each against its own
+// green bullet but the SAME running server — must produce identical
+// resulting bullet state (sealed) and an equivalent response shape.
 func TestCreatePRViaHTTPAndViaSgtCreatePRToolProduceIdenticalBulletState(t *testing.T) {
 	s, st, runID, _, addr := mcpCreatePRFixture(t, "green")
 
 	// A second, independent green bullet/run on the SAME server and repo, so
-	// the HTTP leg has its own target and cannot collide with the MCP leg's
+	// the MCP leg has its own target and cannot collide with the HTTP leg's
 	// seal.
 	const intentID2 = "intent-mcpcp-2"
 	if err := st.CreateIntent(&store.IntentRecord{ID: intentID2, Project: "mcpcp", Statement: "s2", Status: "approved"}); err != nil {
@@ -164,6 +179,21 @@ func TestCreatePRViaHTTPAndViaSgtCreatePRToolProduceIdenticalBulletState(t *test
 	}
 	const runID2 = "run-mcpcp-2"
 	if err := st.CreateRun(&store.RunRecord{ID: runID2, Project: "mcpcp", TaskID: runID2, Status: "passed", IntentID: intentID2}); err != nil {
+		t.Fatal(err)
+	}
+
+	// A third, independent green bullet/run on the SAME server and repo, so
+	// the CLI leg has its own target too and cannot collide with either of
+	// the other two legs' seals.
+	const intentID3 = "intent-mcpcp-3"
+	if err := st.CreateIntent(&store.IntentRecord{ID: intentID3, Project: "mcpcp", Statement: "s3", Status: "approved"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.CreateBullet(&store.BulletRecord{ID: "bullet-mcpcp-3", IntentID: intentID3, Repo: "svc", Position: 1, Status: "green"}); err != nil {
+		t.Fatal(err)
+	}
+	const runID3 = "run-mcpcp-3"
+	if err := st.CreateRun(&store.RunRecord{ID: runID3, Project: "mcpcp", TaskID: runID3, Status: "passed", IntentID: intentID3}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -181,7 +211,7 @@ func TestCreatePRViaHTTPAndViaSgtCreatePRToolProduceIdenticalBulletState(t *test
 
 	// Leg 2: the MCP tool, sealing the second bullet (run-mcpcp-2), against
 	// the identical server.
-	mcpText, err := s.executeTool("sgt_create_pr", map[string]interface{}{
+	mcpText, err := s.ExecuteTool("sgt_create_pr", map[string]interface{}{
 		"run_id": runID2, "project": "mcpcp", "repo": "svc", "title": "t", "body": "b",
 	})
 	if err != nil {
@@ -192,17 +222,32 @@ func TestCreatePRViaHTTPAndViaSgtCreatePRToolProduceIdenticalBulletState(t *test
 		t.Fatalf("decoding MCP leg response: %v; text=%s", err, mcpText)
 	}
 
-	if httpResp.Status != "created" || mcpResp.Status != "created" {
-		t.Fatalf("Status = %q (HTTP) / %q (MCP), want created/created", httpResp.Status, mcpResp.Status)
+	// Leg 3: the compiled sgt binary's `create-pr` subcommand, sealing the
+	// third bullet (run-mcpcp-3), run as a real subprocess against the
+	// identical server.
+	cliBin := cliParityBinary(t)
+	cliStdout, cliStderr, cliErr := runSgtCLI(t, cliBin, addr, cliArgsForCreatePR(map[string]interface{}{
+		"run_id": runID3, "project": "mcpcp", "repo": "svc", "title": "t", "body": "b",
+	})...)
+	if cliErr != nil {
+		t.Fatalf("sgt create-pr subprocess failed: %v; stdout=%s stderr=%s", cliErr, cliStdout, cliStderr)
 	}
-	if httpResp.Branch == "" || mcpResp.Branch == "" {
-		t.Fatal("both legs must report a non-empty branch")
+	var cliResp sgtclient.CreatePRResponse
+	if err := json.Unmarshal([]byte(cliStdout), &cliResp); err != nil {
+		t.Fatalf("decoding CLI leg response: %v; stdout=%s", err, cliStdout)
 	}
-	if httpResp.PRURL == "" || mcpResp.PRURL == "" {
-		t.Fatal("both legs must report a non-empty pr_url")
+
+	if httpResp.Status != "created" || mcpResp.Status != "created" || cliResp.Status != "created" {
+		t.Fatalf("Status = %q (HTTP) / %q (MCP) / %q (CLI), want created/created/created", httpResp.Status, mcpResp.Status, cliResp.Status)
 	}
-	if httpResp.Error != mcpResp.Error {
-		t.Errorf("Error = %q (HTTP) vs %q (MCP), want equal (both empty)", httpResp.Error, mcpResp.Error)
+	if httpResp.Branch == "" || mcpResp.Branch == "" || cliResp.Branch == "" {
+		t.Fatal("all three legs must report a non-empty branch")
+	}
+	if httpResp.PRURL == "" || mcpResp.PRURL == "" || cliResp.PRURL == "" {
+		t.Fatal("all three legs must report a non-empty pr_url")
+	}
+	if httpResp.Error != mcpResp.Error || mcpResp.Error != cliResp.Error {
+		t.Errorf("Error = %q (HTTP) / %q (MCP) / %q (CLI), want equal (all empty)", httpResp.Error, mcpResp.Error, cliResp.Error)
 	}
 
 	origBullets, err := st.ListBulletsForIntent("intent-mcpcp-1")
@@ -213,20 +258,24 @@ func TestCreatePRViaHTTPAndViaSgtCreatePRToolProduceIdenticalBulletState(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
+	thirdBullets, err := st.ListBulletsForIntent(intentID3)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(origBullets) != 1 || origBullets[0].Status != "sealed" {
 		t.Errorf("HTTP-leg bullet = %+v, want sealed", origBullets)
 	}
 	if len(secondBullets) != 1 || secondBullets[0].Status != "sealed" {
 		t.Errorf("MCP-leg bullet = %+v, want sealed", secondBullets)
 	}
+	if len(thirdBullets) != 1 || thirdBullets[0].Status != "sealed" {
+		t.Errorf("CLI-leg bullet = %+v, want sealed", thirdBullets)
+	}
 }
 
-// TODO(cli-dispatch-subcommands): add the CLI-subprocess leg of this parity
-// test once that change lands.
-//
 // An unrecognized work type must be refused with byte-for-byte identical
-// error text whether the caller used a raw HTTP POST /api/dispatch or the
-// sgt_dispatch MCP tool.
+// error text whether the caller used a raw HTTP POST /api/dispatch, the
+// sgt_dispatch MCP tool, or the compiled sgt binary's `dispatch` subcommand.
 func TestUnrecognizedTypeRefusalTextIsIdenticalViaHTTPAndSgtDispatch(t *testing.T) {
 	_, _, _, addr := mcpDispatchFixture(t, "svc")
 
@@ -240,9 +289,9 @@ func TestUnrecognizedTypeRefusalTextIsIdenticalViaHTTPAndSgtDispatch(t *testing.
 
 	// A fresh fixture for the MCP leg: the HTTP leg above already exercised
 	// this server, and a rejected dispatch creates no run to collide with,
-	// but a fresh fixture keeps the two legs from sharing any state at all.
+	// but a fresh fixture keeps the legs from sharing any state at all.
 	s, _, _, _ := mcpDispatchFixture(t, "svc")
-	_, err := s.executeTool("sgt_dispatch", map[string]interface{}{
+	_, err := s.ExecuteTool("sgt_dispatch", map[string]interface{}{
 		"project": "mcpo", "brief": "add stripe webhooks", "type": "bogus",
 	})
 	if err == nil {
@@ -252,22 +301,34 @@ func TestUnrecognizedTypeRefusalTextIsIdenticalViaHTTPAndSgtDispatch(t *testing.
 	if err.Error() != httpErrText {
 		t.Errorf("error text differs between surfaces:\n  HTTP: %q\n  MCP:  %q", httpErrText, err.Error())
 	}
+
+	// A third, also-fresh fixture for the CLI leg, run as a real subprocess.
+	cliBin := cliParityBinary(t)
+	_, _, _, cliAddr := mcpDispatchFixture(t, "svc")
+	cliStdout, cliStderr, cliErr := runSgtCLI(t, cliBin, cliAddr, cliArgsForDispatch(map[string]interface{}{
+		"project": "mcpo", "brief": "add stripe webhooks", "type": "bogus",
+	})...)
+	if cliErr == nil {
+		t.Fatalf("expected sgt dispatch to refuse an unrecognized type, got success; stdout=%s", cliStdout)
+	}
+	cliErrText := strings.TrimRight(cliStderr, "\n")
+	if cliErrText != httpErrText {
+		t.Errorf("error text differs between surfaces:\n  HTTP: %q\n  CLI:  %q", httpErrText, cliErrText)
+	}
 }
 
-// TODO(cli-dispatch-subcommands): add the CLI-subprocess leg of this parity
-// test once that change lands.
-//
 // An unknown/nonexistent change_id must be refused with byte-for-byte
 // identical error text whether the caller used a raw HTTP POST
-// /api/dispatch or the sgt_dispatch MCP tool (O3, resolveChange).
+// /api/dispatch, the sgt_dispatch MCP tool, or the compiled sgt binary's
+// `dispatch` subcommand (O3, resolveChange).
 //
 // Unlike the unrecognized-type case above, resolveChange's refusal embeds
 // the target repo's own absolute filesystem path (design.md:
-// `%q not found: %s does not exist...`), so this test drives both legs
-// against the SAME fixture/repo path rather than two independent ones —
-// two fresh fixtures would each mint their own t.TempDir() and the paths
+// `%q not found: %s does not exist...`), so this test drives every leg
+// against the SAME fixture/repo path rather than independent ones —
+// independent fixtures would each mint their own t.TempDir() and the paths
 // would legitimately differ, which is not the drift this test is checking
-// for. Both legs reject before any run is created, so sharing one server
+// for. Every leg rejects before any run is created, so sharing one server
 // is safe.
 func TestUnknownChangeIDRefusalTextIsIdenticalViaHTTPAndSgtDispatch(t *testing.T) {
 	s, _, _, addr := mcpDispatchFixture(t, "svc")
@@ -281,7 +342,7 @@ func TestUnknownChangeIDRefusalTextIsIdenticalViaHTTPAndSgtDispatch(t *testing.T
 	}
 	httpErrText := string(bytes.TrimRight(httpBody, "\n"))
 
-	_, err := s.executeTool("sgt_dispatch", map[string]interface{}{
+	_, err := s.ExecuteTool("sgt_dispatch", map[string]interface{}{
 		"project": "mcpo", "brief": "add stripe webhooks",
 		"repos": []interface{}{"svc"}, "type": "feat", "change_id": "no-such-change",
 	})
@@ -292,16 +353,27 @@ func TestUnknownChangeIDRefusalTextIsIdenticalViaHTTPAndSgtDispatch(t *testing.T
 	if err.Error() != httpErrText {
 		t.Errorf("error text differs between surfaces:\n  HTTP: %q\n  MCP:  %q", httpErrText, err.Error())
 	}
+
+	cliBin := cliParityBinary(t)
+	cliStdout, cliStderr, cliErr := runSgtCLI(t, cliBin, addr, cliArgsForDispatch(map[string]interface{}{
+		"project": "mcpo", "brief": "add stripe webhooks",
+		"repos": []string{"svc"}, "type": "feat", "change_id": "no-such-change",
+	})...)
+	if cliErr == nil {
+		t.Fatalf("expected sgt dispatch to refuse an unknown change_id, got success; stdout=%s", cliStdout)
+	}
+	cliErrText := strings.TrimRight(cliStderr, "\n")
+	if cliErrText != httpErrText {
+		t.Errorf("error text differs between surfaces:\n  HTTP: %q\n  CLI:  %q", httpErrText, cliErrText)
+	}
 }
 
-// TODO(cli-dispatch-subcommands): add the CLI-subprocess leg of this parity
-// test once that change lands.
-//
 // A non-green bullet must be refused with byte-for-byte identical error text
-// whether the caller used a raw HTTP POST /api/create-pr or the
-// sgt_create_pr MCP tool. Both fixtures build the identical intent/bullet/run
-// id, so SealBulletForRun's refusal (which names the bullet id and its
-// status) is textually identical across the two independent servers.
+// whether the caller used a raw HTTP POST /api/create-pr, the
+// sgt_create_pr MCP tool, or the compiled sgt binary's `create-pr`
+// subcommand. Every fixture builds the identical intent/bullet/run id, so
+// SealBulletForRun's refusal (which names the bullet id and its status) is
+// textually identical across the independent servers.
 func TestNonGreenBulletRefusalTextIsIdenticalViaHTTPAndSgtCreatePR(t *testing.T) {
 	_, _, runID, _, addr := mcpCreatePRFixture(t, "pending")
 	httpCode, httpBody := postJSON(t, addr, "/api/create-pr", map[string]interface{}{
@@ -313,7 +385,7 @@ func TestNonGreenBulletRefusalTextIsIdenticalViaHTTPAndSgtCreatePR(t *testing.T)
 	httpErrText := string(bytes.TrimRight(httpBody, "\n"))
 
 	s, _, runID2, _, _ := mcpCreatePRFixture(t, "pending")
-	_, err := s.executeTool("sgt_create_pr", map[string]interface{}{
+	_, err := s.ExecuteTool("sgt_create_pr", map[string]interface{}{
 		"run_id": runID2, "project": "mcpcp", "repo": "svc", "title": "t", "body": "b",
 	})
 	if err == nil {
@@ -322,5 +394,18 @@ func TestNonGreenBulletRefusalTextIsIdenticalViaHTTPAndSgtCreatePR(t *testing.T)
 
 	if err.Error() != httpErrText {
 		t.Errorf("error text differs between surfaces:\n  HTTP: %q\n  MCP:  %q", httpErrText, err.Error())
+	}
+
+	cliBin := cliParityBinary(t)
+	_, _, runID3, _, cliAddr := mcpCreatePRFixture(t, "pending")
+	cliStdout, cliStderr, cliErr := runSgtCLI(t, cliBin, cliAddr, cliArgsForCreatePR(map[string]interface{}{
+		"run_id": runID3, "project": "mcpcp", "repo": "svc", "title": "t", "body": "b",
+	})...)
+	if cliErr == nil {
+		t.Fatalf("expected sgt create-pr to refuse a non-green bullet, got success; stdout=%s", cliStdout)
+	}
+	cliErrText := strings.TrimRight(cliStderr, "\n")
+	if cliErrText != httpErrText {
+		t.Errorf("error text differs between surfaces:\n  HTTP: %q\n  CLI:  %q", httpErrText, cliErrText)
 	}
 }
