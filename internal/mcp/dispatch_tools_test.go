@@ -371,6 +371,38 @@ func TestSgtDispatchWithAnUnrecognizedTypeIsRefusedWithValidateWorkTypesExactMes
 	}
 }
 
+// sgt_dispatch naming a change_id that does not exist on disk must be
+// refused with resolveChange's exact message (O3, internal/ui/openspec.go)
+// — the same refusal POST /api/dispatch produces for identical input — and
+// must create no run. Mirrors internal/ui's own
+// TestDispatchWithUnknownChangeIDIsRejectedAndCreatesNoRun.
+func TestSgtDispatchWithUnknownChangeIDIsRefusedAndCreatesNoRun(t *testing.T) {
+	s, st, repoPaths, _ := mcpDispatchFixture(t, "svc")
+
+	_, err := s.executeTool("sgt_dispatch", map[string]interface{}{
+		"project": "mcpo", "brief": "add stripe webhooks",
+		"repos": []interface{}{"svc"}, "type": "feat", "change_id": "no-such-change",
+	})
+	if err == nil {
+		t.Fatal("expected an error for an unknown change_id, got nil")
+	}
+	if !strings.Contains(err.Error(), "no-such-change") {
+		t.Errorf("error does not name the change: %v", err)
+	}
+	wantPath := filepath.Join(repoPaths["svc"], "openspec", "changes", "no-such-change")
+	if !strings.Contains(err.Error(), wantPath) {
+		t.Errorf("error does not name the missing path %s: %v", wantPath, err)
+	}
+
+	runs, err := st.ListRecentRuns(50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(runs) != 0 {
+		t.Errorf("store holds %d runs after a rejected dispatch, want 0", len(runs))
+	}
+}
+
 // sgt_create_pr against a green bullet must seal it and call the provider
 // seam — the same seal-then-provider-call sequence handleCreatePR runs.
 func TestSgtCreatePRAgainstGreenBulletSealsItAndCallsProvider(t *testing.T) {

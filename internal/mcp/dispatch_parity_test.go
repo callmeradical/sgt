@@ -257,6 +257,46 @@ func TestUnrecognizedTypeRefusalTextIsIdenticalViaHTTPAndSgtDispatch(t *testing.
 // TODO(cli-dispatch-subcommands): add the CLI-subprocess leg of this parity
 // test once that change lands.
 //
+// An unknown/nonexistent change_id must be refused with byte-for-byte
+// identical error text whether the caller used a raw HTTP POST
+// /api/dispatch or the sgt_dispatch MCP tool (O3, resolveChange).
+//
+// Unlike the unrecognized-type case above, resolveChange's refusal embeds
+// the target repo's own absolute filesystem path (design.md:
+// `%q not found: %s does not exist...`), so this test drives both legs
+// against the SAME fixture/repo path rather than two independent ones —
+// two fresh fixtures would each mint their own t.TempDir() and the paths
+// would legitimately differ, which is not the drift this test is checking
+// for. Both legs reject before any run is created, so sharing one server
+// is safe.
+func TestUnknownChangeIDRefusalTextIsIdenticalViaHTTPAndSgtDispatch(t *testing.T) {
+	s, _, _, addr := mcpDispatchFixture(t, "svc")
+
+	httpCode, httpBody := postJSON(t, addr, "/api/dispatch", map[string]interface{}{
+		"project": "mcpo", "brief": "add stripe webhooks",
+		"repos": []string{"svc"}, "type": "feat", "change_id": "no-such-change",
+	})
+	if httpCode != http.StatusBadRequest {
+		t.Fatalf("HTTP leg status = %d, want 400; body=%s", httpCode, httpBody)
+	}
+	httpErrText := string(bytes.TrimRight(httpBody, "\n"))
+
+	_, err := s.executeTool("sgt_dispatch", map[string]interface{}{
+		"project": "mcpo", "brief": "add stripe webhooks",
+		"repos": []interface{}{"svc"}, "type": "feat", "change_id": "no-such-change",
+	})
+	if err == nil {
+		t.Fatal("expected sgt_dispatch to refuse an unknown change_id, got nil error")
+	}
+
+	if err.Error() != httpErrText {
+		t.Errorf("error text differs between surfaces:\n  HTTP: %q\n  MCP:  %q", httpErrText, err.Error())
+	}
+}
+
+// TODO(cli-dispatch-subcommands): add the CLI-subprocess leg of this parity
+// test once that change lands.
+//
 // A non-green bullet must be refused with byte-for-byte identical error text
 // whether the caller used a raw HTTP POST /api/create-pr or the
 // sgt_create_pr MCP tool. Both fixtures build the identical intent/bullet/run

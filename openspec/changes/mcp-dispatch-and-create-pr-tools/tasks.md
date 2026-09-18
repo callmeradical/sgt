@@ -99,8 +99,10 @@ two-way half available now:
 - Same shape for `create-pr`: raw HTTP POST vs `sgt_create_pr`, same
   resulting bullet/envelope state.
 - Same shape for one negative case each (non-green bullet for
-  create-pr; unrecognized type for dispatch): identical error text from
-  both surfaces.
+  create-pr; unrecognized type for dispatch; unknown/nonexistent
+  `change_id` for dispatch — the PRD's Quality bar #2 names all three
+  refusals explicitly, not just the first two): identical error text
+  from both surfaces.
 - Leave a clearly marked `// TODO(cli-dispatch-subcommands): add the
   CLI-subprocess leg of this parity test once that change lands.`
   comment directly above the test function, naming the change, so it
