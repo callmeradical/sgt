@@ -35,12 +35,34 @@ func TestMiseInstallLinksWikiDigestAndBuildsSgt(t *testing.T) {
 		t.Fatalf("creating stale oc-inject.js symlink: %v", err)
 	}
 
+	// go build (invoked by the install script below) resolves GOMODCACHE from
+	// $HOME when unset, which this test overrides to a throwaway dir — so
+	// without this, a cold cache downloads modules into t.TempDir()'s own
+	// tree. The go toolchain extracts a module's cache entry read-only,
+	// directories included, which t.TempDir()'s own cleanup (plain
+	// os.RemoveAll) cannot remove: unlinking an entry needs write permission
+	// on its *parent* directory, and the extracted module directories don't
+	// have it. `go clean -modcache` knows how to fix that; registering it as
+	// a cleanup — after testRoot's own t.TempDir() call above, so it runs
+	// first (t.Cleanup is LIFO) — clears the tree before testRoot's cleanup
+	// ever has to touch it. GOMODCACHE stays pinned to this throwaway dir
+	// throughout, so the operator's real module cache is never touched.
+	goModCache := filepath.Join(testRoot, "gomodcache")
+	t.Cleanup(func() {
+		cleanCmd := exec.Command("go", "clean", "-modcache")
+		cleanCmd.Env = append(os.Environ(), "GOMODCACHE="+goModCache)
+		if out, err := cleanCmd.CombinedOutput(); err != nil {
+			t.Logf("cleaning isolated GOMODCACHE %s: %v\n%s", goModCache, err, out)
+		}
+	})
+
 	cmd := exec.Command("bash", installScript)
 	cmd.Env = append(os.Environ(),
 		"HOME="+filepath.Join(testRoot, "home"),
 		"MISE_PROJECT_ROOT="+root,
 		"MISE_ORIGINAL_CWD="+root,
 		"SGT_INSTALL_DIR="+binDir,
+		"GOMODCACHE="+goModCache,
 	)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("mise run install failed: %v\n%s", err, out)
