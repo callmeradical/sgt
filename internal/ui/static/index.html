@@ -53,6 +53,19 @@
     <button onclick="fetchRuns(); fetchFleet();" class="px-2 py-0.5 rounded bg-rose-900 hover:bg-rose-800 text-white text-[10px]">Retry Now</button>
   </div>
 
+  <!-- Pre-rebrand v2 upgrade-migration banner (Decision 3,
+       docs/prd-upgrade-migration.md): a conflict or failure must be visible
+       here without the operator already knowing to look for a sentinel
+       file. Hidden by default; loadMigrationStatus() only reveals it when
+       GET /api/migration-status reports Status "failed" or any conflict. -->
+  <div id="migration-status-banner" class="hidden bg-amber-950 text-amber-300 px-3 py-1.5 text-[11px] font-bold border-b border-amber-800 flex items-center justify-between gap-3">
+    <div class="flex items-center gap-2 min-w-0">
+      <i class="fa-solid fa-triangle-exclamation text-amber-400" aria-hidden="true"></i>
+      <span id="migration-status-text" class="truncate"></span>
+    </div>
+    <button onclick="dismissMigrationBanner()" class="shrink-0 px-2 py-0.5 rounded bg-amber-900 hover:bg-amber-800 text-white text-[10px]">Dismiss</button>
+  </div>
+
   <!-- Top Bar: Clean Unified Header -->
   <header class="h-11 border-b border-[#21262d] bg-[#0b0e14] px-3 flex items-center justify-between sticky top-0 z-50">
     <div class="flex items-center space-x-4">
@@ -380,6 +393,51 @@
         banner.classList.remove('hidden');
       } else {
         banner.classList.add('hidden');
+      }
+    }
+
+    // migrationBannerDismissed is per-session (a plain JS variable, not
+    // localStorage): reloading the page re-checks and, if the underlying
+    // migration issue is still unresolved, shows the banner again rather
+    // than hiding a real, still-unresolved conflict forever because it was
+    // dismissed once in an earlier session.
+    let migrationBannerDismissed = false;
+
+    function dismissMigrationBanner() {
+      migrationBannerDismissed = true;
+      document.getElementById('migration-status-banner').classList.add('hidden');
+    }
+
+    // loadMigrationStatus reads GET /api/migration-status — a plain read,
+    // like loadProjects — and reveals the banner only when there is
+    // something an operator can act on: Status "failed" or a non-empty
+    // Conflicts list. A clean or absent migration state (the common case,
+    // once migrated) renders nothing, matching the spec's "adds no
+    // dashboard noise" requirement.
+    async function loadMigrationStatus() {
+      try {
+        const res = await fetch('/api/migration-status');
+        const sentinel = await res.json();
+        const banner = document.getElementById('migration-status-banner');
+        const hasConflicts = sentinel && Array.isArray(sentinel.conflicts) && sentinel.conflicts.length > 0;
+        const failed = sentinel && sentinel.status === 'failed';
+        if (migrationBannerDismissed || !sentinel || (!failed && !hasConflicts)) {
+          banner.classList.add('hidden');
+          return;
+        }
+        const parts = [];
+        if (failed) parts.push('migration failed');
+        if (hasConflicts) parts.push(`conflicts: ${sentinel.conflicts.join(', ')}`);
+        if (Array.isArray(sentinel.mismatches) && sentinel.mismatches.length > 0) {
+          parts.push(`mismatches: ${sentinel.mismatches.join(', ')}`);
+        }
+        document.getElementById('migration-status-text').innerText =
+          `Pre-rebrand v2 upgrade migration needs attention — ${parts.join('; ')}. ` +
+          `Source state under ~/.config/sergeant, ~/.local/share/sergeant, and ` +
+          `~/.local/share/sergeant-v2 is left untouched; clean it up manually once resolved.`;
+        banner.classList.remove('hidden');
+      } catch (err) {
+        console.error("Failed loading migration status:", err);
       }
     }
 
@@ -2585,6 +2643,7 @@
     }
 
     loadProjects();
+    loadMigrationStatus();
     // One read to draw something before the first snapshot arrives. Everything
     // after this is driven by the stream.
     fetchRuns();
