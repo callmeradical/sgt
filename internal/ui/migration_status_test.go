@@ -41,6 +41,72 @@ func migrationStatusTestServer(t *testing.T) (mux http.Handler, sentinelPath str
 	return NewServer(st, 0).Handler(), sentinelPath
 }
 
+// TestMigrationStatusEndpointSurfacesARealConflictFromRun is the Task 4
+// quality-bar closure for the PRD's conflict-detection bar item: "the
+// conflict is visible through the dashboard/API surface (Decision 3), not
+// just in a log." Unlike the tests above (which write a hand-built
+// Sentinel), this one runs the real migration against a real, genuinely
+// conflicting fixture and then reads the conflict back out through the
+// actual HTTP endpoint — an end-to-end proof, not a synthetic response.
+func TestMigrationStatusEndpointSurfacesARealConflictFromRun(t *testing.T) {
+	root := t.TempDir()
+	oldConfigDir := filepath.Join(root, "old-config")
+	newConfigDir := filepath.Join(root, "new-config")
+	t.Setenv("SGT_OLD_CONFIG_DIR", oldConfigDir)
+	t.Setenv("SGT_OLD_DB_PATH", filepath.Join(root, "old-share", "sergeant", "sergeant.db"))
+	t.Setenv("SGT_OLD_FLEET_ROOT", filepath.Join(root, "old-share", "sergeant-v2", "fleet"))
+	t.Setenv("SGT_CONFIG", newConfigDir)
+	t.Setenv("SGT_DB_PATH", filepath.Join(root, "new-share", "sgt", "sgt.db"))
+	t.Setenv("SGT_FLEET_DIR", filepath.Join(root, "new-share", "sgt-v2", "fleet"))
+
+	if err := os.MkdirAll(oldConfigDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(oldConfigDir, "foo.yaml"), []byte("repos:\n  - name: r1\n    path: /tmp/src\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(newConfigDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(newConfigDir, "foo.yaml"), []byte("repos:\n  - name: r1\n    path: /tmp/DIFFERENT\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	real, err := upgrademigrate.Run()
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if real == nil || len(real.Conflicts) == 0 {
+		t.Fatalf("Run() = %+v, want a real conflict on foo.yaml", real)
+	}
+
+	dbPath := filepath.Join(t.TempDir(), "server.db")
+	st, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { st.Close() })
+	mux := NewServer(st, 0).Handler()
+
+	status, body := getMigrationStatus(t, mux)
+	if status != http.StatusOK {
+		t.Fatalf("GET /api/migration-status status = %d, want 200; body=%s", status, body)
+	}
+	var got upgrademigrate.Sentinel
+	if err := json.Unmarshal(body, &got); err != nil {
+		t.Fatalf("decoding response body %s: %v", body, err)
+	}
+	found := false
+	for _, c := range got.Conflicts {
+		if c == "config:foo.yaml" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("GET /api/migration-status Conflicts = %v, want it to include the real conflict config:foo.yaml that Run() reported: %v", got.Conflicts, real.Conflicts)
+	}
+}
+
 func getMigrationStatus(t *testing.T, mux http.Handler) (status int, body []byte) {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, "/api/migration-status", nil)
