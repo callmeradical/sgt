@@ -21,6 +21,7 @@ import (
 	"github.com/callmeradical/sgt/internal/redact"
 	"github.com/callmeradical/sgt/internal/runner"
 	"github.com/callmeradical/sgt/internal/store"
+	"github.com/callmeradical/sgt/internal/upgrademigrate"
 )
 
 //go:embed static/*
@@ -135,6 +136,7 @@ func (srv *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/refine-project", srv.handleRefineProject)
 	mux.HandleFunc("/api/runs", srv.handleRuns)
 	mux.HandleFunc("/api/analytics", srv.handleAnalytics)
+	mux.HandleFunc("/api/migration-status", srv.handleMigrationStatus)
 	mux.HandleFunc("/api/manual", srv.handleManual)
 	mux.HandleFunc("/api/run-details", srv.handleRunDetails)
 	mux.HandleFunc("/api/validate-intent", srv.handleValidateIntent)
@@ -334,6 +336,28 @@ func (srv *Server) handleAnalytics(w http.ResponseWriter, r *http.Request) {
 		Retention:     srv.retentionSummaryFor(project),
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// handleMigrationStatus answers GET /api/migration-status with the
+// pre-rebrand v2 upgrade migration's last recorded outcome (Decision 3 of
+// docs/prd-upgrade-migration.md: an automatic, unattended migration must
+// surface durably and visibly, not only via a log line or the sentinel
+// file). It is a new, dedicated endpoint rather than a field folded into
+// /api/analytics because migration status is global — it is not scoped to
+// a project the way WorkAnalytics is, and analytics' project/all query
+// parameter has no meaning here.
+//
+// This calls upgrademigrate.LastResult(), never upgrademigrate.Run(): a
+// dashboard load must never itself trigger a migration attempt, filesystem
+// scan, or write. The response body is the JSON literal `null` when no
+// sentinel exists yet (nothing to report), or the Sentinel itself.
+func (srv *Server) handleMigrationStatus(w http.ResponseWriter, r *http.Request) {
+	sentinel, err := upgrademigrate.LastResult()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, sentinel)
 }
 
 // handleManual answers GET /api/manual with the parsed, live-substituted
