@@ -10,7 +10,9 @@ package upgrademigrate
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -148,6 +150,127 @@ func mtime(t *testing.T, path string) time.Time {
 	return info.ModTime()
 }
 
+// fileHash returns the hex-encoded sha256 of path's current bytes, failing
+// the test if it cannot be read.
+func fileHash(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("reading %s: %v", path, err)
+	}
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
+}
+
+// sourceState is an explicit before/after snapshot (mtime + content hash for
+// a file, git HEAD/status for a fleet worktree) of the real pre-rebrand v2
+// source paths this package actually reads from — used to independently
+// prove spec.md's "Source files are unchanged after migration" scenario by
+// direct comparison, not by code-inspection reasoning (Gap 2 of Review 042).
+type sourceState struct {
+	configFiles map[string]struct {
+		mtime time.Time
+		hash  string
+	}
+	dbMtime    time.Time
+	dbHash     string
+	dbExisted  bool
+	fleetHead  string
+	fleetStat  string
+	fleetExist bool
+}
+
+// snapshotSource captures f's real pre-rebrand v2 source paths (oldConfigDir's
+// files, oldDBPath, and the single fleet worktree at oldFleetRoot/task/repo,
+// if it exists) as they are right now.
+func (f fixture) snapshotSource(t *testing.T, task, repo string) sourceState {
+	t.Helper()
+	var s sourceState
+	s.configFiles = map[string]struct {
+		mtime time.Time
+		hash  string
+	}{}
+
+	entries, err := os.ReadDir(f.oldConfigDir)
+	if err == nil {
+		for _, e := range entries {
+			if e.IsDir() {
+				continue
+			}
+			p := filepath.Join(f.oldConfigDir, e.Name())
+			s.configFiles[e.Name()] = struct {
+				mtime time.Time
+				hash  string
+			}{mtime: mtime(t, p), hash: fileHash(t, p)}
+		}
+	}
+
+	if info, err := os.Stat(f.oldDBPath); err == nil && !info.IsDir() {
+		s.dbExisted = true
+		s.dbMtime = info.ModTime()
+		s.dbHash = fileHash(t, f.oldDBPath)
+	}
+
+	worktree := filepath.Join(f.oldFleetRoot, task, repo)
+	if dirExists(worktree) {
+		s.fleetExist = true
+		s.fleetStat = gitOutput(t, worktree, "status", "--porcelain")
+		s.fleetHead = gitOutput(t, worktree, "rev-parse", "HEAD")
+	}
+	return s
+}
+
+// assertUnchanged re-snapshots f's source paths and fails the test with a
+// precise description of what differs from before, if anything does.
+func (f fixture) assertUnchanged(t *testing.T, before sourceState, task, repo string) {
+	t.Helper()
+	after := f.snapshotSource(t, task, repo)
+
+	if len(before.configFiles) != len(after.configFiles) {
+		t.Errorf("source config file set changed: before=%d files, after=%d files", len(before.configFiles), len(after.configFiles))
+	}
+	for name, b := range before.configFiles {
+		a, ok := after.configFiles[name]
+		if !ok {
+			t.Errorf("source config file %s disappeared after migration", name)
+			continue
+		}
+		if a.hash != b.hash {
+			t.Errorf("source config file %s content changed after migration", name)
+		}
+		if !a.mtime.Equal(b.mtime) {
+			t.Errorf("source config file %s mtime changed after migration", name)
+		}
+	}
+
+	if before.dbExisted {
+		info, err := os.Stat(f.oldDBPath)
+		if err != nil {
+			t.Errorf("source db %s disappeared after migration: %v", f.oldDBPath, err)
+		} else {
+			if !info.ModTime().Equal(before.dbMtime) {
+				t.Errorf("source db mtime changed after migration")
+			}
+			if got := fileHash(t, f.oldDBPath); got != before.dbHash {
+				t.Errorf("source db content changed after migration")
+			}
+		}
+	}
+
+	if before.fleetExist {
+		if !dirExists(filepath.Join(f.oldFleetRoot, task, repo)) {
+			t.Errorf("source fleet worktree disappeared after migration")
+		} else {
+			if got := after.fleetHead; got != before.fleetHead {
+				t.Errorf("source fleet worktree HEAD changed after migration: before=%q after=%q", before.fleetHead, got)
+			}
+			if got := after.fleetStat; got != before.fleetStat {
+				t.Errorf("source fleet worktree git status changed after migration: before=%q after=%q", before.fleetStat, got)
+			}
+		}
+	}
+}
+
 // --- Scenario: full migration, independently re-read ---
 
 func TestRunMigratesFullFixtureIndependentlyVerifiable(t *testing.T) {
@@ -156,6 +279,12 @@ func TestRunMigratesFullFixtureIndependentlyVerifiable(t *testing.T) {
 	f.buildOldStore(t)
 	originDir, _ := f.buildFleetWorktree(t, "run-1", "r1")
 
+	// Gap 2 (Review 042): explicit before-snapshot of the real pre-rebrand
+	// v2 source paths this package actually reads from, re-asserted
+	// unchanged after Run() — not merely reasoned about from code
+	// inspection.
+	before := f.snapshotSource(t, "run-1", "r1")
+
 	sentinel, err := Run()
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -163,6 +292,7 @@ func TestRunMigratesFullFixtureIndependentlyVerifiable(t *testing.T) {
 	if sentinel == nil {
 		t.Fatal("Run returned nil sentinel for a fixture with real pre-rebrand v2 state")
 	}
+	f.assertUnchanged(t, before, "run-1", "r1")
 	if sentinel.Status != StatusVerified {
 		t.Fatalf("Status = %q, want %q; conflicts=%v mismatches=%v", sentinel.Status, StatusVerified, sentinel.Conflicts, sentinel.Mismatches)
 	}
@@ -350,10 +480,16 @@ func TestConflictsAreReportedAndLeaveBothSidesUntouched(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Gap 2 (Review 042): explicit before-snapshot of the real pre-rebrand
+	// v2 source paths, re-asserted unchanged after Run() even in this
+	// per-item-conflict scenario.
+	before := f.snapshotSource(t, "run-1", "r1")
+
 	sentinel, err := Run()
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
+	f.assertUnchanged(t, before, "run-1", "r1")
 	wantConflicts := map[string]bool{"config:foo.yaml": true, "store": true, "fleet:run-1/r1": true}
 	if len(sentinel.Conflicts) != len(wantConflicts) {
 		t.Fatalf("Conflicts = %v, want exactly %v", sentinel.Conflicts, wantConflicts)
@@ -453,6 +589,11 @@ func TestFailedVerificationThenRetryReachesVerified(t *testing.T) {
 	f.buildOldStore(t)
 	f.buildFleetWorktree(t, "run-1", "r1")
 
+	// Gap 2 (Review 042): explicit before-snapshot of the real pre-rebrand
+	// v2 source paths, re-asserted unchanged after both the failed first
+	// attempt and the successful retry.
+	before := f.snapshotSource(t, "run-1", "r1")
+
 	// Force a verification mismatch on the first attempt without corrupting
 	// any real git/sqlite state, via the package's own test seam.
 	verifyHook = func(mismatches []string) []string {
@@ -487,6 +628,7 @@ func TestFailedVerificationThenRetryReachesVerified(t *testing.T) {
 	if !dirExists(filepath.Join(f.newFleetRoot, "run-1", "r1")) {
 		t.Errorf("destination worktree was removed after a failed migration")
 	}
+	f.assertUnchanged(t, before, "run-1", "r1")
 
 	// Clear the induced fault and retry: the automatic-retry contract
 	// (Decision 6) says a failed sentinel gets retried on the very next
@@ -505,6 +647,7 @@ func TestFailedVerificationThenRetryReachesVerified(t *testing.T) {
 	if len(second.Mismatches) != 0 {
 		t.Errorf("Mismatches on the successful retry = %v, want none", second.Mismatches)
 	}
+	f.assertUnchanged(t, before, "run-1", "r1")
 }
 
 // --- Gap 1 (Review 042): retry idempotency must be content-based, not a
