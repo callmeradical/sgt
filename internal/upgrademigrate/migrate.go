@@ -298,7 +298,7 @@ func migrateFleetRetryAware(p paths, prior *Sentinel) (fleetMigrationResult, err
 
 			if dirExists(dstDir) {
 				if marker, known := priorState[key]; known {
-					curHead, curStatus, gerr := gitStatePorcelain(dstDir)
+					curStatus, curHead, gerr := gitStatePorcelain(dstDir)
 					if gerr == nil && curHead == marker.Head && curStatus == marker.Status {
 						// Genuinely unchanged since we copied it; resubmit
 						// for verification rather than re-copying.
@@ -319,7 +319,7 @@ func migrateFleetRetryAware(p paths, prior *Sentinel) (fleetMigrationResult, err
 			if err := copyTree(srcDir, dstDir); err != nil {
 				return result, fmt.Errorf("copying worktree %s to %s: %w", srcDir, dstDir, err)
 			}
-			head, status, gerr := gitStatePorcelain(dstDir)
+			status, head, gerr := gitStatePorcelain(dstDir)
 			if gerr != nil {
 				return result, fmt.Errorf("capturing post-copy git state for %s: %w", dstDir, gerr)
 			}
