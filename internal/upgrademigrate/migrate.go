@@ -50,8 +50,22 @@ func Run() (*Sentinel, error) {
 	if err != nil {
 		return nil, fmt.Errorf("detecting pre-rebrand v2 state: %w", err)
 	}
-	if !isDetected && prior == nil {
-		return nil, nil
+	if !isDetected {
+		if prior == nil {
+			// Nothing to migrate and no prior attempt to retry: a genuine
+			// no-op.
+			return nil, nil
+		}
+		// A prior (failed) sentinel exists, but every pre-rebrand v2 source
+		// path has since disappeared from disk entirely. Falling through to
+		// runMigration here would be a hollow no-op: every migrate step
+		// would find nothing to read, so nothing would mismatch, and a
+		// failed sentinel would flip to "verified" without ever actually
+		// re-comparing anything against source data — contradicting
+		// Decision 5/6's intent that verification be meaningful. Treat this
+		// exactly like the "nothing to migrate" no-op case: leave the prior
+		// sentinel exactly as it is, on disk, untouched.
+		return prior, nil
 	}
 
 	return runMigration(p, prior)
@@ -59,21 +73,19 @@ func Run() (*Sentinel, error) {
 
 // runMigration performs the three copy steps and verifies the result,
 // writing and returning the sentinel. prior is the previous attempt's
-// sentinel, or nil on a first attempt — it is consulted only to tell "this
-// destination item already exists because we put it there" apart from "this
-// destination item already exists and is a genuine, still-unresolved
-// conflict", so a failed→retry cycle (Decision 6) does not relitigate every
-// conflict it already reported as a fresh one, nor treat its own prior
-// output as something to skip verifying again.
+// sentinel, or nil on a first attempt. It is no longer consulted merely for
+// which items its own Conflicts list happened to name last time (a purely
+// historical, content-blind proxy) — store and fleet migration instead
+// re-check the destination's actual current content/identity against a
+// marker prior itself recorded when it produced that content
+// (Sentinel.StoreSnapshotHash / Sentinel.FleetItemState), the same
+// self-healing, per-call re-check migrateConfig already performs via
+// bytes.Equal. This means a failed→retry cycle (Decision 6) still doesn't
+// relitigate or re-copy its own genuinely unchanged prior output, but a
+// destination item that has organically diverged since (real use, or
+// something else writing to it) is now correctly reported as a fresh
+// conflict instead of being silently treated as still-ours.
 func runMigration(p paths, prior *Sentinel) (*Sentinel, error) {
-	hasPrior := prior != nil
-	priorConflicts := map[string]bool{}
-	if prior != nil {
-		for _, c := range prior.Conflicts {
-			priorConflicts[c] = true
-		}
-	}
-
 	var conflicts []string
 	var mismatches []string
 
@@ -83,7 +95,7 @@ func runMigration(p paths, prior *Sentinel) (*Sentinel, error) {
 	}
 	conflicts = append(conflicts, cfgResult.Conflicts...)
 
-	storeResult, err := migrateStoreRetryAware(p, hasPrior, priorConflicts)
+	storeResult, err := migrateStoreRetryAware(p, prior)
 	if err != nil {
 		return nil, fmt.Errorf("migrating store: %w", err)
 	}
@@ -91,7 +103,7 @@ func runMigration(p paths, prior *Sentinel) (*Sentinel, error) {
 		conflicts = append(conflicts, storeResult.Conflict)
 	}
 
-	fleetResult, err := migrateFleetRetryAware(p, hasPrior, priorConflicts)
+	fleetResult, err := migrateFleetRetryAware(p, prior)
 	if err != nil {
 		return nil, fmt.Errorf("migrating fleet: %w", err)
 	}
@@ -108,11 +120,13 @@ func runMigration(p paths, prior *Sentinel) (*Sentinel, error) {
 	}
 
 	sentinel := &Sentinel{
-		Status:      status,
-		SourcePaths: []string{p.oldConfigDir, p.oldDBPath, p.oldFleetRoot},
-		Timestamp:   time.Now().UTC(),
-		Conflicts:   conflicts,
-		Mismatches:  mismatches,
+		Status:            status,
+		SourcePaths:       []string{p.oldConfigDir, p.oldDBPath, p.oldFleetRoot},
+		Timestamp:         time.Now().UTC(),
+		Conflicts:         conflicts,
+		Mismatches:        mismatches,
+		StoreSnapshotHash: storeResult.StoreSnapshotHash,
+		FleetItemState:    fleetResult.ItemState,
 	}
 	if err := writeSentinel(p.sentinelPath, sentinel); err != nil {
 		return nil, fmt.Errorf("writing sentinel: %w", err)
@@ -120,22 +134,73 @@ func runMigration(p paths, prior *Sentinel) (*Sentinel, error) {
 	return sentinel, nil
 }
 
-// migrateStoreRetryAware wraps migrateStore with the "is this destination
-// already ours" check a failed→retry cycle needs: if newDBPath exists but
-// the prior attempt did not report "store" as a conflict, that file is this
-// package's own earlier output (the prior attempt's verification failed for
-// an unrelated reason, e.g. fleet), not a genuine conflict — so it is left
-// in place, treated as already migrated, and its source counts are
-// recomputed fresh (the source is read-only, so re-vacuuming it into a
-// throwaway snapshot purely to count rows is always safe) so verifyStore
-// still has something to check on a retry.
-func migrateStoreRetryAware(p paths, hasPrior bool, priorConflicts map[string]bool) (storeMigrationResult, error) {
-	if hasPrior && fileExists(p.oldDBPath) && fileExists(p.newDBPath) && !priorConflicts["store"] {
+// migrateStoreRetryAware wraps migrateStore with a content-based "is this
+// destination unchanged since we produced it" check for the failed→retry
+// cycle: if newDBPath exists and prior recorded a StoreSnapshotHash (meaning
+// this package itself successfully produced newDBPath on some earlier
+// attempt), the destination's *current* hash is recomputed and compared
+// against that recorded value — not against whether the prior sentinel's
+// Conflicts list happened to name "store".
+//
+//   - Hash still matches: genuinely unchanged since we produced it. Left in
+//     place, treated as already migrated, and its source counts are
+//     recomputed fresh (the source is read-only, so re-vacuuming it into a
+//     throwaway snapshot purely to count rows is always safe) so verifyStore
+//     still has something to check.
+//   - Hash no longer matches: the destination has organically diverged since
+//     migration ran (real use, or something else writing to it) and is no
+//     longer safely "ours" to recount against a frozen source snapshot —
+//     report a fresh "store" conflict and leave the destination completely
+//     untouched, exactly like any other never-ours conflicting destination.
+//   - No recorded hash at all (first attempt, or an old sentinel from before
+//     this marker existed): falls through to plain migrateStore, which
+//     fails closed with a "store" conflict if newDBPath already exists.
+func migrateStoreRetryAware(p paths, prior *Sentinel) (storeMigrationResult, error) {
+	if prior != nil && prior.StoreSnapshotHash != "" && fileExists(p.newDBPath) {
+		currentHash, err := hashFile(p.newDBPath)
+		if err != nil {
+			return storeMigrationResult{}, fmt.Errorf("hashing existing %s: %w", p.newDBPath, err)
+		}
+		if currentHash != prior.StoreSnapshotHash {
+			// Organically diverged since we produced it: no longer ours.
+			// Do not touch it, do not recount it — just report it as a
+			// fresh, genuine conflict.
+			return storeMigrationResult{Conflict: "store"}, nil
+		}
+
+		if !fileExists(p.oldDBPath) {
+			// The source has vanished since the original copy (see Gap 3 /
+			// Run()'s own vanished-source guard, which normally catches the
+			// case where *every* source path is gone; this handles the
+			// narrower case where only the store's source specifically is
+			// gone while config/fleet source still exists). There is
+			// nothing left to meaningfully recompute against — comparing a
+			// real, unchanged destination against an empty, freshly
+			// auto-created database at a nonexistent path would fabricate a
+			// phantom mismatch, not a genuine one. Compare the destination
+			// against itself instead: nothing to verify, so nothing fails.
+			destRuns, err := countRows(p.newDBPath, "runs")
+			if err != nil {
+				return storeMigrationResult{}, fmt.Errorf("counting destination runs: %w", err)
+			}
+			destPhases, err := countRows(p.newDBPath, "phases")
+			if err != nil {
+				return storeMigrationResult{}, fmt.Errorf("counting destination phases: %w", err)
+			}
+			return storeMigrationResult{
+				Migrated:          true,
+				SourceRuns:        destRuns,
+				SourcePhases:      destPhases,
+				StoreSnapshotHash: currentHash,
+			}, nil
+		}
+
 		counts, err := sourceRowCountsOnly(p.oldDBPath)
 		if err != nil {
 			return storeMigrationResult{}, err
 		}
 		counts.Migrated = true
+		counts.StoreSnapshotHash = currentHash
 		return counts, nil
 	}
 	return migrateStore(p)
@@ -167,18 +232,46 @@ func sourceRowCountsOnly(oldDBPath string) (storeMigrationResult, error) {
 	return result, nil
 }
 
-// migrateFleetRetryAware wraps migrateFleet with the same "is this ours
-// already" check migrateStoreRetryAware makes: a <task>/<repo> directory
-// that already exists at the destination but was not reported as a conflict
-// by the prior attempt is this package's own earlier copy, so it is
-// resubmitted for verification rather than reported as a fresh conflict or
-// silently ignored.
-func migrateFleetRetryAware(p paths, hasPrior bool, priorConflicts map[string]bool) (fleetMigrationResult, error) {
-	if !dirExists(p.oldFleetRoot) {
-		return fleetMigrationResult{}, nil
+// migrateFleetRetryAware wraps migrateFleet with a content-based "is this
+// destination unchanged since we copied it" check for the failed→retry
+// cycle: a <task>/<repo> directory that already exists at the destination is
+// compared against prior's recorded FleetItemState marker for that exact
+// item (the git HEAD/status captured immediately after this package copied
+// it), not against whether the prior sentinel's Conflicts list happened to
+// name it.
+//
+//   - A recorded marker exists and still matches the destination's current
+//     HEAD/status: genuinely unchanged since we copied it. Resubmitted for
+//     verification rather than reported as a fresh conflict or re-copied.
+//   - A recorded marker exists but no longer matches (or the destination's
+//     git state can't even be read): the worktree has organically diverged
+//     since the copy (a new commit, local edits) — report a fresh
+//     "fleet:<task>/<repo>" conflict and leave it completely untouched.
+//   - No recorded marker at all (first attempt, or an old sentinel from
+//     before this marker existed): fails closed with a fresh conflict,
+//     exactly as a genuinely pre-existing, never-ours destination would.
+//
+// Markers for items not visited this call (their source directory is gone,
+// or oldFleetRoot itself is gone) are carried forward unchanged from prior
+// rather than dropped, so a transient absence of the source doesn't erase
+// this package's memory of what it once produced.
+func migrateFleetRetryAware(p paths, prior *Sentinel) (fleetMigrationResult, error) {
+	priorState := map[string]FleetItemMarker{}
+	if prior != nil {
+		for k, v := range prior.FleetItemState {
+			priorState[k] = v
+		}
 	}
 
-	var result fleetMigrationResult
+	if !dirExists(p.oldFleetRoot) {
+		return fleetMigrationResult{ItemState: priorState}, nil
+	}
+
+	result := fleetMigrationResult{ItemState: map[string]FleetItemMarker{}}
+	for k, v := range priorState {
+		result.ItemState[k] = v
+	}
+
 	taskEntries, err := os.ReadDir(p.oldFleetRoot)
 	if err != nil {
 		return result, fmt.Errorf("listing %s: %w", p.oldFleetRoot, err)
@@ -199,24 +292,39 @@ func migrateFleetRetryAware(p paths, hasPrior bool, priorConflicts map[string]bo
 			}
 			repo := repoEntry.Name()
 			item := fleetItem{Task: task, Repo: repo}
+			key := item.String()
 			srcDir := filepath.Join(taskDir, repo)
 			dstDir := filepath.Join(p.newFleetRoot, task, repo)
 
 			if dirExists(dstDir) {
-				if hasPrior && !priorConflicts["fleet:"+item.String()] {
-					// Already copied by an earlier attempt of ours;
-					// resubmit for verification rather than re-copying.
-					result.Migrated = append(result.Migrated, item)
-					continue
+				if marker, known := priorState[key]; known {
+					curHead, curStatus, gerr := gitStatePorcelain(dstDir)
+					if gerr == nil && curHead == marker.Head && curStatus == marker.Status {
+						// Genuinely unchanged since we copied it; resubmit
+						// for verification rather than re-copying.
+						result.Migrated = append(result.Migrated, item)
+						result.ItemState[key] = marker
+						continue
+					}
 				}
-				result.Conflicts = append(result.Conflicts, "fleet:"+item.String())
+				// Either no marker was ever recorded for this item (never
+				// ours), or it no longer matches what we recorded: report a
+				// fresh conflict and leave the destination completely
+				// untouched either way.
+				result.Conflicts = append(result.Conflicts, "fleet:"+key)
+				delete(result.ItemState, key)
 				continue
 			}
 
 			if err := copyTree(srcDir, dstDir); err != nil {
 				return result, fmt.Errorf("copying worktree %s to %s: %w", srcDir, dstDir, err)
 			}
+			head, status, gerr := gitStatePorcelain(dstDir)
+			if gerr != nil {
+				return result, fmt.Errorf("capturing post-copy git state for %s: %w", dstDir, gerr)
+			}
 			result.Migrated = append(result.Migrated, item)
+			result.ItemState[key] = FleetItemMarker{Head: head, Status: status}
 		}
 	}
 	return result, nil

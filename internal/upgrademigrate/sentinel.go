@@ -25,6 +25,29 @@ type Sentinel struct {
 	// Mismatches is only ever set when Status == "failed": the specific
 	// post-migration verification checks that did not match the source.
 	Mismatches []string `json:"mismatches,omitempty"`
+	// StoreSnapshotHash is a content-based marker of what this package's own
+	// store migration last produced at the destination database path: the
+	// hex-encoded sha256 of newDBPath's bytes, captured immediately after a
+	// successful copy (or reconfirmed, unchanged, on a retry). A retry
+	// compares the destination's *current* hash against this recorded value
+	// rather than trusting the prior attempt's Conflicts list as a proxy for
+	// "unchanged since we produced it" — the same self-healing, per-call
+	// re-check migrateConfig already does with bytes.Equal. If the hash no
+	// longer matches, the destination has organically diverged since
+	// migration ran (real use, or something else writing to it) and is
+	// reported as a fresh "store" conflict instead of being compared against
+	// the source as if it were still this package's own untouched output.
+	// Empty when the store step has never successfully migrated anything.
+	StoreSnapshotHash string `json:"store_snapshot_hash,omitempty"`
+	// FleetItemState is the analogous per-"<task>/<repo>" content-based
+	// marker for fleet worktrees: the git HEAD and `status --porcelain`
+	// output captured immediately after this package copied that worktree.
+	// A retry re-checks the destination's current HEAD/status against the
+	// recorded marker instead of trusting the prior sentinel's Conflicts
+	// list alone, so a worktree that has organically changed since the copy
+	// (a new commit, local edits) is reported as a fresh conflict rather
+	// than silently treated as still-ours.
+	FleetItemState map[string]FleetItemMarker `json:"fleet_item_state,omitempty"`
 }
 
 // StatusVerified and StatusFailed are the two Sentinel.Status values this

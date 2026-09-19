@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -503,6 +504,279 @@ func TestFailedVerificationThenRetryReachesVerified(t *testing.T) {
 	}
 	if len(second.Mismatches) != 0 {
 		t.Errorf("Mismatches on the successful retry = %v, want none", second.Mismatches)
+	}
+}
+
+// --- Gap 1 (Review 042): retry idempotency must be content-based, not a
+// stale name-in-Conflicts-list proxy ---
+
+// TestStoreDivergesBetweenAttemptsSurfacesFreshConflictNotPermanentMismatch
+// reproduces exactly the scenario Review 042 traced through the code but did
+// not (per its own constraints) turn into a test: store migration succeeds
+// on attempt 1, an unrelated verification failure forces the sentinel to
+// "failed", the now-real destination db is then used organically (an extra
+// row is written directly into it, simulating real post-migration use)
+// before the next automatic retry. Before the Gap 1 fix, migrateStoreRetryAware
+// classified this destination as "ours, unchanged" purely because the prior
+// sentinel's Conflicts list didn't name "store", recomputed the (frozen,
+// never-changing) source's row counts, and produced a permanent, never
+// resolvable "store: run count mismatch" — the sentinel could never reach
+// "verified" again. After the fix, the destination's current content is
+// re-hashed and compared against what migration itself actually produced
+// (Sentinel.StoreSnapshotHash); since it no longer matches, this is
+// correctly reported as a fresh "store" conflict instead.
+func TestStoreDivergesBetweenAttemptsSurfacesFreshConflictNotPermanentMismatch(t *testing.T) {
+	f := newFixture(t)
+	f.writeConfigFile(t, "fooproj.yaml", "repos:\n  - name: r1\n    path: /tmp/x\n")
+	f.buildOldStore(t)
+	f.buildFleetWorktree(t, "run-1", "r1")
+
+	// Attempt 1: store copy itself succeeds, but an unrelated verification
+	// failure (the same test seam Review 042 pointed at) forces the overall
+	// sentinel to "failed" without store ever being named a conflict.
+	verifyHook = func(mismatches []string) []string {
+		return append(mismatches, "induced-test-mismatch: unrelated failure")
+	}
+	t.Cleanup(func() { verifyHook = func(mismatches []string) []string { return mismatches } })
+
+	first, err := Run()
+	if err != nil {
+		t.Fatalf("first Run: %v", err)
+	}
+	if first == nil || first.Status != StatusFailed {
+		t.Fatalf("first Run() = %+v, want Status failed (induced, unrelated)", first)
+	}
+	for _, c := range first.Conflicts {
+		if c == "store" {
+			t.Fatalf("store must not be a conflict after a clean first-attempt copy: %v", first.Conflicts)
+		}
+	}
+	if !fileExists(f.newDBPath) {
+		t.Fatalf("store should have migrated successfully on attempt 1")
+	}
+	if first.StoreSnapshotHash == "" {
+		t.Fatalf("a successful store migration must record a StoreSnapshotHash marker")
+	}
+
+	// Between attempts: the now-real, now-working destination db is used
+	// organically (an extra row is written directly into it) — exactly the
+	// scenario Review 042 traced. This does NOT go through upgrademigrate at
+	// all, simulating real independent use of the migrated database.
+	organic, err := store.Open(f.newDBPath)
+	if err != nil {
+		t.Fatalf("opening destination db to simulate organic use: %v", err)
+	}
+	if err := organic.CreateRun(&store.RunRecord{ID: "organic-run", Project: "fooproj", TaskID: "organic-run", Status: "passed"}); err != nil {
+		t.Fatalf("simulating organic write: %v", err)
+	}
+	if err := organic.Close(); err != nil {
+		t.Fatalf("closing simulated organic connection: %v", err)
+	}
+
+	// Clear the unrelated induced fault: the only remaining issue for the
+	// retry to surface should now be the diverged store.
+	verifyHook = func(mismatches []string) []string { return mismatches }
+
+	second, err := Run()
+	if err != nil {
+		t.Fatalf("second Run: %v", err)
+	}
+	if second == nil {
+		t.Fatal("second Run() = nil, want a sentinel")
+	}
+
+	foundStoreConflict := false
+	for _, c := range second.Conflicts {
+		if c == "store" {
+			foundStoreConflict = true
+		}
+	}
+	if !foundStoreConflict {
+		t.Errorf("want a fresh \"store\" conflict once the destination has organically diverged; got Conflicts=%v Mismatches=%v", second.Conflicts, second.Mismatches)
+	}
+	for _, m := range second.Mismatches {
+		if strings.Contains(m, "run count mismatch") {
+			t.Errorf("must not surface a permanent, never-resolvable run count mismatch; got Mismatches=%v", second.Mismatches)
+		}
+	}
+	// A conflict alone is not a failure (Decision 3): with the store
+	// correctly reclassified as a fresh conflict rather than a mismatch,
+	// and nothing else wrong, the sentinel must be able to reach verified —
+	// proving the fix actually breaks the "permanently stuck failed" loop
+	// Review 042 described, not just relabels it.
+	if second.Status != StatusVerified {
+		t.Errorf("Status = %q, want verified (a store conflict alone must not permanently block verification): Mismatches=%v", second.Status, second.Mismatches)
+	}
+
+	// The diverged destination must be left completely untouched: the
+	// organic row must still be there, and the source run must not have
+	// been merged/overwritten into it.
+	stillThere, err := store.Open(f.newDBPath)
+	if err != nil {
+		t.Fatalf("opening destination db after retry: %v", err)
+	}
+	defer stillThere.Close()
+	if _, err := stillThere.GetRun("organic-run"); err != nil {
+		t.Errorf("organic row disappeared; destination was touched: %v", err)
+	}
+
+	// Stable, not stuck: a further call must not change anything further —
+	// a verified sentinel is a hard skip regardless of its Conflicts.
+	third, err := Run()
+	if err != nil {
+		t.Fatalf("third Run: %v", err)
+	}
+	if !third.Timestamp.Equal(second.Timestamp) {
+		t.Errorf("a verified sentinel must be a hard skip on the next call, got a rewritten Timestamp")
+	}
+}
+
+// TestFleetWorktreeDivergesBetweenAttemptsSurfacesFreshConflictNotPermanentMismatch
+// is the fleet analogue of the store test above: a worktree copied
+// successfully on attempt 1 organically changes (an uncommitted edit is made
+// directly in the destination worktree) before the next automatic retry.
+// Before the Gap 1 fix, migrateFleetRetryAware classified this destination
+// as "ours" purely because the prior sentinel's Conflicts list didn't name
+// it, resubmitted it for verification, and would keep comparing it against
+// the source's unchanged git state forever. After the fix, the destination's
+// current git HEAD/status is compared against what migration itself actually
+// recorded when it copied the worktree (Sentinel.FleetItemState); since it
+// no longer matches, this is correctly reported as a fresh
+// "fleet:<task>/<repo>" conflict instead.
+func TestFleetWorktreeDivergesBetweenAttemptsSurfacesFreshConflictNotPermanentMismatch(t *testing.T) {
+	f := newFixture(t)
+	f.writeConfigFile(t, "fooproj.yaml", "repos:\n  - name: r1\n    path: /tmp/x\n")
+	f.buildOldStore(t)
+	f.buildFleetWorktree(t, "run-1", "r1")
+
+	verifyHook = func(mismatches []string) []string {
+		return append(mismatches, "induced-test-mismatch: unrelated failure")
+	}
+	t.Cleanup(func() { verifyHook = func(mismatches []string) []string { return mismatches } })
+
+	first, err := Run()
+	if err != nil {
+		t.Fatalf("first Run: %v", err)
+	}
+	if first == nil || first.Status != StatusFailed {
+		t.Fatalf("first Run() = %+v, want Status failed (induced, unrelated)", first)
+	}
+	for _, c := range first.Conflicts {
+		if c == "fleet:run-1/r1" {
+			t.Fatalf("fleet:run-1/r1 must not be a conflict after a clean first-attempt copy: %v", first.Conflicts)
+		}
+	}
+	dstWorktree := filepath.Join(f.newFleetRoot, "run-1", "r1")
+	if !dirExists(dstWorktree) {
+		t.Fatalf("fleet worktree should have migrated successfully on attempt 1")
+	}
+	if first.FleetItemState["run-1/r1"] == (FleetItemMarker{}) {
+		t.Fatalf("a successful fleet copy must record a FleetItemState marker for run-1/r1")
+	}
+
+	// Between attempts: the destination worktree is used organically — an
+	// uncommitted local edit is made directly in it, changing its
+	// `git status --porcelain` output without touching upgrademigrate at
+	// all.
+	if err := os.WriteFile(filepath.Join(dstWorktree, "organic.txt"), []byte("local edit\n"), 0o644); err != nil {
+		t.Fatalf("simulating organic worktree edit: %v", err)
+	}
+
+	verifyHook = func(mismatches []string) []string { return mismatches }
+
+	second, err := Run()
+	if err != nil {
+		t.Fatalf("second Run: %v", err)
+	}
+	if second == nil {
+		t.Fatal("second Run() = nil, want a sentinel")
+	}
+
+	foundFleetConflict := false
+	for _, c := range second.Conflicts {
+		if c == "fleet:run-1/r1" {
+			foundFleetConflict = true
+		}
+	}
+	if !foundFleetConflict {
+		t.Errorf("want a fresh \"fleet:run-1/r1\" conflict once the destination worktree has organically diverged; got Conflicts=%v Mismatches=%v", second.Conflicts, second.Mismatches)
+	}
+	for _, m := range second.Mismatches {
+		if strings.Contains(m, "fleet:run-1/r1") {
+			t.Errorf("must not surface a permanent fleet git-state mismatch; got Mismatches=%v", second.Mismatches)
+		}
+	}
+	if second.Status != StatusVerified {
+		t.Errorf("Status = %q, want verified (a fleet conflict alone must not permanently block verification): Mismatches=%v", second.Status, second.Mismatches)
+	}
+
+	// The diverged destination worktree must be left completely untouched:
+	// the organic file must still be there, not overwritten by a re-copy.
+	if _, err := os.Stat(filepath.Join(dstWorktree, "organic.txt")); err != nil {
+		t.Errorf("organic worktree edit disappeared; destination was touched: %v", err)
+	}
+
+	third, err := Run()
+	if err != nil {
+		t.Fatalf("third Run: %v", err)
+	}
+	if !third.Timestamp.Equal(second.Timestamp) {
+		t.Errorf("a verified sentinel must be a hard skip on the next call, got a rewritten Timestamp")
+	}
+}
+
+// --- Gap 3 (Review 042): a retry against a fully vanished source must not
+// hollowly "verify" a failed sentinel by comparing nothing against nothing ---
+
+func TestVanishedSourceOnRetryLeavesFailedSentinelUntouched(t *testing.T) {
+	f := newFixture(t)
+	f.writeConfigFile(t, "fooproj.yaml", "repos:\n  - name: r1\n    path: /tmp/x\n")
+	f.buildOldStore(t)
+	f.buildFleetWorktree(t, "run-1", "r1")
+
+	verifyHook = func(mismatches []string) []string {
+		return append(mismatches, "induced-test-mismatch: forcing a failure")
+	}
+	t.Cleanup(func() { verifyHook = func(mismatches []string) []string { return mismatches } })
+
+	first, err := Run()
+	if err != nil {
+		t.Fatalf("first Run: %v", err)
+	}
+	if first == nil || first.Status != StatusFailed {
+		t.Fatalf("first Run() = %+v, want Status failed", first)
+	}
+
+	// The pre-rebrand v2 source has since disappeared from disk entirely
+	// (e.g. the operator wiped the old install after the failed attempt).
+	if err := os.RemoveAll(f.oldConfigDir); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(filepath.Dir(f.oldDBPath)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(f.oldFleetRoot); err != nil {
+		t.Fatal(err)
+	}
+
+	sentinelPath := filepath.Join(f.newConfigDir, sentinelFileName)
+	sentinelMtimeBefore := mtime(t, sentinelPath)
+
+	second, err := Run()
+	if err != nil {
+		t.Fatalf("second Run: %v", err)
+	}
+	if second == nil {
+		t.Fatal("second Run() = nil, want the untouched prior failed sentinel returned, not nil")
+	}
+	if second.Status != StatusFailed {
+		t.Errorf("a hollow no-op retry against a fully vanished source must not flip Status to verified: got %q (Mismatches=%v)", second.Status, second.Mismatches)
+	}
+	if !second.Timestamp.Equal(first.Timestamp) {
+		t.Errorf("sentinel Timestamp changed on a vanished-source retry; want it left exactly as-is: got %v, want %v", second.Timestamp, first.Timestamp)
+	}
+	if got := mtime(t, sentinelPath); !got.Equal(sentinelMtimeBefore) {
+		t.Errorf("sentinel file was rewritten on a vanished-source retry")
 	}
 }
 

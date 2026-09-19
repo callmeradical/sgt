@@ -1,7 +1,9 @@
 package upgrademigrate
 
 import (
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,6 +27,13 @@ type storeMigrationResult struct {
 	// against a description of the source that might have moved on.
 	SourceRuns   int64
 	SourcePhases int64
+	// StoreSnapshotHash is the hex-encoded sha256 of newDBPath's bytes,
+	// captured immediately after this attempt produced (or reconfirmed) it.
+	// Persisted in the Sentinel as Sentinel.StoreSnapshotHash so a later
+	// retry can tell "byte-for-byte unchanged since we produced it" from
+	// actual content, not from whether the prior sentinel happened to name
+	// "store" as a conflict. See migrateStoreRetryAware.
+	StoreSnapshotHash string
 }
 
 // migrateStore makes oldDBPath's data available at newDBPath, WAL-safely.
@@ -105,8 +114,32 @@ func migrateStore(p paths) (storeMigrationResult, error) {
 		return result, fmt.Errorf("closing migrated store %s: %w", p.newDBPath, err)
 	}
 
+	// Captured last, after the schema-migration open/close above has already
+	// made whatever changes it's going to make: this is the actual final
+	// byte content this attempt produced, which is what a later retry needs
+	// to compare against.
+	hash, err := hashFile(p.newDBPath)
+	if err != nil {
+		return result, fmt.Errorf("hashing migrated store %s: %w", p.newDBPath, err)
+	}
+	result.StoreSnapshotHash = hash
+
 	result.Migrated = true
 	return result, nil
+}
+
+// hashFile returns the hex-encoded sha256 of path's current on-disk bytes.
+// Used to give store migration a content-based "is the destination
+// unchanged since we produced it" check on a retry (migrateStoreRetryAware),
+// the same self-healing re-check migrateConfig's bytes.Equal already
+// performs on every call for config files.
+func hashFile(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:]), nil
 }
 
 // vacuumInto opens srcPath (a live sqlite database, possibly WAL-mode with

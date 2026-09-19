@@ -18,9 +18,27 @@ type fleetItem struct {
 
 func (f fleetItem) String() string { return f.Task + "/" + f.Repo }
 
+// FleetItemMarker is the content-based "what did we last copy here" record
+// migrateFleetRetryAware persists per <task>/<repo> item in the Sentinel
+// (Sentinel.FleetItemState), so a retry can tell a genuinely unchanged
+// destination worktree apart from one that has organically diverged since
+// the copy (a new commit, local edits) rather than trusting the prior
+// sentinel's Conflicts list as a stand-in for "unchanged."
+type FleetItemMarker struct {
+	Head   string `json:"head"`
+	Status string `json:"status"`
+}
+
 type fleetMigrationResult struct {
 	Migrated  []fleetItem
 	Conflicts []string // "fleet:<task>/<repo>"
+	// ItemState is this attempt's full "<task>/<repo>" -> FleetItemMarker
+	// map to persist into the Sentinel: markers for items untouched this
+	// round are carried forward from the prior sentinel unchanged, freshly
+	// copied items get a newly captured marker, and items that turned out
+	// to have organically diverged are excluded (see
+	// migrateFleetRetryAware).
+	ItemState map[string]FleetItemMarker
 }
 
 // Fleet migration itself lives in migrate.go's migrateFleetRetryAware,
