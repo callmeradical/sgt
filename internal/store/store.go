@@ -536,6 +536,12 @@ const bulletsIntentIDIndex = `CREATE INDEX IF NOT EXISTS idx_bullets_intent_id O
 // artifactsRunIDIndex makes fetching artifacts for a specific run faster.
 const artifactsRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_artifacts_run_id ON artifacts(run_id)`
 
+// runsProjectCreatedAt makes ListRunsForProject faster and avoids full table scans.
+const runsProjectCreatedAt = `CREATE INDEX IF NOT EXISTS idx_runs_project_created_at ON runs(project, created_at DESC)`
+
+// intentsProjectCreatedAt makes ListIntentsForProject faster and avoids full table scans.
+const intentsProjectCreatedAt = `CREATE INDEX IF NOT EXISTS idx_intents_project_created_at ON intents(project, created_at DESC)`
+
 // migrateAddIndexes creates the indexes the code depends on for correctness
 // rather than for speed. IF NOT EXISTS makes it idempotent across reopens.
 func (s *Store) migrateAddIndexes() error {
@@ -556,6 +562,12 @@ func (s *Store) migrateAddIndexes() error {
 	}
 	if _, err := s.db.Exec(artifactsRunIDIndex); err != nil {
 		return fmt.Errorf("creating the index on artifacts.run_id: %w", err)
+	}
+	if _, err := s.db.Exec(runsProjectCreatedAt); err != nil {
+		return fmt.Errorf("creating the index on runs(project, created_at DESC): %w", err)
+	}
+	if _, err := s.db.Exec(intentsProjectCreatedAt); err != nil {
+		return fmt.Errorf("creating the index on intents(project, created_at DESC): %w", err)
 	}
 	return nil
 }
