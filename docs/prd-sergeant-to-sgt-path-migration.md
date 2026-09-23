@@ -1,6 +1,11 @@
 # Product Requirements: Sergeant-to-sgt Path Migration
 
-Status: Draft, awaiting explicit human PRD approval
+Status: Superseded 2026-09-19 by `docs/prd-upgrade-migration.md`
+(grilled and approved for issue #15). This draft was never approved
+or implemented. Its design (rename in place, no WAL-safety handling,
+no verification/idempotency) is superseded by a safer copy-based
+design — see `openspec/changes/archive/2026-08-27-sergeant-to-sgt-path-migration-superseded/SUPERSEDED.md`
+for the specific differences. Left here for history only.
 
 Extends: `docs/prd-sgt.md` (the rename itself, commits `a955ebf`/
 `9a220ca`); AGENTS.md's Truthfulness section ("must not display

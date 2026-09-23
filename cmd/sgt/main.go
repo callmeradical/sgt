@@ -17,6 +17,7 @@ import (
 	"github.com/callmeradical/sgt/internal/naming"
 	"github.com/callmeradical/sgt/internal/store"
 	"github.com/callmeradical/sgt/internal/ui"
+	"github.com/callmeradical/sgt/internal/upgrademigrate"
 )
 
 func main() {
@@ -32,13 +33,19 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Usage: sgt run <project-name-or-file>\n")
 			os.Exit(1)
 		}
+		runAutoMigration()
 		runProject(os.Args[2])
 	case "status":
+		runAutoMigration()
 		showStatus()
 	case "ui":
+		runAutoMigration()
 		startUI()
 	case "mcp":
+		runAutoMigration()
 		startMCP()
+	case "migrate":
+		runMigrateCommand()
 	case "dispatch":
 		runDispatchCommand(os.Args[2:])
 	case "runs":
@@ -104,6 +111,64 @@ func printHelpTopic(query string) {
 		for _, s := range matches {
 			fmt.Printf("  %s — run `sgt help %q` for the full section\n", s.Title, s.Title)
 		}
+	}
+}
+
+// runAutoMigration is called at the top of every subcommand that resolves
+// config/store paths (run, status, ui, mcp — Decision 2 of
+// docs/prd-upgrade-migration.md), before any of that subcommand's own
+// logic, so none of them can ever start from an apparently empty
+// config/store while recognizable pre-rebrand v2 state sits unmigrated on
+// disk. upgrademigrate.Run() is itself cheap once migration has completed
+// (a verified sentinel short-circuits to a single stat), so this call adds
+// no meaningful cost to the common case.
+//
+// A migration error is never silently swallowed: it fails the invocation
+// loudly, on stderr, with a non-zero exit, exactly like every other
+// unrecoverable startup error in this file.
+func runAutoMigration() {
+	if _, err := upgrademigrate.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "upgrade migration: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+// runMigrateCommand implements `sgt migrate` (Decision 7): the same
+// automatic logic runAutoMigration calls, on demand, printing the
+// resulting sentinel's status and any conflicts/mismatches rather than
+// running silently ahead of some other subcommand's own output.
+//
+// Exit code: 0 when there was nothing to migrate, or migration reached
+// Status "verified" with no conflicts; non-zero when Status is "failed" or
+// any conflict was reported, so a script invoking this directly can tell
+// "clean" from "needs operator attention" without parsing the sentinel
+// itself.
+func runMigrateCommand() {
+	sentinel, err := upgrademigrate.Run()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "upgrade migration: %v\n", err)
+		os.Exit(1)
+	}
+	if sentinel == nil {
+		fmt.Println("nothing to migrate")
+		return
+	}
+
+	fmt.Printf("migration status: %s\n", sentinel.Status)
+	if len(sentinel.Conflicts) > 0 {
+		fmt.Println("conflicts:")
+		for _, c := range sentinel.Conflicts {
+			fmt.Printf("  - %s\n", c)
+		}
+	}
+	if len(sentinel.Mismatches) > 0 {
+		fmt.Println("mismatches:")
+		for _, m := range sentinel.Mismatches {
+			fmt.Printf("  - %s\n", m)
+		}
+	}
+	if sentinel.Status == upgrademigrate.StatusFailed || len(sentinel.Conflicts) > 0 {
+		os.Exit(1)
 	}
 }
 
