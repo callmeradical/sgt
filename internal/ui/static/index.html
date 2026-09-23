@@ -180,17 +180,18 @@
                  not on a run card: a card is a navigation target, and a
                  state-changing action there is one stray click from a scan
                  gesture. -->
+            <!-- Activity used to be a separate drawer/button; its content is
+                 now a section inside this same Run detail drawer (issue #13)
+                 — one run-scoped entry point instead of two. -->
             <button type="button" id="btn-open-run-detail" onclick="openRunDrawer(this)"
               class="px-2 py-1 rounded bg-[#161b22] hover:bg-[#21262d] border border-[#30363d] text-[10px] font-bold text-slate-300 hover:text-white flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14]">
               <i class="fa-solid fa-circle-info text-[10px]" aria-hidden="true"></i>
               Run detail
             </button>
-            <button type="button" id="btn-open-activity" onclick="openActivityDrawer(this)"
-              class="px-2 py-1 rounded bg-[#161b22] hover:bg-[#21262d] border border-[#30363d] text-[10px] font-bold text-slate-300 hover:text-white flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14]">
-              <i class="fa-regular fa-rectangle-list text-[10px]" aria-hidden="true"></i>
-              Activity <span id="activity-count" class="font-mono text-[#8b949e]">0</span>
-            </button>
-            <button id="btn-stop-run" onclick="cancelActiveRun()" aria-label="Stop run" title="Stop run"
+            <!-- Hidden by default (no run selected yet); selectRun shows it
+                 only while the selected run's own status is "running" and
+                 hides it again the instant that stops being true (issue #12). -->
+            <button id="btn-stop-run" onclick="cancelActiveRun()" aria-label="Stop run" title="Stop run" hidden
               class="min-w-[44px] min-h-[44px] flex items-center justify-center gap-1 rounded text-[#8b949e] hover:text-rose-400 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14]">
               <i class="fa-regular fa-circle-stop text-sm" aria-hidden="true"></i>
               <span class="lg:hidden text-[10px] font-bold">Stop run</span>
@@ -899,6 +900,15 @@
             bannerStatus.className = "px-2 py-0.5 rounded text-[10px] font-bold bg-[#161b22] text-slate-300 border border-[#30363d]";
             bannerStatus.innerText = `● ${current.status}`;
         }
+
+        // The stop control acts on activeRunId specifically -- whichever run
+        // is selected here, not a true global action -- so it is only ever
+        // shown next to that run's own status pill, and only while there is
+        // actually something to stop (issue #12). selectRun re-runs on every
+        // live status transition (see the polling loop above), so this stays
+        // correct without a separate listener.
+        const stopBtn = document.getElementById('btn-stop-run');
+        if (stopBtn) stopBtn.hidden = current.status !== 'running';
       }
 
       try {
@@ -932,6 +942,8 @@
       document.getElementById('stage-run-badge').innerText = 'No run selected';
       const metaReset = document.getElementById('active-run-meta');
       if (metaReset) metaReset.innerText = '';
+      const stopBtn = document.getElementById('btn-stop-run');
+      if (stopBtn) stopBtn.hidden = true;
       renderRunBrief('');
       document.getElementById('active-matrix-project').innerText = 'None';
       document.getElementById('workflow-graph').innerHTML =
@@ -940,8 +952,7 @@
       drawerDeliveries = [];
       activeRunSkips = [];
       refreshRunDrawer(null);
-      const envBadge = document.getElementById('activity-count');
-      if (envBadge) envBadge.innerText = '0';
+      refreshDrawerActivity();
       renderProgressPanel();
     }
 
@@ -1451,21 +1462,34 @@
       return Array.from(byRepo.values()).filter(b => b.status === 'blocked');
     }
 
+    // The drawer body is two independently-refreshable sections (issue #13:
+    // Activity folded into Run Detail rather than a second drawer) so a
+    // stream-driven activity/delivery update never has to re-fetch and
+    // re-render the metadata section (blocked-bullet lookup included), and
+    // vice versa.
+    function combinedRunDrawerHTML(run, skips, blocked) {
+      return `<div id="drawer-body-meta">${runDetailHTML(run, skips, blocked)}</div>
+        <div id="drawer-body-activity">${activityDrawerBodyHTML()}</div>`;
+    }
+
     async function openRunDrawer(opener) {
       const run = allRuns.find(r => r.id === activeRunId) || null;
       const blocked = run ? await blockedBulletsForRun(run.id) : [];
-      openDrawer(runDrawerTitle(run), 'run', runDetailHTML(run, activeRunSkips, blocked), opener);
+      openDrawer(runDrawerTitle(run), 'run', combinedRunDrawerHTML(run, activeRunSkips, blocked), opener);
     }
 
-    // Keeps an open run drawer current. Called where run details arrive, so the
-    // resume control disappears the moment the served run stops offering it --
-    // including the transition the stream carries after a resume is accepted.
+    // Keeps an open run drawer's metadata section current. Called where run
+    // details arrive, so the resume control disappears the moment the served
+    // run stops offering it -- including the transition the stream carries
+    // after a resume is accepted. Only touches drawer-body-meta: the activity
+    // section refreshes independently via refreshDrawerActivity.
     async function refreshRunDrawer(run) {
       if (!drawerIsOpen()) return;
       if (document.getElementById('drawer-kind').textContent !== 'run') return;
       const blocked = run ? await blockedBulletsForRun(run.id) : [];
       document.getElementById('drawer-title').textContent = runDrawerTitle(run);
-      document.getElementById('drawer-body').innerHTML = runDetailHTML(run, activeRunSkips, blocked);
+      const metaEl = document.getElementById('drawer-body-meta');
+      if (metaEl) metaEl.innerHTML = runDetailHTML(run, activeRunSkips, blocked);
     }
 
     // Displays a refusal in the server's own words. This page did not decide the
@@ -2041,26 +2065,21 @@
       return activityHTML(drawerActivity) + deliveriesHTML(drawerDeliveries);
     }
 
-    function openActivityDrawer(opener) {
-      const n = drawerActivity.length;
-      openDrawer(`Activity (${n})`, 'activity', activityDrawerBodyHTML(), opener);
-    }
-
-    // Keeps an open activity drawer current. Called from both renderActivity and
-    // renderDeliveries so whichever of the two arrives first still redraws a
-    // consistent body instead of one section going stale until the other fetch
-    // lands.
-    function refreshActivityDrawer() {
-      if (!drawerIsOpen() || document.getElementById('drawer-kind').textContent !== 'activity') return;
-      document.getElementById('drawer-title').textContent = `Activity (${drawerActivity.length})`;
-      document.getElementById('drawer-body').innerHTML = activityDrawerBodyHTML();
+    // Keeps the run drawer's activity section current. Called from both
+    // renderActivity and renderDeliveries (issue #13: one drawer, two
+    // sections) so whichever of the two arrives first still redraws a
+    // consistent body instead of one section going stale until the other
+    // fetch lands. Only touches drawer-body-activity: the metadata section
+    // refreshes independently via refreshRunDrawer.
+    function refreshDrawerActivity() {
+      if (!drawerIsOpen() || document.getElementById('drawer-kind').textContent !== 'run') return;
+      const el = document.getElementById('drawer-body-activity');
+      if (el) el.innerHTML = activityDrawerBodyHTML();
     }
 
     function renderActivity(envelopes) {
       drawerActivity = envelopes || [];
-      const badge = document.getElementById('activity-count');
-      badge.innerText = String(drawerActivity.length);
-      refreshActivityDrawer();
+      refreshDrawerActivity();
     }
 
     // Fetches this run's delivery history (R5.6) alongside its envelopes. A
@@ -2080,7 +2099,7 @@
 
     function renderDeliveries(deliveries) {
       drawerDeliveries = deliveries || [];
-      refreshActivityDrawer();
+      refreshDrawerActivity();
     }
 
     // Delivery state vocabulary, following the same shape as PHASE_LOOK.
