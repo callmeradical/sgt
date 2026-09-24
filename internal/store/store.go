@@ -522,19 +522,27 @@ func (s *Store) migrateAddColumns() error {
 const requestIDIndex = `CREATE UNIQUE INDEX IF NOT EXISTS idx_runs_request_id ON runs(request_id)`
 
 // phasesRunIDIndex makes fetching phases for a specific run faster.
-const phasesRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_phases_run_id ON phases(run_id)`
+// phasesRunIDIndex optimizes ListPhasesForRun by providing exact ordering (eliminates TEMP B-TREE).
+const phasesRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_phases_run_id_created_at ON phases(run_id, created_at ASC)`
 
 // envelopesRunIDIndex makes fetching envelopes and cascading deletes faster.
-const envelopesRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_envelopes_run_id ON envelopes(run_id)`
+// envelopesRunIDIndex optimizes ListEnvelopesForRun by providing exact ordering (eliminates TEMP B-TREE).
+const envelopesRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_envelopes_run_id_created_at ON envelopes(run_id, created_at ASC)`
+
+// envelopesRunIDRepoIndex optimizes GetLatestEnvelope by providing exact filtering and ordering (eliminates TEMP B-TREE).
+const envelopesRunIDRepoIndex = `CREATE INDEX IF NOT EXISTS idx_envelopes_run_id_repo_created_at ON envelopes(run_id, repo, created_at DESC)`
 
 // deliveriesEnvelopeIDIndex makes fetching deliveries and cascading deletes faster.
-const deliveriesEnvelopeIDIndex = `CREATE INDEX IF NOT EXISTS idx_deliveries_envelope_id ON deliveries(envelope_id)`
+// deliveriesEnvelopeIDIndex optimizes ListDeliveryHistory by providing exact filtering and ordering (eliminates TEMP B-TREE).
+const deliveriesEnvelopeIDIndex = `CREATE INDEX IF NOT EXISTS idx_deliveries_envelope_id_created_at_id ON deliveries(envelope_id, created_at ASC, id ASC)`
 
 // bulletsIntentIDIndex makes fetching bullets for an intent faster.
-const bulletsIntentIDIndex = `CREATE INDEX IF NOT EXISTS idx_bullets_intent_id ON bullets(intent_id)`
+// bulletsIntentIDIndex optimizes ListBulletsForIntent by providing exact ordering (eliminates TEMP B-TREE).
+const bulletsIntentIDIndex = `CREATE INDEX IF NOT EXISTS idx_bullets_intent_id_position_created_at_id ON bullets(intent_id, position ASC, created_at ASC, id ASC)`
 
 // artifactsRunIDIndex makes fetching artifacts for a specific run faster.
-const artifactsRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_artifacts_run_id ON artifacts(run_id)`
+// artifactsRunIDIndex optimizes ListArtifactsForRun by providing exact ordering (eliminates TEMP B-TREE).
+const artifactsRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_artifacts_run_id_captured_at_id ON artifacts(run_id, captured_at ASC, id ASC)`
 
 // runsProjectIndex optimizes ListRunsForProject (filters by project, sorts by created_at).
 const runsProjectIndex = `CREATE INDEX IF NOT EXISTS idx_runs_project_created_at ON runs(project, created_at DESC)`
@@ -545,9 +553,23 @@ const intentsProjectIndex = `CREATE INDEX IF NOT EXISTS idx_intents_project_crea
 // intentsStatusIndex optimizes ListIntentsByStatus (filters by status, sorts by created_at, id).
 const intentsStatusIndex = `CREATE INDEX IF NOT EXISTS idx_intents_status_created_at_id ON intents(status, created_at DESC, id ASC)`
 
+
+// runsCreatedAt optimizes ListRecentRuns by providing exact ordering (eliminates TEMP B-TREE).
+const runsCreatedAt = `CREATE INDEX IF NOT EXISTS idx_runs_created_at ON runs(created_at DESC)`
+
+// runsUpdatedAtStatus optimizes RunsEligibleForCleanup by providing exact filtering and ordering (eliminates TEMP B-TREE).
+const runsUpdatedAtStatus = `CREATE INDEX IF NOT EXISTS idx_runs_updated_at_status ON runs(updated_at ASC, status)`
+
 // migrateAddIndexes creates the indexes the code depends on for correctness
 // rather than for speed. IF NOT EXISTS makes it idempotent across reopens.
 func (s *Store) migrateAddIndexes() error {
+	// Drop old unoptimized indexes that caused TEMP B-TREE sorting on read
+	_, _ = s.db.Exec(`DROP INDEX IF EXISTS idx_phases_run_id`)
+	_, _ = s.db.Exec(`DROP INDEX IF EXISTS idx_envelopes_run_id`)
+	_, _ = s.db.Exec(`DROP INDEX IF EXISTS idx_deliveries_envelope_id`)
+	_, _ = s.db.Exec(`DROP INDEX IF EXISTS idx_bullets_intent_id`)
+	_, _ = s.db.Exec(`DROP INDEX IF EXISTS idx_artifacts_run_id`)
+
 	if _, err := s.db.Exec(requestIDIndex); err != nil {
 		return fmt.Errorf("creating the unique index on runs.request_id: %w", err)
 	}
@@ -555,7 +577,10 @@ func (s *Store) migrateAddIndexes() error {
 		return fmt.Errorf("creating the index on phases.run_id: %w", err)
 	}
 	if _, err := s.db.Exec(envelopesRunIDIndex); err != nil {
-		return fmt.Errorf("creating the index on envelopes.run_id: %w", err)
+		return fmt.Errorf("creating the index on envelopes(run_id, created_at): %w", err)
+	}
+	if _, err := s.db.Exec(envelopesRunIDRepoIndex); err != nil {
+		return fmt.Errorf("creating the index on envelopes(run_id, repo, created_at): %w", err)
 	}
 	if _, err := s.db.Exec(deliveriesEnvelopeIDIndex); err != nil {
 		return fmt.Errorf("creating the index on deliveries.envelope_id: %w", err)
@@ -568,6 +593,12 @@ func (s *Store) migrateAddIndexes() error {
 	}
 	if _, err := s.db.Exec(runsProjectIndex); err != nil {
 		return fmt.Errorf("creating the index on runs(project, created_at): %w", err)
+	}
+	if _, err := s.db.Exec(runsCreatedAt); err != nil {
+		return fmt.Errorf("creating the index on runs(created_at): %w", err)
+	}
+	if _, err := s.db.Exec(runsUpdatedAtStatus); err != nil {
+		return fmt.Errorf("creating the index on runs(updated_at, status): %w", err)
 	}
 	if _, err := s.db.Exec(intentsProjectIndex); err != nil {
 		return fmt.Errorf("creating the index on intents(project, created_at, id): %w", err)
