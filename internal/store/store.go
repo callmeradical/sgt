@@ -536,6 +536,9 @@ const bulletsIntentIDIndex = `CREATE INDEX IF NOT EXISTS idx_bullets_intent_id O
 // artifactsRunIDIndex makes fetching artifacts for a specific run faster.
 const artifactsRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_artifacts_run_id ON artifacts(run_id)`
 
+// deliveriesIdempotencyKeyIndex optimizes fetching deliveries by idempotency_key (filters by idempotency_key, sorts by created_at, id).
+const deliveriesIdempotencyKeyIndex = `CREATE INDEX IF NOT EXISTS idx_deliveries_idempotency_key_created_at_id ON deliveries(idempotency_key, created_at DESC, id DESC)`
+
 // runsProjectIndex optimizes ListRunsForProject (filters by project, sorts by created_at).
 const runsProjectIndex = `CREATE INDEX IF NOT EXISTS idx_runs_project_created_at ON runs(project, created_at DESC)`
 
@@ -565,6 +568,9 @@ func (s *Store) migrateAddIndexes() error {
 	}
 	if _, err := s.db.Exec(artifactsRunIDIndex); err != nil {
 		return fmt.Errorf("creating the index on artifacts.run_id: %w", err)
+	}
+	if _, err := s.db.Exec(deliveriesIdempotencyKeyIndex); err != nil {
+		return fmt.Errorf("creating the index on deliveries(idempotency_key, created_at, id): %w", err)
 	}
 	if _, err := s.db.Exec(runsProjectIndex); err != nil {
 		return fmt.Errorf("creating the index on runs(project, created_at): %w", err)
