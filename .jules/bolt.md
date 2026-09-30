@@ -7,3 +7,6 @@
 ## 2024-05-20 - SQLite Composite Indexes for Filtering and Sorting
 **Learning:** SQLite requires specific composite indexes to avoid temp B-trees and full table scans when a query filters by one column (e.g., `WHERE project = ?`) and sorts by another (e.g., `ORDER BY created_at DESC`). Simple single-column indexes on the WHERE clause are not enough to prevent the temporary B-tree sorting penalty on large core tables like `runs` and `intents`.
 **Action:** Always create composite indexes mapping exactly to the `(filter_column, sort_column [direction])` for frequently executed, paginated, or ordered reads in SQLite stores.
+## 2026-10-01 - SQLite falls back to Temp B-Tree for sorted foreign key reads
+**Learning:** Adding a single column index on a foreign key (e.g. `phases(run_id)`) stops a full table scan, but if the query includes an `ORDER BY` clause (e.g. `ORDER BY created_at ASC`), SQLite will still incur a temporary B-Tree sorting penalty unless the index explicitly includes the sorted columns. This was happening across core relations like `phases`, `envelopes`, `deliveries`, and `artifacts` when loaded for a given run or intent.
+**Action:** When a query filters by a foreign key and orders by other columns, always use a composite index in the exact format `(foreign_key, sort_col1 [DIR], sort_col2 [DIR])` to completely eliminate the temp B-tree overhead.
