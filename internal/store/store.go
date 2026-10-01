@@ -522,19 +522,19 @@ func (s *Store) migrateAddColumns() error {
 const requestIDIndex = `CREATE UNIQUE INDEX IF NOT EXISTS idx_runs_request_id ON runs(request_id)`
 
 // phasesRunIDIndex makes fetching phases for a specific run faster.
-const phasesRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_phases_run_id ON phases(run_id)`
+const phasesRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_phases_run_id_created_at ON phases(run_id, created_at ASC)`
 
 // envelopesRunIDIndex makes fetching envelopes and cascading deletes faster.
-const envelopesRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_envelopes_run_id ON envelopes(run_id)`
+const envelopesRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_envelopes_run_id_created_at ON envelopes(run_id, created_at ASC)`
 
 // deliveriesEnvelopeIDIndex makes fetching deliveries and cascading deletes faster.
-const deliveriesEnvelopeIDIndex = `CREATE INDEX IF NOT EXISTS idx_deliveries_envelope_id ON deliveries(envelope_id)`
+const deliveriesEnvelopeIDIndex = `CREATE INDEX IF NOT EXISTS idx_deliveries_envelope_id_created_at_id ON deliveries(envelope_id, created_at ASC, id ASC)`
 
 // bulletsIntentIDIndex makes fetching bullets for an intent faster.
-const bulletsIntentIDIndex = `CREATE INDEX IF NOT EXISTS idx_bullets_intent_id ON bullets(intent_id)`
+const bulletsIntentIDIndex = `CREATE INDEX IF NOT EXISTS idx_bullets_intent_id_position_created_at_id ON bullets(intent_id, position ASC, created_at ASC, id ASC)`
 
 // artifactsRunIDIndex makes fetching artifacts for a specific run faster.
-const artifactsRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_artifacts_run_id ON artifacts(run_id)`
+const artifactsRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_artifacts_run_id_captured_at_id ON artifacts(run_id, captured_at ASC, id ASC)`
 
 // runsProjectIndex optimizes ListRunsForProject (filters by project, sorts by created_at).
 const runsProjectIndex = `CREATE INDEX IF NOT EXISTS idx_runs_project_created_at ON runs(project, created_at DESC)`
@@ -550,6 +550,20 @@ const intentsStatusIndex = `CREATE INDEX IF NOT EXISTS idx_intents_status_create
 func (s *Store) migrateAddIndexes() error {
 	if _, err := s.db.Exec(requestIDIndex); err != nil {
 		return fmt.Errorf("creating the unique index on runs.request_id: %w", err)
+	}
+	// Drop old single-column indexes before creating their composite replacements
+	// to avoid redundant indexes bloating the database.
+	oldIndexes := []string{
+		"idx_phases_run_id",
+		"idx_envelopes_run_id",
+		"idx_deliveries_envelope_id",
+		"idx_bullets_intent_id",
+		"idx_artifacts_run_id",
+	}
+	for _, idx := range oldIndexes {
+		if _, err := s.db.Exec("DROP INDEX IF EXISTS " + idx); err != nil {
+			return fmt.Errorf("dropping old index %s: %w", idx, err)
+		}
 	}
 	if _, err := s.db.Exec(phasesRunIDIndex); err != nil {
 		return fmt.Errorf("creating the index on phases.run_id: %w", err)
