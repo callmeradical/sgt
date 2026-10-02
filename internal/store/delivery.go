@@ -50,7 +50,9 @@ const createDeliveriesTable = `
 	);
 	CREATE UNIQUE INDEX IF NOT EXISTS idx_deliveries_idempotency_key_terminal
 		ON deliveries (idempotency_key)
-		WHERE state IN ('delivered', 'acknowledged');`
+		WHERE state IN ('delivered', 'acknowledged');
+	CREATE INDEX IF NOT EXISTS idx_deliveries_idempotency_key_created_at_id
+		ON deliveries (idempotency_key, created_at ASC, id ASC);`
 
 // DeliveryRecord is one row in the deliveries table.
 //
