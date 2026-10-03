@@ -111,12 +111,12 @@ type IntentRecord struct {
 	// argument order) can silently pick a different repository or scaffold
 	// a second change, discarding whatever change_id the caller named at
 	// proposal time.
-	ChangeID   string    `json:"change_id,omitempty"`
-	ChangeRepo string    `json:"change_repo,omitempty"`
+	ChangeID   string `json:"change_id,omitempty"`
+	ChangeRepo string `json:"change_repo,omitempty"`
 	// Type is the work type a proposed plan was resolved with (decision O2),
 	// for the same reason ChangeID/ChangeRepo are recorded here: an approval
 	// reuses it verbatim rather than requiring the caller to state it again.
-	Type      string    `json:"type,omitempty"`
+	Type string `json:"type,omitempty"`
 	// ShippingGateStatus is "", "passed", or "failed". Empty means the intent's
 	// bullets have not all reached sealed/merged yet, OR they have and no
 	// shipping gates are configured for the project — in the latter case
@@ -135,15 +135,15 @@ type IntentRecord struct {
 // through that repo's stack, yielding one commit and one PR. Repo is a single
 // string on purpose — work in a second repository is a second bullet.
 type BulletRecord struct {
-	ID        string    `json:"id"`
-	IntentID  string    `json:"intent_id"`
-	Repo      string    `json:"repo"`
-	Position  int       `json:"position"` // merge order within the intent
-	Status    string    `json:"status"`   // one of BulletStatuses()
-	Branch    string    `json:"branch,omitempty"`
-	Worktree  string    `json:"worktree,omitempty"`
-	CommitSHA string    `json:"commit_sha,omitempty"`
-	PRURL     string    `json:"pr_url,omitempty"`
+	ID        string `json:"id"`
+	IntentID  string `json:"intent_id"`
+	Repo      string `json:"repo"`
+	Position  int    `json:"position"` // merge order within the intent
+	Status    string `json:"status"`   // one of BulletStatuses()
+	Branch    string `json:"branch,omitempty"`
+	Worktree  string `json:"worktree,omitempty"`
+	CommitSHA string `json:"commit_sha,omitempty"`
+	PRURL     string `json:"pr_url,omitempty"`
 	// BlockedReason is a human-readable explanation of why the bullet is
 	// stuck. Empty unless Status is "blocked".
 	BlockedReason string    `json:"blocked_reason,omitempty"`
@@ -521,20 +521,20 @@ func (s *Store) migrateAddColumns() error {
 // other, which is what makes the key optional.
 const requestIDIndex = `CREATE UNIQUE INDEX IF NOT EXISTS idx_runs_request_id ON runs(request_id)`
 
-// phasesRunIDIndex makes fetching phases for a specific run faster.
-const phasesRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_phases_run_id ON phases(run_id)`
+// phasesRunIDIndex makes fetching phases for a specific run faster and sorts them.
+const phasesRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_phases_run_id_created_at ON phases(run_id, created_at ASC)`
 
-// envelopesRunIDIndex makes fetching envelopes and cascading deletes faster.
-const envelopesRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_envelopes_run_id ON envelopes(run_id)`
+// envelopesRunIDIndex makes fetching envelopes and cascading deletes faster and sorts them.
+const envelopesRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_envelopes_run_id_created_at ON envelopes(run_id, created_at ASC)`
 
 // deliveriesEnvelopeIDIndex makes fetching deliveries and cascading deletes faster.
 const deliveriesEnvelopeIDIndex = `CREATE INDEX IF NOT EXISTS idx_deliveries_envelope_id ON deliveries(envelope_id)`
 
-// bulletsIntentIDIndex makes fetching bullets for an intent faster.
-const bulletsIntentIDIndex = `CREATE INDEX IF NOT EXISTS idx_bullets_intent_id ON bullets(intent_id)`
+// bulletsIntentIDIndex makes fetching bullets for an intent faster and sorts them.
+const bulletsIntentIDIndex = `CREATE INDEX IF NOT EXISTS idx_bullets_intent_id_position_created_at_id ON bullets(intent_id, position ASC, created_at ASC, id ASC)`
 
-// artifactsRunIDIndex makes fetching artifacts for a specific run faster.
-const artifactsRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_artifacts_run_id ON artifacts(run_id)`
+// artifactsRunIDIndex makes fetching artifacts for a specific run faster and sorts them.
+const artifactsRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_artifacts_run_id_captured_at_id ON artifacts(run_id, captured_at ASC, id ASC)`
 
 // runsProjectIndex optimizes ListRunsForProject (filters by project, sorts by created_at).
 const runsProjectIndex = `CREATE INDEX IF NOT EXISTS idx_runs_project_created_at ON runs(project, created_at DESC)`
@@ -551,20 +551,35 @@ func (s *Store) migrateAddIndexes() error {
 	if _, err := s.db.Exec(requestIDIndex); err != nil {
 		return fmt.Errorf("creating the unique index on runs.request_id: %w", err)
 	}
+
+	// Drop old, non-covering indexes if they exist to prevent bloat.
+	if _, err := s.db.Exec(`DROP INDEX IF EXISTS idx_phases_run_id`); err != nil {
+		return fmt.Errorf("dropping old index idx_phases_run_id: %w", err)
+	}
+	if _, err := s.db.Exec(`DROP INDEX IF EXISTS idx_envelopes_run_id`); err != nil {
+		return fmt.Errorf("dropping old index idx_envelopes_run_id: %w", err)
+	}
+	if _, err := s.db.Exec(`DROP INDEX IF EXISTS idx_bullets_intent_id`); err != nil {
+		return fmt.Errorf("dropping old index idx_bullets_intent_id: %w", err)
+	}
+	if _, err := s.db.Exec(`DROP INDEX IF EXISTS idx_artifacts_run_id`); err != nil {
+		return fmt.Errorf("dropping old index idx_artifacts_run_id: %w", err)
+	}
+
 	if _, err := s.db.Exec(phasesRunIDIndex); err != nil {
-		return fmt.Errorf("creating the index on phases.run_id: %w", err)
+		return fmt.Errorf("creating the index on phases(run_id, created_at): %w", err)
 	}
 	if _, err := s.db.Exec(envelopesRunIDIndex); err != nil {
-		return fmt.Errorf("creating the index on envelopes.run_id: %w", err)
+		return fmt.Errorf("creating the index on envelopes(run_id, created_at): %w", err)
 	}
 	if _, err := s.db.Exec(deliveriesEnvelopeIDIndex); err != nil {
 		return fmt.Errorf("creating the index on deliveries.envelope_id: %w", err)
 	}
 	if _, err := s.db.Exec(bulletsIntentIDIndex); err != nil {
-		return fmt.Errorf("creating the index on bullets.intent_id: %w", err)
+		return fmt.Errorf("creating the index on bullets(intent_id, position, created_at, id): %w", err)
 	}
 	if _, err := s.db.Exec(artifactsRunIDIndex); err != nil {
-		return fmt.Errorf("creating the index on artifacts.run_id: %w", err)
+		return fmt.Errorf("creating the index on artifacts(run_id, captured_at, id): %w", err)
 	}
 	if _, err := s.db.Exec(runsProjectIndex); err != nil {
 		return fmt.Errorf("creating the index on runs(project, created_at): %w", err)
