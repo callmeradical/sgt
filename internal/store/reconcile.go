@@ -67,31 +67,42 @@ func (s *Store) ReconcileOrphanedRuns() (ReconcileResult, error) {
 	}
 
 	// Bulk-fetch running phases for all orphans to avoid an N+1 query pattern.
-	var orphanIDs []string
-	var args []interface{}
-	for _, run := range orphans {
-		orphanIDs = append(orphanIDs, "?")
-		args = append(args, run.ID)
-	}
-
-	query := "SELECT id, run_id FROM phases WHERE status = 'running' AND run_id IN (" + strings.Join(orphanIDs, ",") + ") ORDER BY created_at ASC"
-	phRows, err := s.db.Query(query, args...)
-	if err != nil {
-		return ReconcileResult{}, err
-	}
-
+	// We chunk the IN clause by 500 to avoid exceeding SQLite's parameter limits
+	// when there are thousands of orphaned runs.
 	phasesByRun := make(map[string][]string)
-	for phRows.Next() {
-		var id, runID string
-		if err := phRows.Scan(&id, &runID); err != nil {
-			phRows.Close()
+	const chunkSize = 500
+	for i := 0; i < len(orphans); i += chunkSize {
+		end := i + chunkSize
+		if end > len(orphans) {
+			end = len(orphans)
+		}
+		chunk := orphans[i:end]
+
+		var orphanIDs []string
+		var args []interface{}
+		for _, run := range chunk {
+			orphanIDs = append(orphanIDs, "?")
+			args = append(args, run.ID)
+		}
+
+		query := "SELECT id, run_id FROM phases WHERE status = 'running' AND run_id IN (" + strings.Join(orphanIDs, ",") + ") ORDER BY created_at ASC"
+		phRows, err := s.db.Query(query, args...)
+		if err != nil {
 			return ReconcileResult{}, err
 		}
-		phasesByRun[runID] = append(phasesByRun[runID], id)
-	}
-	phRows.Close()
-	if err := phRows.Err(); err != nil {
-		return ReconcileResult{}, err
+
+		for phRows.Next() {
+			var id, runID string
+			if err := phRows.Scan(&id, &runID); err != nil {
+				phRows.Close()
+				return ReconcileResult{}, err
+			}
+			phasesByRun[runID] = append(phasesByRun[runID], id)
+		}
+		phRows.Close()
+		if err := phRows.Err(); err != nil {
+			return ReconcileResult{}, err
+		}
 	}
 
 	var result ReconcileResult
