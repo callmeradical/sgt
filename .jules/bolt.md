@@ -7,3 +7,6 @@
 ## 2024-05-20 - SQLite Composite Indexes for Filtering and Sorting
 **Learning:** SQLite requires specific composite indexes to avoid temp B-trees and full table scans when a query filters by one column (e.g., `WHERE project = ?`) and sorts by another (e.g., `ORDER BY created_at DESC`). Simple single-column indexes on the WHERE clause are not enough to prevent the temporary B-tree sorting penalty on large core tables like `runs` and `intents`.
 **Action:** Always create composite indexes mapping exactly to the `(filter_column, sort_column [direction])` for frequently executed, paginated, or ordered reads in SQLite stores.
+## 2026-10-06 - Chunking SQLite IN clauses
+**Learning:** SQLite has a variable limit (`SQLITE_MAX_VARIABLE_NUMBER`) which restricts the number of parameters you can pass in an `IN (...)` clause. When dealing with arrays of IDs that can grow large (like reconciling an unbounded number of orphaned runs after a crash), passing them all into a single query causes the query to fail.
+**Action:** When using `IN (?)` with dynamically sized slices (especially things scaling with runs, phases, etc.), chunk the slice into smaller batches (e.g., chunks of 500) and execute the query iteratively.
