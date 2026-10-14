@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -290,5 +291,65 @@ func TestReconcileOrphanedRunsOnlyReconcilesPhasesOfRunningRuns(t *testing.T) {
 	}
 	if result.PhasesReconciled != 0 {
 		t.Errorf("PhasesReconciled = %d, want 0; phases of terminal runs must not be touched", result.PhasesReconciled)
+	}
+}
+
+// TestReconcileOrphanedRunsHandlesMoreRunsThanSQLiteVariableLimit: a crash with
+// a very large number of runs in flight must still be fully reconciled. The
+// driver (modernc.org/sqlite) caps bound parameters per statement at
+// SQLITE_MAX_VARIABLE_NUMBER = 32766, so a single IN (...) over every orphan
+// fails with "too many SQL variables" and leaves every run stuck at running.
+func TestReconcileOrphanedRunsHandlesMoreRunsThanSQLiteVariableLimit(t *testing.T) {
+	st, _ := openTestStore(t)
+
+	const sqliteMaxVariableNumber = 32766
+	const n = sqliteMaxVariableNumber + 1
+
+	// Seed directly in one transaction: CreateRun/RecordPhase per row would
+	// make this test far slower without exercising anything extra.
+	tx, err := st.db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	runStmt, err := tx.Prepare(`INSERT INTO runs (id, project, task_id, status, created_at, updated_at) VALUES (?, 'p', ?, 'running', datetime('now'), datetime('now'))`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	phaseStmt, err := tx.Prepare(`INSERT INTO phases (id, run_id, repo, name, kind, status, created_at) VALUES (?, ?, 'api', 'build', 'agent', 'running', datetime('now'))`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < n; i++ {
+		id := fmt.Sprintf("orphan-%05d", i)
+		if _, err := runStmt.Exec(id, id); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := phaseStmt.Exec("phase-"+id, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	runStmt.Close()
+	phaseStmt.Close()
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := st.ReconcileOrphanedRuns()
+	if err != nil {
+		t.Fatalf("ReconcileOrphanedRuns with %d orphans: %v", n, err)
+	}
+	if result.RunsReconciled != n {
+		t.Errorf("RunsReconciled = %d, want %d", result.RunsReconciled, n)
+	}
+	if result.PhasesReconciled != n {
+		t.Errorf("PhasesReconciled = %d, want %d", result.PhasesReconciled, n)
+	}
+
+	var stillRunning int
+	if err := st.db.QueryRow(`SELECT (SELECT COUNT(*) FROM runs WHERE status = 'running') + (SELECT COUNT(*) FROM phases WHERE status = 'running')`).Scan(&stillRunning); err != nil {
+		t.Fatal(err)
+	}
+	if stillRunning != 0 {
+		t.Errorf("%d runs/phases still running after reconciliation, want 0", stillRunning)
 	}
 }
