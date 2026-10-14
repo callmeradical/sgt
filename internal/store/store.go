@@ -521,20 +521,40 @@ func (s *Store) migrateAddColumns() error {
 // other, which is what makes the key optional.
 const requestIDIndex = `CREATE UNIQUE INDEX IF NOT EXISTS idx_runs_request_id ON runs(request_id)`
 
-// phasesRunIDIndex makes fetching phases for a specific run faster.
-const phasesRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_phases_run_id ON phases(run_id)`
+// The indexes below each pair a list query's filter column with its ORDER BY
+// columns, so SQLite reads the matching rows already sorted instead of sorting
+// them in a TEMP B-TREE on every call. TestHotListQueriesReadInIndexOrder pins
+// each one to the query it serves. The leading column alone still serves every
+// plain lookup and DELETE by that foreign key.
 
-// envelopesRunIDIndex makes fetching envelopes and cascading deletes faster.
-const envelopesRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_envelopes_run_id ON envelopes(run_id)`
+// phasesRunIDIndex serves ListPhasesForRun and phase deletes by run.
+const phasesRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_phases_run_id_created_at ON phases(run_id, created_at)`
 
-// deliveriesEnvelopeIDIndex makes fetching deliveries and cascading deletes faster.
+// envelopesRunIDIndex serves ListEnvelopesForRun, GetLatestEnvelope (read
+// newest-first, stopping at the first row for the repo) and envelope deletes.
+const envelopesRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_envelopes_run_id_created_at ON envelopes(run_id, created_at)`
+
+// deliveriesEnvelopeIDIndex serves the envelope join in ListDeliveriesForRun
+// and the retention delete. It stays single-column on purpose: that join
+// orders rows drawn from several envelopes, so no envelope_id-leading
+// composite can supply its sort order.
 const deliveriesEnvelopeIDIndex = `CREATE INDEX IF NOT EXISTS idx_deliveries_envelope_id ON deliveries(envelope_id)`
 
-// bulletsIntentIDIndex makes fetching bullets for an intent faster.
-const bulletsIntentIDIndex = `CREATE INDEX IF NOT EXISTS idx_bullets_intent_id ON bullets(intent_id)`
+// deliveriesIdempotencyKeyIndex serves ListDeliveryHistory, latestDeliveryState
+// (read backwards for DESC) and hasDeadLetterRow. The partial unique index on
+// idempotency_key covers only terminal rows, so without this every delivery
+// attempt scanned the whole table.
+const deliveriesIdempotencyKeyIndex = `CREATE INDEX IF NOT EXISTS idx_deliveries_idempotency_key_created_at_id ON deliveries(idempotency_key, created_at, id)`
 
-// artifactsRunIDIndex makes fetching artifacts for a specific run faster.
-const artifactsRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_artifacts_run_id ON artifacts(run_id)`
+// bulletsIntentIDIndex serves ListBulletsForIntent's merge order.
+const bulletsIntentIDIndex = `CREATE INDEX IF NOT EXISTS idx_bullets_intent_id_position_created_at_id ON bullets(intent_id, position, created_at, id)`
+
+// artifactsRunIDIndex serves ListArtifactsForRun.
+const artifactsRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_artifacts_run_id_captured_at_id ON artifacts(run_id, captured_at, id)`
+
+// runsCreatedAtIndex serves ListRecentRuns, which the dashboard, the event
+// stream and the fleet view call with no filter.
+const runsCreatedAtIndex = `CREATE INDEX IF NOT EXISTS idx_runs_created_at ON runs(created_at DESC)`
 
 // runsProjectIndex optimizes ListRunsForProject (filters by project, sorts by created_at).
 const runsProjectIndex = `CREATE INDEX IF NOT EXISTS idx_runs_project_created_at ON runs(project, created_at DESC)`
@@ -545,35 +565,43 @@ const intentsProjectIndex = `CREATE INDEX IF NOT EXISTS idx_intents_project_crea
 // intentsStatusIndex optimizes ListIntentsByStatus (filters by status, sorts by created_at, id).
 const intentsStatusIndex = `CREATE INDEX IF NOT EXISTS idx_intents_status_created_at_id ON intents(status, created_at DESC, id ASC)`
 
-// migrateAddIndexes creates the indexes the code depends on for correctness
-// rather than for speed. IF NOT EXISTS makes it idempotent across reopens.
+// supersededIndexes are single-column indexes earlier releases created. Each
+// is a strict prefix of a composite above, which serves every lookup it did,
+// so keeping it would only add write cost.
+var supersededIndexes = []string{
+	"idx_phases_run_id",
+	"idx_envelopes_run_id",
+	"idx_bullets_intent_id",
+	"idx_artifacts_run_id",
+}
+
+// migrateAddIndexes creates the indexes the code depends on, for correctness
+// (request_id) and for speed. IF NOT EXISTS makes it idempotent across reopens.
 func (s *Store) migrateAddIndexes() error {
-	if _, err := s.db.Exec(requestIDIndex); err != nil {
-		return fmt.Errorf("creating the unique index on runs.request_id: %w", err)
+	indexes := []struct{ ddl, what string }{
+		{requestIDIndex, "the unique index on runs.request_id"},
+		{phasesRunIDIndex, "the index on phases(run_id, created_at)"},
+		{envelopesRunIDIndex, "the index on envelopes(run_id, created_at)"},
+		{deliveriesEnvelopeIDIndex, "the index on deliveries.envelope_id"},
+		{deliveriesIdempotencyKeyIndex, "the index on deliveries(idempotency_key, created_at, id)"},
+		{bulletsIntentIDIndex, "the index on bullets(intent_id, position, created_at, id)"},
+		{artifactsRunIDIndex, "the index on artifacts(run_id, captured_at, id)"},
+		{runsCreatedAtIndex, "the index on runs(created_at)"},
+		{runsProjectIndex, "the index on runs(project, created_at)"},
+		{intentsProjectIndex, "the index on intents(project, created_at, id)"},
+		{intentsStatusIndex, "the index on intents(status, created_at, id)"},
 	}
-	if _, err := s.db.Exec(phasesRunIDIndex); err != nil {
-		return fmt.Errorf("creating the index on phases.run_id: %w", err)
+	for _, idx := range indexes {
+		if _, err := s.db.Exec(idx.ddl); err != nil {
+			return fmt.Errorf("creating %s: %w", idx.what, err)
+		}
 	}
-	if _, err := s.db.Exec(envelopesRunIDIndex); err != nil {
-		return fmt.Errorf("creating the index on envelopes.run_id: %w", err)
-	}
-	if _, err := s.db.Exec(deliveriesEnvelopeIDIndex); err != nil {
-		return fmt.Errorf("creating the index on deliveries.envelope_id: %w", err)
-	}
-	if _, err := s.db.Exec(bulletsIntentIDIndex); err != nil {
-		return fmt.Errorf("creating the index on bullets.intent_id: %w", err)
-	}
-	if _, err := s.db.Exec(artifactsRunIDIndex); err != nil {
-		return fmt.Errorf("creating the index on artifacts.run_id: %w", err)
-	}
-	if _, err := s.db.Exec(runsProjectIndex); err != nil {
-		return fmt.Errorf("creating the index on runs(project, created_at): %w", err)
-	}
-	if _, err := s.db.Exec(intentsProjectIndex); err != nil {
-		return fmt.Errorf("creating the index on intents(project, created_at, id): %w", err)
-	}
-	if _, err := s.db.Exec(intentsStatusIndex); err != nil {
-		return fmt.Errorf("creating the index on intents(status, created_at, id): %w", err)
+	// Dropped only after their replacements exist, so a failed open never
+	// leaves a foreign key unindexed.
+	for _, name := range supersededIndexes {
+		if _, err := s.db.Exec("DROP INDEX IF EXISTS " + name); err != nil {
+			return fmt.Errorf("dropping superseded index %s: %w", name, err)
+		}
 	}
 	return nil
 }
@@ -1111,10 +1139,15 @@ func scanEnvelope(r rowScanner) (EnvelopeRecord, error) {
 	return e, nil
 }
 
+// latestEnvelopeSQL is GetLatestEnvelope's query. It is named, like the other
+// *SQL constants beside the list methods, so TestHotListQueriesReadInIndexOrder
+// plans the exact text that runs rather than a copy that could drift.
+const latestEnvelopeSQL = `SELECT ` + envelopeColumns + ` FROM envelopes
+		 WHERE run_id = ? AND repo = ? ORDER BY created_at DESC LIMIT 1`
+
 func (s *Store) GetLatestEnvelope(runID, repo string) (*EnvelopeRecord, error) {
 	row := s.db.QueryRow(
-		`SELECT `+envelopeColumns+` FROM envelopes
-		 WHERE run_id = ? AND repo = ? ORDER BY created_at DESC LIMIT 1`,
+		latestEnvelopeSQL,
 		runID, repo,
 	)
 	e, err := scanEnvelope(row)
@@ -1161,9 +1194,12 @@ func scanRun(row rowScanner) (RunRecord, error) {
 	return r, err
 }
 
+// listRecentRunsSQL is ListRecentRuns' query; see latestEnvelopeSQL.
+const listRecentRunsSQL = `SELECT ` + runColumns + ` FROM runs ORDER BY created_at DESC LIMIT ?`
+
 func (s *Store) ListRecentRuns(limit int) ([]RunRecord, error) {
 	rows, err := s.db.Query(
-		`SELECT `+runColumns+` FROM runs ORDER BY created_at DESC LIMIT ?`,
+		listRecentRunsSQL,
 		limit,
 	)
 	if err != nil {
@@ -1236,9 +1272,12 @@ func (s *Store) GetRun(runID string) (*RunRecord, error) {
 	return &r, nil
 }
 
+// listPhasesForRunSQL is ListPhasesForRun's query; see latestEnvelopeSQL.
+const listPhasesForRunSQL = `SELECT id, run_id, repo, name, kind, status, error, duration_ms, payload, attempt, fix_cycle, created_at FROM phases WHERE run_id = ? ORDER BY created_at ASC`
+
 func (s *Store) ListPhasesForRun(runID string) ([]PhaseRecord, error) {
 	rows, err := s.db.Query(
-		`SELECT id, run_id, repo, name, kind, status, error, duration_ms, payload, attempt, fix_cycle, created_at FROM phases WHERE run_id = ? ORDER BY created_at ASC`,
+		listPhasesForRunSQL,
 		runID,
 	)
 	if err != nil {
@@ -1263,9 +1302,12 @@ func (s *Store) ListPhasesForRun(runID string) ([]PhaseRecord, error) {
 	return list, nil
 }
 
+// listEnvelopesForRunSQL is ListEnvelopesForRun's query; see latestEnvelopeSQL.
+const listEnvelopesForRunSQL = `SELECT ` + envelopeColumns + ` FROM envelopes WHERE run_id = ? ORDER BY created_at ASC`
+
 func (s *Store) ListEnvelopesForRun(runID string) ([]EnvelopeRecord, error) {
 	rows, err := s.db.Query(
-		`SELECT `+envelopeColumns+` FROM envelopes WHERE run_id = ? ORDER BY created_at ASC`,
+		listEnvelopesForRunSQL,
 		runID,
 	)
 	if err != nil {
@@ -1501,14 +1543,17 @@ func (s *Store) CreateBullet(b *BulletRecord) error {
 	})
 }
 
-// ListBulletsForIntent returns an intent's bullets in merge order.
-func (s *Store) ListBulletsForIntent(intentID string) ([]BulletRecord, error) {
-	rows, err := s.db.Query(
-		`SELECT id, intent_id, repo, position, status,
+// listBulletsForIntentSQL is ListBulletsForIntent's query; see latestEnvelopeSQL.
+const listBulletsForIntentSQL = `SELECT id, intent_id, repo, position, status,
 		        COALESCE(branch, ''), COALESCE(worktree, ''), COALESCE(commit_sha, ''), COALESCE(pr_url, ''),
 		        COALESCE(blocked_reason, ''),
 		        created_at, updated_at
-		 FROM bullets WHERE intent_id = ? ORDER BY position ASC, created_at ASC, id ASC`,
+		 FROM bullets WHERE intent_id = ? ORDER BY position ASC, created_at ASC, id ASC`
+
+// ListBulletsForIntent returns an intent's bullets in merge order.
+func (s *Store) ListBulletsForIntent(intentID string) ([]BulletRecord, error) {
+	rows, err := s.db.Query(
+		listBulletsForIntentSQL,
 		intentID,
 	)
 	if err != nil {

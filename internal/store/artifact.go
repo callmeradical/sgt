@@ -80,14 +80,18 @@ func scanArtifactRow(r rowScanner) (ArtifactRecord, error) {
 	return rec, nil
 }
 
+// listArtifactsForRunSQL is ListArtifactsForRun's query, named so the
+// query-plan test plans the exact text that runs (see latestEnvelopeSQL).
+const listArtifactsForRunSQL = `SELECT id, run_id, phase_id, repo, filename, content_type, size_bytes, path, captured_at, dropped_count, dropped_reason
+		 FROM artifacts WHERE run_id = ? ORDER BY captured_at ASC, id ASC`
+
 // ListArtifactsForRun returns every artifact (and drop notice) captured
 // during runID, ordered by captured_at then id ascending. It returns an
 // empty, non-nil slice for a run with none, so a JSON caller serialises []
 // rather than null.
 func (s *Store) ListArtifactsForRun(runID string) ([]*ArtifactRecord, error) {
 	rows, err := s.db.Query(
-		`SELECT id, run_id, phase_id, repo, filename, content_type, size_bytes, path, captured_at, dropped_count, dropped_reason
-		 FROM artifacts WHERE run_id = ? ORDER BY captured_at ASC, id ASC`,
+		listArtifactsForRunSQL,
 		runID,
 	)
 	if err != nil {
