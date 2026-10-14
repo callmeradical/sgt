@@ -211,16 +211,20 @@ func (s *Store) isAlreadyTerminalSuccess(envelopeID, consumer string) (bool, err
 	return count > 0, nil
 }
 
+// latestDeliveryStateSQL is latestDeliveryState's query, named so the
+// query-plan test plans the exact text that runs (see latestEnvelopeSQL).
+const latestDeliveryStateSQL = `SELECT state FROM deliveries
+		 WHERE idempotency_key = ?
+		 ORDER BY created_at DESC, id DESC
+		 LIMIT 1`
+
 // latestDeliveryState returns the state of the most recent row for the given
 // (envelopeID, consumer) pair, or "" if no row exists.
 func (s *Store) latestDeliveryState(envelopeID, consumer string) (string, error) {
 	key := deliveryIdempotencyKey(envelopeID, consumer)
 	var state string
 	err := s.db.QueryRow(
-		`SELECT state FROM deliveries
-		 WHERE idempotency_key = ?
-		 ORDER BY created_at DESC, id DESC
-		 LIMIT 1`,
+		latestDeliveryStateSQL,
 		key,
 	).Scan(&state)
 	if err == sql.ErrNoRows {
@@ -232,6 +236,10 @@ func (s *Store) latestDeliveryState(envelopeID, consumer string) (string, error)
 	return state, nil
 }
 
+// countDeliveriesInStateSQL is hasDeadLetterRow's query; see
+// latestDeliveryStateSQL.
+const countDeliveriesInStateSQL = `SELECT COUNT(*) FROM deliveries WHERE idempotency_key = ? AND state = ?`
+
 // hasDeadLetterRow reports whether any row in the delivery history for the
 // given (envelopeID, consumer) pair has state dead_letter. Used by ReplayDelivery
 // to distinguish the idempotency case (previously dead-lettered, now delivered)
@@ -240,7 +248,7 @@ func (s *Store) hasDeadLetterRow(envelopeID, consumer string) (bool, error) {
 	key := deliveryIdempotencyKey(envelopeID, consumer)
 	var count int
 	err := s.db.QueryRow(
-		`SELECT COUNT(*) FROM deliveries WHERE idempotency_key = ? AND state = ?`,
+		countDeliveriesInStateSQL,
 		key, deliveryStateDeadLetter,
 	).Scan(&count)
 	if err != nil && err != sql.ErrNoRows {
@@ -486,29 +494,31 @@ func scanDeliveryRow(r rowScanner) (DeliveryRecord, error) {
 	return rec, nil
 }
 
-// ListDeliveryHistory returns all delivery rows for the (envelopeID, consumer)
-// pair, ordered by created_at ascending. Because every state transition is an
-// INSERT, the result is the full history of the delivery chain.
-func (s *Store) ListDeliveryHistory(envelopeID, consumer string) ([]DeliveryRecord, error) {
-	key := deliveryIdempotencyKey(envelopeID, consumer)
-	rows, err := s.db.Query(
-		// next_attempt_at is deliberately NOT wrapped in COALESCE: the
-		// modernc/sqlite driver returns a COALESCE'd DATETIME using Go's
-		// time.Time.String() format ("2006-01-02 15:04:05.999999999 -0700 MST"),
-		// which parseSQLiteTime's format list does not include, so every row
-		// silently parsed back as the zero time regardless of what was stored —
-		// exactly the bug this column exists to not have. Selected plain, the
-		// driver returns the stored text as-is (or a true NULL), matching the
-		// same pattern already used for envelopes.occurred_at/published_at.
-		`SELECT id, envelope_id, consumer, state, attempt,
+// listDeliveryHistorySQL is ListDeliveryHistory's query; see
+// latestDeliveryStateSQL.
+//
+// next_attempt_at is deliberately NOT wrapped in COALESCE: the modernc/sqlite
+// driver returns a COALESCE'd DATETIME using Go's time.Time.String() format
+// ("2006-01-02 15:04:05.999999999 -0700 MST"), which parseSQLiteTime's format
+// list does not include, so every row silently parsed back as the zero time
+// regardless of what was stored — exactly the bug this column exists to not
+// have. Selected plain, the driver returns the stored text as-is (or a true
+// NULL), matching the same pattern already used for
+// envelopes.occurred_at/published_at.
+const listDeliveryHistorySQL = `SELECT id, envelope_id, consumer, state, attempt,
 		        next_attempt_at, COALESCE(error, ''), COALESCE(error_class, ''),
 		        COALESCE(recovery_instructions, ''),
 		        idempotency_key, created_at, updated_at
 		 FROM deliveries
 		 WHERE idempotency_key = ?
-		 ORDER BY created_at ASC, id ASC`,
-		key,
-	)
+		 ORDER BY created_at ASC, id ASC`
+
+// ListDeliveryHistory returns all delivery rows for the (envelopeID, consumer)
+// pair, ordered by created_at ascending. Because every state transition is an
+// INSERT, the result is the full history of the delivery chain.
+func (s *Store) ListDeliveryHistory(envelopeID, consumer string) ([]DeliveryRecord, error) {
+	key := deliveryIdempotencyKey(envelopeID, consumer)
+	rows, err := s.db.Query(listDeliveryHistorySQL, key)
 	if err != nil {
 		return nil, err
 	}
