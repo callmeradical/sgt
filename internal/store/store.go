@@ -1426,9 +1426,11 @@ func (s *Store) GetBullet(bulletID string) (*BulletRecord, error) {
 	return &b, nil
 }
 
+const listIntentsForProjectSQL = `SELECT ` + intentColumns + ` FROM intents WHERE project = ? ORDER BY created_at DESC, id ASC`
+
 func (s *Store) ListIntentsForProject(project string) ([]IntentRecord, error) {
 	rows, err := s.db.Query(
-		`SELECT `+intentColumns+` FROM intents WHERE project = ? ORDER BY created_at DESC, id ASC`,
+		listIntentsForProjectSQL,
 		project,
 	)
 	if err != nil {
@@ -1447,6 +1449,8 @@ func (s *Store) ListIntentsForProject(project string) ([]IntentRecord, error) {
 	return list, rows.Err()
 }
 
+const listIntentsByStatusSQL = `SELECT ` + intentColumns + ` FROM intents WHERE status = ? ORDER BY created_at DESC, id ASC`
+
 // ListIntentsByStatus lists every intent in a given status, most recent first.
 //
 // This is how a plan awaiting approval (decision D2) is found: it is an intent
@@ -1454,7 +1458,7 @@ func (s *Store) ListIntentsForProject(project string) ([]IntentRecord, error) {
 // status rather than adding a parallel table is what surfaces it.
 func (s *Store) ListIntentsByStatus(status string) ([]IntentRecord, error) {
 	rows, err := s.db.Query(
-		`SELECT `+intentColumns+` FROM intents WHERE status = ? ORDER BY created_at DESC, id ASC`,
+		listIntentsByStatusSQL,
 		status,
 	)
 	if err != nil {
@@ -1812,9 +1816,11 @@ func requireOneRow(res sql.Result, kind, id string) error {
 	return nil
 }
 
+const listRunsForProjectSQL = `SELECT ` + runColumns + ` FROM runs WHERE project = ? ORDER BY created_at DESC LIMIT ?`
+
 func (s *Store) ListRunsForProject(project string, limit int) ([]RunRecord, error) {
 	rows, err := s.db.Query(
-		`SELECT `+runColumns+` FROM runs WHERE project = ? ORDER BY created_at DESC LIMIT ?`,
+		listRunsForProjectSQL,
 		project, limit,
 	)
 	if err != nil {
