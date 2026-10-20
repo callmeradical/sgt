@@ -111,12 +111,12 @@ type IntentRecord struct {
 	// argument order) can silently pick a different repository or scaffold
 	// a second change, discarding whatever change_id the caller named at
 	// proposal time.
-	ChangeID   string    `json:"change_id,omitempty"`
-	ChangeRepo string    `json:"change_repo,omitempty"`
+	ChangeID   string `json:"change_id,omitempty"`
+	ChangeRepo string `json:"change_repo,omitempty"`
 	// Type is the work type a proposed plan was resolved with (decision O2),
 	// for the same reason ChangeID/ChangeRepo are recorded here: an approval
 	// reuses it verbatim rather than requiring the caller to state it again.
-	Type      string    `json:"type,omitempty"`
+	Type string `json:"type,omitempty"`
 	// ShippingGateStatus is "", "passed", or "failed". Empty means the intent's
 	// bullets have not all reached sealed/merged yet, OR they have and no
 	// shipping gates are configured for the project — in the latter case
@@ -135,15 +135,15 @@ type IntentRecord struct {
 // through that repo's stack, yielding one commit and one PR. Repo is a single
 // string on purpose — work in a second repository is a second bullet.
 type BulletRecord struct {
-	ID        string    `json:"id"`
-	IntentID  string    `json:"intent_id"`
-	Repo      string    `json:"repo"`
-	Position  int       `json:"position"` // merge order within the intent
-	Status    string    `json:"status"`   // one of BulletStatuses()
-	Branch    string    `json:"branch,omitempty"`
-	Worktree  string    `json:"worktree,omitempty"`
-	CommitSHA string    `json:"commit_sha,omitempty"`
-	PRURL     string    `json:"pr_url,omitempty"`
+	ID        string `json:"id"`
+	IntentID  string `json:"intent_id"`
+	Repo      string `json:"repo"`
+	Position  int    `json:"position"` // merge order within the intent
+	Status    string `json:"status"`   // one of BulletStatuses()
+	Branch    string `json:"branch,omitempty"`
+	Worktree  string `json:"worktree,omitempty"`
+	CommitSHA string `json:"commit_sha,omitempty"`
+	PRURL     string `json:"pr_url,omitempty"`
 	// BlockedReason is a human-readable explanation of why the bullet is
 	// stuck. Empty unless Status is "blocked".
 	BlockedReason string    `json:"blocked_reason,omitempty"`
@@ -556,7 +556,8 @@ const artifactsRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_artifacts_run_id_cap
 // stream and the fleet view call with no filter.
 const runsCreatedAtIndex = `CREATE INDEX IF NOT EXISTS idx_runs_created_at ON runs(created_at DESC)`
 
-// runsProjectIndex optimizes ListRunsForProject (filters by project, sorts by created_at).
+// runsProjectIndex optimizes ListRunsForProject (filters by project, sorts by
+// created_at DESC) and RotateProject, which SQLite serves by scanning it backward.
 const runsProjectIndex = `CREATE INDEX IF NOT EXISTS idx_runs_project_created_at ON runs(project, created_at DESC)`
 
 // runsStatusCreatedAtIndex optimizes ReconcileOrphanedRuns (filters by status, sorts by created_at ASC).
