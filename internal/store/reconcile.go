@@ -15,6 +15,8 @@ type ReconcileResult struct {
 	PhasesReconciled int
 }
 
+const reconcileOrphanedRunsSQL = `SELECT ` + runColumns + ` FROM runs WHERE status = 'running' ORDER BY created_at ASC`
+
 // ReconcileOrphanedRuns moves every run currently marked running to interrupted
 // and reconciles their running phases in the same call.
 //
@@ -42,7 +44,7 @@ func (s *Store) ReconcileOrphanedRuns() (ReconcileResult, error) {
 	// narrow: terminal statuses are not read, so no terminal run can be
 	// accidentally touched even if the caller ignores the result.
 	rows, err := s.db.Query(
-		`SELECT ` + runColumns + ` FROM runs WHERE status = 'running' ORDER BY created_at ASC`,
+		reconcileOrphanedRunsSQL,
 	)
 	if err != nil {
 		return ReconcileResult{}, err

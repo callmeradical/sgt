@@ -35,6 +35,16 @@ func queryPlan(t *testing.T, st *Store, query string) []string {
 	return plan
 }
 
+func planUsesIndex(plan []string, name string) bool {
+	for _, detail := range plan {
+		marker := "INDEX " + name
+		if strings.Contains(detail, marker+" ") || strings.HasSuffix(detail, marker) {
+			return true
+		}
+	}
+	return false
+}
+
 // indexNames returns the names of every explicitly created index on table.
 func indexNames(t *testing.T, st *Store, table string) map[string]bool {
 	t.Helper()
@@ -84,6 +94,9 @@ func TestHotListQueriesReadInIndexOrder(t *testing.T) {
 		{"ListRunsForProject", listRunsForProjectSQL, "idx_runs_project_created_at"},
 		{"ListIntentsForProject", listIntentsForProjectSQL, "idx_intents_project_created_at_id"},
 		{"ListIntentsByStatus", listIntentsByStatusSQL, "idx_intents_status_created_at_id"},
+		{"ReconcileOrphanedRuns", reconcileOrphanedRunsSQL, "idx_runs_status_created_at"},
+		{"RunsEligibleForCleanup", runsEligibleForCleanupSQL, "idx_runs_updated_at_status"},
+		{"RotateProject", rotateProjectCandidatesSQL, "idx_runs_project_created_at"},
 		{"ListDeliveryHistory", listDeliveryHistorySQL, "idx_deliveries_idempotency_key_created_at_id"},
 		{"latestDeliveryState", latestDeliveryStateSQL, "idx_deliveries_idempotency_key_created_at_id"},
 		{"hasDeadLetterRow", countDeliveriesInStateSQL, "idx_deliveries_idempotency_key_created_at_id"},
@@ -95,7 +108,7 @@ func TestHotListQueriesReadInIndexOrder(t *testing.T) {
 			if strings.Contains(joined, "TEMP B-TREE") {
 				t.Errorf("%s sorts in a TEMP B-TREE instead of reading index order: %s", c.method, joined)
 			}
-			if !strings.Contains(joined, "INDEX "+c.index) {
+			if !planUsesIndex(plan, c.index) {
 				t.Errorf("%s does not use %s: %s", c.method, c.index, joined)
 			}
 		})
@@ -122,10 +135,13 @@ func TestOpenReplacesSingleColumnForeignKeyIndexesOnAnOlderDatabase(t *testing.T
 		`DROP INDEX IF EXISTS idx_artifacts_run_id_captured_at_id`,
 		`DROP INDEX IF EXISTS idx_deliveries_idempotency_key_created_at_id`,
 		`DROP INDEX IF EXISTS idx_runs_created_at`,
+		`DROP INDEX IF EXISTS idx_runs_status_created_at`,
+		`DROP INDEX IF EXISTS idx_runs_updated_at_status`,
 		`CREATE INDEX IF NOT EXISTS idx_phases_run_id ON phases(run_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_envelopes_run_id ON envelopes(run_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_bullets_intent_id ON bullets(intent_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_artifacts_run_id ON artifacts(run_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_runs_project_created_at_asc ON runs(project, created_at ASC)`,
 	}
 	for _, ddl := range legacy {
 		if _, err := st.db.Exec(ddl); err != nil {
@@ -173,8 +189,14 @@ func TestOpenReplacesSingleColumnForeignKeyIndexesOnAnOlderDatabase(t *testing.T
 				t.Errorf("reopen %d: deliveries is missing %s; have %v", i+1, name, deliveries)
 			}
 		}
-		if !indexNames(t, upgraded, "runs")["idx_runs_created_at"] {
-			t.Errorf("reopen %d: runs is missing idx_runs_created_at", i+1)
+		runs := indexNames(t, upgraded, "runs")
+		for _, name := range []string{"idx_runs_created_at", "idx_runs_status_created_at", "idx_runs_updated_at_status"} {
+			if !runs[name] {
+				t.Errorf("reopen %d: runs is missing %s; have %v", i+1, name, runs)
+			}
+		}
+		if runs["idx_runs_project_created_at_asc"] {
+			t.Errorf("reopen %d: runs still has redundant idx_runs_project_created_at_asc", i+1)
 		}
 
 		phases, err := upgraded.ListPhasesForRun("old-run")

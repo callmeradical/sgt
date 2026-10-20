@@ -252,12 +252,14 @@ func (s *Store) intentFullyMerged(intentID string) (bool, error) {
 // Bullets and intents are never deleted here: a bullet is shared by its
 // intent across every run that ever served it, so deleting one on this run's
 // say-so could hide evidence a sibling run still needs.
+const rotateProjectCandidatesSQL = `SELECT ` + runColumns + ` FROM runs
+	 WHERE project = ? AND status IN (` + rotationEligibleStatusesSQL + `)
+	   AND created_at < ?
+	 ORDER BY created_at ASC`
+
 func (s *Store) RotateProject(project string, cutoff time.Time) (int, error) {
 	rows, err := s.db.Query(
-		`SELECT `+runColumns+` FROM runs
-		 WHERE project = ? AND status IN (`+rotationEligibleStatusesSQL+`)
-		   AND created_at < ?
-		 ORDER BY created_at ASC`,
+		rotateProjectCandidatesSQL,
 		project, cutoff,
 	)
 	if err != nil {

@@ -559,9 +559,6 @@ const runsCreatedAtIndex = `CREATE INDEX IF NOT EXISTS idx_runs_created_at ON ru
 // runsProjectIndex optimizes ListRunsForProject (filters by project, sorts by created_at).
 const runsProjectIndex = `CREATE INDEX IF NOT EXISTS idx_runs_project_created_at ON runs(project, created_at DESC)`
 
-// runsProjectCreatedAtAscIndex optimizes RotateProject (filters by project, sorts by created_at ASC).
-const runsProjectCreatedAtAscIndex = `CREATE INDEX IF NOT EXISTS idx_runs_project_created_at_asc ON runs(project, created_at ASC)`
-
 // runsStatusCreatedAtIndex optimizes ReconcileOrphanedRuns (filters by status, sorts by created_at ASC).
 const runsStatusCreatedAtIndex = `CREATE INDEX IF NOT EXISTS idx_runs_status_created_at ON runs(status, created_at ASC)`
 
@@ -574,14 +571,14 @@ const intentsProjectIndex = `CREATE INDEX IF NOT EXISTS idx_intents_project_crea
 // intentsStatusIndex optimizes ListIntentsByStatus (filters by status, sorts by created_at, id).
 const intentsStatusIndex = `CREATE INDEX IF NOT EXISTS idx_intents_status_created_at_id ON intents(status, created_at DESC, id ASC)`
 
-// supersededIndexes are single-column indexes earlier releases created. Each
-// is a strict prefix of a composite above, which serves every lookup it did,
-// so keeping it would only add write cost.
+// supersededIndexes are indexes earlier revisions created whose replacement
+// serves every lookup they did, so keeping them would only add write cost.
 var supersededIndexes = []string{
 	"idx_phases_run_id",
 	"idx_envelopes_run_id",
 	"idx_bullets_intent_id",
 	"idx_artifacts_run_id",
+	"idx_runs_project_created_at_asc",
 }
 
 // migrateAddIndexes creates the indexes the code depends on, for correctness
@@ -597,7 +594,6 @@ func (s *Store) migrateAddIndexes() error {
 		{artifactsRunIDIndex, "the index on artifacts(run_id, captured_at, id)"},
 		{runsCreatedAtIndex, "the index on runs(created_at)"},
 		{runsProjectIndex, "the index on runs(project, created_at)"},
-		{runsProjectCreatedAtAscIndex, "the index on runs(project, created_at ASC)"},
 		{runsStatusCreatedAtIndex, "the index on runs(status, created_at ASC)"},
 		{runsUpdatedAtStatusIndex, "the index on runs(updated_at ASC, status)"},
 		{intentsProjectIndex, "the index on intents(project, created_at, id)"},
@@ -1239,6 +1235,13 @@ func (s *Store) ListRecentRuns(limit int) ([]RunRecord, error) {
 // does not change.
 const rotationEligibleStatusesSQL = `'passed','failed','cancelled','interrupted'`
 
+// INDEXED BY is deliberate: without it, SQLite prefers the status-leading
+// reconciliation index and sorts eligible runs in a temporary B-tree.
+const runsEligibleForCleanupSQL = `SELECT ` + runColumns + ` FROM runs INDEXED BY idx_runs_updated_at_status
+	 WHERE status IN (` + rotationEligibleStatusesSQL + `)
+	   AND updated_at <= ?
+	 ORDER BY updated_at ASC`
+
 // RunsEligibleForCleanup returns terminal runs whose UpdatedAt is at or
 // before cutoff — used by the automatic fleet-cleanup pass so it does not
 // have to rely on ListRecentRuns' fixed 200-row window, which answers "is
@@ -1246,10 +1249,7 @@ const rotationEligibleStatusesSQL = `'passed','failed','cancelled','interrupted'
 // run". A run in status "running" is never eligible, no matter how old.
 func (s *Store) RunsEligibleForCleanup(cutoff time.Time) ([]RunRecord, error) {
 	rows, err := s.db.Query(
-		`SELECT `+runColumns+` FROM runs
-		 WHERE status IN (`+rotationEligibleStatusesSQL+`)
-		   AND updated_at <= ?
-		 ORDER BY updated_at ASC`,
+		runsEligibleForCleanupSQL,
 		cutoff,
 	)
 	if err != nil {
