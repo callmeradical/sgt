@@ -237,6 +237,11 @@ func (s *Store) intentFullyMerged(intentID string) (bool, error) {
 	return true, nil
 }
 
+const rotateProjectCandidatesSQL = `SELECT ` + runColumns + ` FROM runs
+	 WHERE project = ? AND status IN (` + rotationEligibleStatusesSQL + `)
+	   AND created_at < ?
+	 ORDER BY created_at ASC`
+
 // RotateProject folds every eligible run for project into its rollup row,
 // then deletes those runs' deliveries, envelopes, phases, and the run rows
 // themselves. Returns how many runs were rotated.
@@ -252,11 +257,6 @@ func (s *Store) intentFullyMerged(intentID string) (bool, error) {
 // Bullets and intents are never deleted here: a bullet is shared by its
 // intent across every run that ever served it, so deleting one on this run's
 // say-so could hide evidence a sibling run still needs.
-const rotateProjectCandidatesSQL = `SELECT ` + runColumns + ` FROM runs
-	 WHERE project = ? AND status IN (` + rotationEligibleStatusesSQL + `)
-	   AND created_at < ?
-	 ORDER BY created_at ASC`
-
 func (s *Store) RotateProject(project string, cutoff time.Time) (int, error) {
 	rows, err := s.db.Query(
 		rotateProjectCandidatesSQL,
