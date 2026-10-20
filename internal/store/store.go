@@ -111,12 +111,12 @@ type IntentRecord struct {
 	// argument order) can silently pick a different repository or scaffold
 	// a second change, discarding whatever change_id the caller named at
 	// proposal time.
-	ChangeID   string    `json:"change_id,omitempty"`
-	ChangeRepo string    `json:"change_repo,omitempty"`
+	ChangeID   string `json:"change_id,omitempty"`
+	ChangeRepo string `json:"change_repo,omitempty"`
 	// Type is the work type a proposed plan was resolved with (decision O2),
 	// for the same reason ChangeID/ChangeRepo are recorded here: an approval
 	// reuses it verbatim rather than requiring the caller to state it again.
-	Type      string    `json:"type,omitempty"`
+	Type string `json:"type,omitempty"`
 	// ShippingGateStatus is "", "passed", or "failed". Empty means the intent's
 	// bullets have not all reached sealed/merged yet, OR they have and no
 	// shipping gates are configured for the project — in the latter case
@@ -135,15 +135,15 @@ type IntentRecord struct {
 // through that repo's stack, yielding one commit and one PR. Repo is a single
 // string on purpose — work in a second repository is a second bullet.
 type BulletRecord struct {
-	ID        string    `json:"id"`
-	IntentID  string    `json:"intent_id"`
-	Repo      string    `json:"repo"`
-	Position  int       `json:"position"` // merge order within the intent
-	Status    string    `json:"status"`   // one of BulletStatuses()
-	Branch    string    `json:"branch,omitempty"`
-	Worktree  string    `json:"worktree,omitempty"`
-	CommitSHA string    `json:"commit_sha,omitempty"`
-	PRURL     string    `json:"pr_url,omitempty"`
+	ID        string `json:"id"`
+	IntentID  string `json:"intent_id"`
+	Repo      string `json:"repo"`
+	Position  int    `json:"position"` // merge order within the intent
+	Status    string `json:"status"`   // one of BulletStatuses()
+	Branch    string `json:"branch,omitempty"`
+	Worktree  string `json:"worktree,omitempty"`
+	CommitSHA string `json:"commit_sha,omitempty"`
+	PRURL     string `json:"pr_url,omitempty"`
 	// BlockedReason is a human-readable explanation of why the bullet is
 	// stuck. Empty unless Status is "blocked".
 	BlockedReason string    `json:"blocked_reason,omitempty"`
@@ -556,8 +556,15 @@ const artifactsRunIDIndex = `CREATE INDEX IF NOT EXISTS idx_artifacts_run_id_cap
 // stream and the fleet view call with no filter.
 const runsCreatedAtIndex = `CREATE INDEX IF NOT EXISTS idx_runs_created_at ON runs(created_at DESC)`
 
-// runsProjectIndex optimizes ListRunsForProject (filters by project, sorts by created_at).
+// runsProjectIndex optimizes ListRunsForProject (filters by project, sorts by
+// created_at DESC) and RotateProject, which SQLite serves by scanning it backward.
 const runsProjectIndex = `CREATE INDEX IF NOT EXISTS idx_runs_project_created_at ON runs(project, created_at DESC)`
+
+// runsStatusCreatedAtIndex optimizes ReconcileOrphanedRuns (filters by status, sorts by created_at ASC).
+const runsStatusCreatedAtIndex = `CREATE INDEX IF NOT EXISTS idx_runs_status_created_at ON runs(status, created_at ASC)`
+
+// runsUpdatedAtStatusIndex optimizes RunsEligibleForCleanup (filters by updated_at <= ? and status IN (...), sorts by updated_at ASC).
+const runsUpdatedAtStatusIndex = `CREATE INDEX IF NOT EXISTS idx_runs_updated_at_status ON runs(updated_at ASC, status)`
 
 // intentsProjectIndex optimizes ListIntentsForProject (filters by project, sorts by created_at, id).
 const intentsProjectIndex = `CREATE INDEX IF NOT EXISTS idx_intents_project_created_at_id ON intents(project, created_at DESC, id ASC)`
@@ -565,14 +572,14 @@ const intentsProjectIndex = `CREATE INDEX IF NOT EXISTS idx_intents_project_crea
 // intentsStatusIndex optimizes ListIntentsByStatus (filters by status, sorts by created_at, id).
 const intentsStatusIndex = `CREATE INDEX IF NOT EXISTS idx_intents_status_created_at_id ON intents(status, created_at DESC, id ASC)`
 
-// supersededIndexes are single-column indexes earlier releases created. Each
-// is a strict prefix of a composite above, which serves every lookup it did,
-// so keeping it would only add write cost.
+// supersededIndexes are indexes earlier revisions created whose replacement
+// serves every lookup they did, so keeping them would only add write cost.
 var supersededIndexes = []string{
 	"idx_phases_run_id",
 	"idx_envelopes_run_id",
 	"idx_bullets_intent_id",
 	"idx_artifacts_run_id",
+	"idx_runs_project_created_at_asc",
 }
 
 // migrateAddIndexes creates the indexes the code depends on, for correctness
@@ -588,6 +595,8 @@ func (s *Store) migrateAddIndexes() error {
 		{artifactsRunIDIndex, "the index on artifacts(run_id, captured_at, id)"},
 		{runsCreatedAtIndex, "the index on runs(created_at)"},
 		{runsProjectIndex, "the index on runs(project, created_at)"},
+		{runsStatusCreatedAtIndex, "the index on runs(status, created_at ASC)"},
+		{runsUpdatedAtStatusIndex, "the index on runs(updated_at ASC, status)"},
 		{intentsProjectIndex, "the index on intents(project, created_at, id)"},
 		{intentsStatusIndex, "the index on intents(status, created_at, id)"},
 	}
@@ -1227,6 +1236,13 @@ func (s *Store) ListRecentRuns(limit int) ([]RunRecord, error) {
 // does not change.
 const rotationEligibleStatusesSQL = `'passed','failed','cancelled','interrupted'`
 
+// INDEXED BY is deliberate: without it, SQLite prefers the status-leading
+// reconciliation index and sorts eligible runs in a temporary B-tree.
+const runsEligibleForCleanupSQL = `SELECT ` + runColumns + ` FROM runs INDEXED BY idx_runs_updated_at_status
+	 WHERE status IN (` + rotationEligibleStatusesSQL + `)
+	   AND updated_at <= ?
+	 ORDER BY updated_at ASC`
+
 // RunsEligibleForCleanup returns terminal runs whose UpdatedAt is at or
 // before cutoff — used by the automatic fleet-cleanup pass so it does not
 // have to rely on ListRecentRuns' fixed 200-row window, which answers "is
@@ -1234,10 +1250,7 @@ const rotationEligibleStatusesSQL = `'passed','failed','cancelled','interrupted'
 // run". A run in status "running" is never eligible, no matter how old.
 func (s *Store) RunsEligibleForCleanup(cutoff time.Time) ([]RunRecord, error) {
 	rows, err := s.db.Query(
-		`SELECT `+runColumns+` FROM runs
-		 WHERE status IN (`+rotationEligibleStatusesSQL+`)
-		   AND updated_at <= ?
-		 ORDER BY updated_at ASC`,
+		runsEligibleForCleanupSQL,
 		cutoff,
 	)
 	if err != nil {
