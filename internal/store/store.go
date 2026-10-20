@@ -1449,13 +1449,13 @@ func (s *Store) ListIntentsForProject(project string) ([]IntentRecord, error) {
 	return list, rows.Err()
 }
 
+const listIntentsByStatusSQL = `SELECT ` + intentColumns + ` FROM intents WHERE status = ? ORDER BY created_at DESC, id ASC`
+
 // ListIntentsByStatus lists every intent in a given status, most recent first.
 //
 // This is how a plan awaiting approval (decision D2) is found: it is an intent
 // like any other, distinguished only by Status == "proposed", so listing by
 // status rather than adding a parallel table is what surfaces it.
-const listIntentsByStatusSQL = `SELECT ` + intentColumns + ` FROM intents WHERE status = ? ORDER BY created_at DESC, id ASC`
-
 func (s *Store) ListIntentsByStatus(status string) ([]IntentRecord, error) {
 	rows, err := s.db.Query(
 		listIntentsByStatusSQL,
