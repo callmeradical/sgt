@@ -559,6 +559,15 @@ const runsCreatedAtIndex = `CREATE INDEX IF NOT EXISTS idx_runs_created_at ON ru
 // runsProjectIndex optimizes ListRunsForProject (filters by project, sorts by created_at).
 const runsProjectIndex = `CREATE INDEX IF NOT EXISTS idx_runs_project_created_at ON runs(project, created_at DESC)`
 
+// runsProjectCreatedAtAscIndex optimizes RotateProject (filters by project, sorts by created_at ASC).
+const runsProjectCreatedAtAscIndex = `CREATE INDEX IF NOT EXISTS idx_runs_project_created_at_asc ON runs(project, created_at ASC)`
+
+// runsStatusCreatedAtIndex optimizes ReconcileOrphanedRuns (filters by status, sorts by created_at ASC).
+const runsStatusCreatedAtIndex = `CREATE INDEX IF NOT EXISTS idx_runs_status_created_at ON runs(status, created_at ASC)`
+
+// runsUpdatedAtStatusIndex optimizes RunsEligibleForCleanup (filters by updated_at <= ? and status IN (...), sorts by updated_at ASC).
+const runsUpdatedAtStatusIndex = `CREATE INDEX IF NOT EXISTS idx_runs_updated_at_status ON runs(updated_at ASC, status)`
+
 // intentsProjectIndex optimizes ListIntentsForProject (filters by project, sorts by created_at, id).
 const intentsProjectIndex = `CREATE INDEX IF NOT EXISTS idx_intents_project_created_at_id ON intents(project, created_at DESC, id ASC)`
 
@@ -588,6 +597,9 @@ func (s *Store) migrateAddIndexes() error {
 		{artifactsRunIDIndex, "the index on artifacts(run_id, captured_at, id)"},
 		{runsCreatedAtIndex, "the index on runs(created_at)"},
 		{runsProjectIndex, "the index on runs(project, created_at)"},
+		{runsProjectCreatedAtAscIndex, "the index on runs(project, created_at ASC)"},
+		{runsStatusCreatedAtIndex, "the index on runs(status, created_at ASC)"},
+		{runsUpdatedAtStatusIndex, "the index on runs(updated_at ASC, status)"},
 		{intentsProjectIndex, "the index on intents(project, created_at, id)"},
 		{intentsStatusIndex, "the index on intents(status, created_at, id)"},
 	}
