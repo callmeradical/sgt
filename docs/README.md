@@ -11,7 +11,7 @@ the full v1/v2 distinction.
 
 | Goal | Document |
 |---|---|
-| What is Sgt, install it, run your first project, day-to-day workflow, command/MCP reference | [`internal/manual/manual.md`](../internal/manual/manual.md) — also reachable via `sgt help [topic]` or `GET /api/manual` |
+| What is Sgt, install it, run your first project, and follow the complete intent-to-PR workflow through CLI/API or MCP | [`internal/manual/manual.md`](../internal/manual/manual.md) — also reachable via `sgt help [topic]` or `GET /api/manual` |
 | Understand v2's architecture and design rationale | [Architecture overview](architecture.md) |
 | Read the binding product requirements and settled decisions | [PRD: Sgt v2](prd-sgt.md) |
 | Diagnose API/server problems | [Troubleshooting](troubleshooting.md) |

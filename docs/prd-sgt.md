@@ -28,8 +28,10 @@ v2 has **two ways in, and both write the same records**:
    `sgt_emit_envelope`, `sgt_seal_pr`, `sgt_status`). Sgt
    does not spawn, host, or multiplex the session; it is the system the agent
    works *within*.
-2. **Coordinator-driven.** The operator dispatches from the UI and Sgt
-   coordinates the work itself, invoking bounded headless agent phases.
+2. **Coordinator-driven.** The operator dispatches through the running Sgt
+   server (`sgt dispatch` or `POST /api/dispatch`) and Sgt coordinates the work
+   itself, invoking bounded headless agent phases. The embedded dashboard is
+   currently an observation and recovery surface, not a dispatch form.
 
 Both create and update the same records, and both go through the same gates. Neither uses tmux. Having two different execution models inside v2
 would be a bug, not a feature.
@@ -118,8 +120,9 @@ workflow or by the model. The two are trusted differently (see D2).
 
 ### Settled decisions
 
-- **D1 — Two ways in, one set of records.** Agent-driven (MCP) and coordinator-driven
-  (UI dispatch) both create the same intents, bullets and evidence.
+- **D1 — Two ways in, one set of records.** Agent-driven (MCP) and
+  coordinator-driven (server dispatch via CLI/API) both create the same intents,
+  bullets and evidence.
 - **D2 — Trust the workflow, review the inference.** Workflow-defined
   decomposition executes immediately; it is deterministic given the intent's repo
   set and was approved when the workflow was authored. Inferred decomposition

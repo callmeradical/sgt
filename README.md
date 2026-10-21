@@ -18,9 +18,9 @@ You have a project. It has four repos: an API, a frontend, an infra chart, and a
 
 Sgt fixes that. It is a Go-native engine (`sgt`) plus an
 `AGENTS.md` and skills that turn a general-purpose agent into a
-project-aware first mate. Either dispatch work from its embedded
-dashboard, or launch your own agent harness inside a registered
-project and let it talk to Sgt directly — either way, Sgt
+project-aware first mate. Either dispatch through its CLI/API, or launch
+your own agent harness inside a registered project and let it talk to Sgt
+directly over MCP — either way, Sgt
 knows your projects, their repos, how they group, and what instructions
 apply to each one.
 
@@ -70,6 +70,10 @@ Then talk to it:
 > go work on smith-api
 > add feature X across all repos
 ```
+
+Follow the manual's [day-to-day workflow](internal/manual/manual.md#day-to-day-workflow)
+for the complete intent-to-PR loop driven through CLI/API or MCP and observed in
+the dashboard.
 
 ## Upgrading from a pre-rename ("Sergeant") install
 

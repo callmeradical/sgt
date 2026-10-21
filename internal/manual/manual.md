@@ -24,9 +24,11 @@ records:
   claude) inside a registered repo and let it talk to Sgt over MCP —
   `sgt mcp`, a subcommand of the `sgt` binary. Sgt does not spawn or
   host this session; it only answers the agent's tool calls.
-- **Coordinator-driven.** Dispatch work from the embedded dashboard
-  (`POST /api/dispatch`) and Sgt runs bounded headless agent phases
-  itself, each in an isolated git worktree on its own branch.
+- **Coordinator-driven.** Dispatch work to the running Sgt server through
+  `sgt dispatch` or `POST /api/dispatch`, and Sgt runs bounded headless
+  agent phases itself, each in an isolated git worktree on its own branch.
+  The embedded dashboard currently observes and recovers work; it does not
+  contain a dispatch form.
 
 ## Installation
 
@@ -125,27 +127,155 @@ here.
 
 ## Day-to-day workflow
 
-Once a project is registered, the loop is the same regardless of which
-of the two entry points (agent-driven or coordinator-driven) you use:
+The primary workflow is **intent to reviewed pull request**. "Primary"
+describes this shared lifecycle, not a preferred interface: an agent using
+MCP and the CLI/API create the same Intent, Bullet, run, phase, and evidence
+records, which the dashboard reads.
 
-1. State or update the intent — the durable statement of what should
-   change, potentially spanning repos.
-2. Work proceeds per repo (a bullet), in an isolated git worktree on
-   its own branch, never touching your own checkout.
-3. Code gates run deterministically, in sorted name order, before any
-   phase can be recorded as passed.
-4. A bullet that passes its gates is sealed into a pull request; the
-   intent tracks merge order across its bullets when more than one
-   repo is involved.
+### 1. Start Sgt and choose the work
 
-Check on things without reading logs:
+Start the long-running engine before using the dashboard, the dispatch CLI,
+or the MCP dispatch tools:
 
-- `sgt status` — recent factory runs and phase states from the CLI.
-- The embedded dashboard (`bin/sgt ui`, `http://127.0.0.1:8484`) —
-  runs, worktrees, work analytics, and this manual, all read from the
-  same durable store.
-- The `sgt_status` / `sgt_run_status` / `sgt_run_wait` MCP tools, from
-  inside an agent session — see MCP tools for agents below.
+```bash
+bin/sgt ui
+```
+
+Open `http://127.0.0.1:8484`, or launch an MCP-configured agent inside a
+registered project repository. State one bounded intent: what should change,
+the acceptance criteria, the repositories that own it, and their merge order.
+Use one bullet per repository; a bullet is a vertical slice that yields one
+commit and one pull request.
+
+Every dispatch must name a work `type` (`feat`, `fix`, `refactor`, `docs`,
+`chore`, or `test`) and resolves to an OpenSpec change before a run or
+worktree exists. Supply `change_id` when one already exists; otherwise Sgt
+derives and scaffolds one from the brief.
+
+### 2. Dispatch the intent
+
+When the target repositories are known, name them explicitly. This is the
+normal path and starts execution immediately. Repeated `--repo` flags, or the
+MCP `repos` array, become bullet positions in that order, so list repositories
+in the intended merge order:
+
+```bash
+bin/sgt dispatch \
+  --project myproject \
+  --type feat \
+  --change-id add-google-oauth \
+  --repo myapp-api \
+  --repo myapp-app \
+  --brief "Add Google OAuth"
+```
+
+The HTTP API performs the same operation at `POST /api/dispatch`. From an
+agent session, call `sgt_dispatch` with the equivalent arguments:
+
+```json
+{
+  "project": "myproject",
+  "brief": "Add Google OAuth",
+  "repos": ["myapp-api", "myapp-app"],
+  "type": "feat",
+  "change_id": "add-google-oauth",
+  "request_id": "add-google-oauth-1"
+}
+```
+
+Use a stable `request_id` when retrying an uncertain request; repeating it
+returns the original run instead of starting duplicate work.
+
+If you omit `repos`, Sgt does not guess and execute. It records a proposed
+intent spanning every project repository, ordered alphabetically, and starts no
+run. Review, approve, or reject it through the API:
+
+```text
+GET  /api/plans
+POST /api/plans/{intent_id}/approve
+POST /api/plans/{intent_id}/reject
+```
+
+Approval reuses the exact OpenSpec change and work type recorded on the
+proposal; it does not infer them again. The dashboard is currently an
+observation and recovery surface: it does not yet expose dispatch or plan
+approval controls.
+
+### 3. Let each bullet go red to green
+
+Sgt creates an isolated worktree and branch for each repository bullet, never
+mutating your checkout. Each bullet follows the same evidence-producing loop:
+
+1. Render the brief from the stored intent.
+2. Record a failing deterministic gate result, or an explicit red-state
+   exemption when no natural failing state exists.
+3. Implement one test-first vertical slice at a time.
+4. Run the configured gates in sorted name order and record the passing result.
+5. Record phase output and typed handoff envelopes in Sgt's store.
+
+A failed or timed-out phase is recorded as failed, never passed. A bullet that
+cannot proceed becomes blocked with a reason rather than guessing.
+
+### 4. Monitor and recover
+
+Use stored state rather than log scraping:
+
+```bash
+bin/sgt runs --project myproject
+bin/sgt run-details <run-id>
+```
+
+An MCP-connected agent can use `sgt_status`, `sgt_run_status`, or
+`sgt_run_wait`. The dashboard shows the same records and live updates.
+
+For a failed, cancelled, timed-out, or interrupted run, read its run details,
+fix the underlying cause in the isolated worktree or OpenSpec change, then
+resume it from the dashboard or call:
+
+```text
+POST /api/run-resume  {"id":"<run-id>"}
+```
+
+Resume keeps the existing branch and worktree and skips phases already recorded
+as passed. `blocked` is a bullet status, not a resumable run status; when a
+bullet is blocked, its underlying run is normally one of the resumable terminal
+statuses above. Read the blocked reason, fix it, and resume that run. If the
+underlying run is already `passed` — for example, a PR merged into the wrong
+base branch — resume is refused. Resolve that delivery mismatch explicitly or
+dispatch corrected work; do not retry resume as if it were a transient failure.
+
+### 5. Open, review, and merge pull requests
+
+After a bullet is green, explicitly seal it and open its pull request:
+
+```bash
+bin/sgt create-pr \
+  --run-id <run-id> \
+  --project myproject \
+  --repo myapp-api \
+  --title "feat: add Google OAuth" \
+  --body "Implements add-google-oauth"
+```
+
+From an MCP agent, use `sgt_create_pr` for a coordinator-dispatched isolated
+worktree. `sgt_seal_pr` is the separate tool for verified work already sitting
+in the agent's own current checkout. Sgt refuses to create a PR for a bullet
+that is not green.
+
+When sealing makes every bullet in an intent sealed-or-merged, Sgt evaluates the
+project's configured shipping gates once and records their outcome on the
+intent. This is durable delivery evidence; in the released engine it does not
+delay or undo the PR action that triggered it.
+
+Review and merge each PR in the intent's recorded order. Sgt records and displays
+that order, but the released engine does not currently enforce that order or
+automatically release downstream bullets. The operator must follow it. Sgt can
+observe each PR's real merge state, but **Sgt never merges**; the human remains
+the final irreversible boundary.
+
+The intent, not an individual run, is the durable completion record. A run
+ending or a PR opening does not by itself mean a multi-repository intent is
+complete: every bullet must reach its required delivered state.
 
 ## Filesystem and database
 

@@ -79,6 +79,37 @@ func TestSearchIsCaseInsensitive(t *testing.T) {
 	}
 }
 
+func TestDayToDayWorkflowDocumentsTheCompleteDeliveryLoop(t *testing.T) {
+	var body string
+	for _, section := range Sections() {
+		if section.Title == "Day-to-day workflow" {
+			body = section.Body
+			break
+		}
+	}
+
+	for _, want := range []string{
+		"sgt dispatch",
+		"sgt_dispatch",
+		"Repeated `--repo` flags",
+		"/api/plans/{intent_id}/approve",
+		"sgt run-details",
+		"sgt_create_pr",
+		"`blocked` is a bullet status",
+		"observation and recovery surface",
+		"does not currently enforce that order",
+		"shipping gates",
+		"Sgt never merges",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("Day-to-day workflow is missing %q:\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, "Sgt enforces") || strings.Contains(body, "automatically releases") {
+		t.Errorf("Day-to-day workflow claims unimplemented merge-order enforcement:\n%s", body)
+	}
+}
+
 // The Command reference section's rendered content must come from the same
 // data cmd/sgt's own --help output uses (manual.CommandList), not
 // hand-written prose that merely happens to agree with it today. Changing

@@ -106,10 +106,10 @@ assumption while self-hosting `sgt` to fix its own bugs:
 
 ## Interface: CLI and MCP
 
-Today, driving dispatch from outside the dashboard means raw HTTP calls
-— `curl` plus manual JSON parsing — for everything except the read-only
-MCP tools (`sgt_status`, `sgt_run_status`, `sgt_run_wait`, etc.). This
-session's self-hosting sweep ran entirely this way, including working
+Today, dispatch is supported by `sgt dispatch` and the `sgt_dispatch` MCP tool,
+with `sgt create-pr`/`sgt_create_pr` for delivery. Those clients target one
+globally configured `SGT_UI_ADDR`; none can select a relay target per request.
+This session's earlier self-hosting sweep used raw HTTP calls, including working
 around a real bug (`/api/create-pr`'s missing `~` expansion, filed as
 issue #8) that a proper client would have caught or avoided. Relay
 dispatch makes this worse before it makes it better: a `remote:` block

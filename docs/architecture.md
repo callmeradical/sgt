@@ -118,11 +118,13 @@ direction.
 Sgt's execution engine is reachable two ways — decision **D1, "two
 ways in, one set of records"**: an operator's own agent CLI can talk to
 sgt over MCP (`sgt_get_brief`, `sgt_run_gates`,
-`sgt_emit_envelope`), or the embedded dashboard can `POST
-/api/dispatch` directly. Both converge on the exact same intents, bullets,
+`sgt_emit_envelope`), or a coordinator can dispatch through the running
+server with `sgt dispatch` or `POST /api/dispatch`. The embedded dashboard
+currently observes and recovers this work; it has no dispatch form. Both
+entry paths converge on the exact same intents, bullets,
 and evidence records — there is no separate "agent-driven" data model. An
-agent following its own plan and an operator clicking dispatch produce
-identically-shaped, identically-auditable history.
+agent submitting `sgt_dispatch` and a coordinator submitting `sgt dispatch`
+produce identically-shaped, identically-auditable history.
 
 **Decision O3** requires every dispatch to resolve to an OpenSpec change
 before anything else exists. `handleDispatch` enforces this by literal
@@ -250,16 +252,19 @@ the *pattern* it got right rather than taking on that dependency.
 
 **MCP is the agent-facing half of "two ways in, one set of records" (D1).**
 Agent-driven work (an operator's own CLI agent talking to sgt
-directly) and coordinator-driven work (dispatch through the HTTP API) must
+directly) and coordinator-driven work (server dispatch through the CLI or HTTP
+API) must
 produce identical intents, bullets, and evidence — MCP is not a second,
 parallel execution path. Its tool surface (`internal/mcp/server.go`):
 `sgt_status` and `sgt_get_brief` for situational awareness;
+`sgt_dispatch`, which submits the same server dispatch as the CLI/API;
 `sgt_run_gates`, which executes a repo's configured deterministic
 checks and is explicitly the *zero-token* half of the factory model — no
 model judgment, just pass/fail evidence a bullet's red→green history
 depends on (D3); `sgt_emit_envelope`, the durable, typed, versioned
 handoff record between phases (R5); `sgt_seal_pr`, the
-human-approval-gated delivery action (R3.5); `sgt_run_status`/
+human-approval-gated delivery action for work in the caller's checkout, and
+`sgt_create_pr`, its coordinator-worktree counterpart (R3.5); `sgt_run_status`/
 `sgt_run_wait` for an agent to follow a run it dispatched without
 polling the dashboard; and `sgt_graph_query`/`sgt_graph_explain`/
 `sgt_graph_affected` (D9), which let an agent navigate a codebase's

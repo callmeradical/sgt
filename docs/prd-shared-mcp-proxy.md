@@ -69,18 +69,19 @@ independent data-access layer.
 
 ### Every current MCP tool needs a real REST counterpart — most don't have one yet
 
-This was flagged as needing validation rather than assumed, and the
-validation shows the opposite of the optimistic read: `internal/mcp/server.go`'s
-`executeTool` does **not** call any `internal/ui` HTTP handler today. It
-calls `s.Store.*`/`config.LoadProject`/`runner.PhaseRunner` directly — a
-fully separate code path from `internal/ui/server.go`'s REST handlers,
-even though both ultimately touch the same `store.Store`. Per
+This was flagged as needing validation rather than assumed. Most tools in
+`internal/mcp/server.go` still call
+`s.Store.*`/`config.LoadProject`/`runner.PhaseRunner` directly — a
+separate code path from `internal/ui/server.go`'s REST handlers, even though
+both ultimately touch the same `store.Store`. `sgt_dispatch` and
+`sgt_create_pr` are the existing exceptions: they are already thin HTTP clients
+of `/api/dispatch` and `/api/create-pr`. Per
 `AGENTS.md`'s "Two ways in" split, this is structural, not an oversight:
 MCP is explicitly the **agent-driven** path's interface (an operator's
 own agent CLI, running interactively in a terminal), while `/api/*` is
-the **coordinator-driven** path's interface (the dashboard dispatching
-headless runs) — two different callers, so no REST endpoint was ever
-built for several of these tools:
+the **coordinator-driven** server interface used by `sgt dispatch` and other
+clients — two different callers, so no REST endpoint was built for several of
+the direct tools:
 
 - **Have a reasonable existing/near-equivalent:** `sgt_status` →
   `/api/runs`/`/api/projects` combined; `sgt_run_status` →
@@ -124,11 +125,10 @@ and only then does `sgt mcp` stop calling them directly.
 
 - `sgt mcp` makes zero calls to `store.Open` (or any other direct
   SQLite access) — grep-verifiable at implementation time.
-- Every one of the 9 tools in `Tools()` is served by relaying to a
+- Every advertised tool in `Tools()` is served by relaying to a
   `sgt ui` HTTP endpoint, with identical tool-call results to
-  today's direct-access behavior — including the 6 tools confirmed
-  above to need a genuinely new endpoint, not just the 2-3 with a
-  near-equivalent already.
+  today's behavior, preserving the already-proxied dispatch/PR tools and adding
+  real endpoints for tools that still use direct access.
 - `sgt mcp` starts `sgt ui` itself if it finds it isn't
   already running, before falling back to a clear, actionable error.
 - N concurrent interactive-agent instances produce N thin `sgt mcp`
@@ -144,11 +144,11 @@ and only then does `sgt mcp` stop calling them directly.
 1. **`sgt mcp` auto-starts `sgt ui`** if it isn't already
    running, rather than requiring the operator to start it manually
    first.
-2. **The existing REST surface does not cover the current MCP tool
-   set** — validated by reading `executeTool`, not assumed. 6 of 9
-   tools need either a new endpoint or new semantics (see Proposal);
-   only `sgt_status`/`sgt_run_status` have a reasonable
-   existing near-equivalent. This PRD's scope includes building those
+2. **The existing REST surface does not cover the full MCP tool
+   set** — validated by reading `executeTool`, not assumed.
+   `sgt_dispatch`/`sgt_create_pr` already proxy their exact server routes and
+   `sgt_status`/`sgt_run_status` have reasonable near-equivalents; the remaining
+   direct tools need either a new endpoint or new semantics. This PRD's scope includes building those
    new endpoints as thin wrappers around the same underlying calls
    `executeTool` already makes, not just rewiring `sgt mcp`.
 

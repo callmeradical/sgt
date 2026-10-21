@@ -7,7 +7,7 @@ One repository: `sgt-v2`.
 ## Requirements served
 
 **D1** — "Two ways in, one set of records": agent-driven (MCP) and
-coordinator-driven (UI dispatch) both create the same intents, bullets and
+coordinator-driven (server dispatch via CLI/API) both create the same intents, bullets and
 evidence.
 
 **D4** — "Sgt stores intents and bullets itself": intents and bullets

@@ -44,12 +44,14 @@ Every phase for a bullet renders its prompt from the same canonical intent revis
    sgt over MCP — `sgt mcp` (a subcommand of the `sgt` binary,
    declared in `mcp.json` as `{"command": "./bin/sgt", "args": ["mcp"]}`;
    there is no separate `sgt-mcp` executable):
-   `sgt_get_brief`, `sgt_run_gates`, `sgt_emit_envelope`,
-   `sgt_seal_pr`, `sgt_status`, `sgt_run_status`,
+   `sgt_dispatch`, `sgt_get_brief`, `sgt_run_gates`, `sgt_emit_envelope`,
+   `sgt_create_pr`, `sgt_seal_pr`, `sgt_status`, `sgt_run_status`,
    `sgt_run_wait`, `sgt_graph_query`, `sgt_graph_explain`,
    `sgt_graph_affected`. Sgt does not spawn or host the session.
-2. **Coordinator-driven.** The operator dispatches from the UI
-   (`POST /api/dispatch`) and sgt runs bounded headless agent phases itself.
+2. **Coordinator-driven.** The operator dispatches through the running Sgt
+   server (`sgt dispatch` or `POST /api/dispatch`) and sgt runs bounded
+   headless agent phases itself. The embedded dashboard currently observes and
+   recovers work; it does not contain dispatch or plan-approval controls.
 
 Both create the same records. Adding a third, divergent execution model is a bug.
 
