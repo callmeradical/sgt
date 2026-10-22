@@ -87,7 +87,10 @@ func (s *Store) ReconcileOrphanedRuns() (ReconcileResult, error) {
 			args = append(args, run.ID)
 		}
 
-		query := "SELECT id, run_id FROM phases WHERE status = 'running' AND run_id IN (" + strings.Join(orphanIDs, ",") + ") ORDER BY created_at ASC"
+		// ⚡ Bolt: Removed ORDER BY created_at ASC to avoid a TEMP B-TREE sort.
+		// Since we only collect phase IDs into a map to iterate over and update later,
+		// the order does not matter for correctness.
+		query := "SELECT id, run_id FROM phases WHERE status = 'running' AND run_id IN (" + strings.Join(orphanIDs, ",") + ")"
 		phRows, err := s.db.Query(query, args...)
 		if err != nil {
 			return ReconcileResult{}, err
