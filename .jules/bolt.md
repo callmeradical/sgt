@@ -19,3 +19,7 @@
 ## 2026-10-20 - SQLite Composite Indexes with Inequality and IN clauses
 **Learning:** `ReconcileOrphanedRuns` benefits from `(status, created_at)`. `RunsEligibleForCleanup` needs `(updated_at, status)` for index-order reads, but SQLite otherwise prefers the status-leading reconciliation index and retains a TEMP B-TREE; pinning the query with `INDEXED BY` makes the intended plan deterministic. SQLite can scan `(project, created_at DESC)` backward for `RotateProject`, so a second ascending index is redundant.
 **Action:** Pin every maintenance index to its production SQL with `EXPLAIN QUERY PLAN`, reject TEMP B-TREE sorts, and match the exact index name so a similarly prefixed index cannot satisfy the assertion accidentally.
+
+## 2026-10-23 - Removed ORDER BY to avoid TEMP B-TREE in IN clause
+**Learning:** Adding `ORDER BY` to an `IN (...)` clause query (like the one fetching running phases during orphan reconciliation) forces SQLite to perform an expensive `TEMP B-TREE` in-memory sort, even if an index covers the queried columns. Benchmarks showed this caused ~10% overhead, which scales linearly with the number of orphaned phases.
+**Action:** When grouping queried records into a map where processing order does not matter, omit the `ORDER BY` clause from the SQL string to bypass the unnecessary sort step.
