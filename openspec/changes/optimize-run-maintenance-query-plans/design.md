@@ -31,7 +31,9 @@ index if an earlier revision created it.
 
 `TestHotListQueriesReadInIndexOrder` rejects a TEMP B-TREE and requires the exact
 index name for each production query, including a two-run instance of the
-dynamic phase fetch. Exact matching prevents
+dynamic phase fetch. A negative control appends the removed `ORDER BY
+created_at ASC` to that same two-run SQL and requires the TEMP B-TREE to
+reappear, proving the fixture reproduces the regression. Exact matching prevents
 `idx_runs_project_created_at_asc` from falsely satisfying an assertion for
 `idx_runs_project_created_at`.
 
