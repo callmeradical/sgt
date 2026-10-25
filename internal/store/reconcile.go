@@ -17,6 +17,17 @@ type ReconcileResult struct {
 
 const reconcileOrphanedRunsSQL = `SELECT ` + runColumns + ` FROM runs WHERE status = 'running' ORDER BY created_at ASC`
 
+// reconcileRunningPhaseRowsSQL omits ORDER BY deliberately. Across several
+// run_id values SQLite otherwise sorts into a TEMP B-TREE, while reconciliation
+// only needs to group phase IDs by run before updating them.
+func reconcileRunningPhaseRowsSQL(runCount int) string {
+	if runCount < 1 {
+		panic("reconcileRunningPhaseRowsSQL requires at least one run")
+	}
+	placeholders := strings.TrimSuffix(strings.Repeat("?,", runCount), ",")
+	return "SELECT id, run_id FROM phases WHERE status = 'running' AND run_id IN (" + placeholders + ")"
+}
+
 // ReconcileOrphanedRuns moves every run currently marked running to interrupted
 // and reconciles their running phases in the same call.
 //
@@ -80,14 +91,12 @@ func (s *Store) ReconcileOrphanedRuns() (ReconcileResult, error) {
 		}
 		chunk := orphans[i:end]
 
-		var orphanIDs []string
 		var args []interface{}
 		for _, run := range chunk {
-			orphanIDs = append(orphanIDs, "?")
 			args = append(args, run.ID)
 		}
 
-		query := "SELECT id, run_id FROM phases WHERE status = 'running' AND run_id IN (" + strings.Join(orphanIDs, ",") + ")"
+		query := reconcileRunningPhaseRowsSQL(len(chunk))
 		phRows, err := s.db.Query(query, args...)
 		if err != nil {
 			return ReconcileResult{}, err

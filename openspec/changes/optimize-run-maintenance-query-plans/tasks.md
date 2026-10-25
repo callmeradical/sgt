@@ -6,11 +6,12 @@ One repository, `sgt-v2`, so one task and no cross-repo merge order.
 
 Repository: `sgt-v2`. Depends on: nothing.
 
-- Name the three production SQL statements used by reconciliation, cleanup, and
-  rotation.
+- Name the four production SQL sources used by run reconciliation, phase
+  reconciliation, cleanup, and rotation.
 - Add only the status/created-at and updated-at/status indexes.
 - Remove the redundant ascending project/created-at index if present.
 - Make cleanup deterministically use its ordering index.
+- Remove phase reconciliation's unused cross-run ordering.
 - Add exact-name query-plan tests rejecting TEMP B-TREE sorts.
 - Prove both new indexes are installed idempotently on an older database.
 

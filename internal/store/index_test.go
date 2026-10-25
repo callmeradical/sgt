@@ -79,6 +79,15 @@ func indexNames(t *testing.T, st *Store, table string) map[string]bool {
 // a query's WHERE or ORDER BY that no longer matches its index fails here.
 func TestHotListQueriesReadInIndexOrder(t *testing.T) {
 	st, _ := openTestStore(t)
+	// Two run IDs are essential: one equality lookup can read created_at order
+	// directly, while multiple IN values trigger the TEMP B-TREE regression.
+	reconcilePhasesForTwoRunsSQL := reconcileRunningPhaseRowsSQL(2)
+	t.Run("ReconcileRunningPhasesOrderedControl", func(t *testing.T) {
+		plan := queryPlan(t, st, reconcilePhasesForTwoRunsSQL+" ORDER BY created_at ASC")
+		if joined := strings.Join(plan, " | "); !strings.Contains(joined, "TEMP B-TREE") {
+			t.Fatalf("ordered two-run control did not reproduce the TEMP B-TREE regression: %s", joined)
+		}
+	})
 
 	cases := []struct {
 		method string
@@ -95,6 +104,7 @@ func TestHotListQueriesReadInIndexOrder(t *testing.T) {
 		{"ListIntentsForProject", listIntentsForProjectSQL, "idx_intents_project_created_at_id"},
 		{"ListIntentsByStatus", listIntentsByStatusSQL, "idx_intents_status_created_at_id"},
 		{"ReconcileOrphanedRuns", reconcileOrphanedRunsSQL, "idx_runs_status_created_at"},
+		{"ReconcileRunningPhases", reconcilePhasesForTwoRunsSQL, "idx_phases_run_id_created_at"},
 		{"RunsEligibleForCleanup", runsEligibleForCleanupSQL, "idx_runs_updated_at_status"},
 		{"RotateProject", rotateProjectCandidatesSQL, "idx_runs_project_created_at"},
 		{"ListDeliveryHistory", listDeliveryHistorySQL, "idx_deliveries_idempotency_key_created_at_id"},
