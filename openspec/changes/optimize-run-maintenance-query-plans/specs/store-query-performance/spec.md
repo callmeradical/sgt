@@ -4,13 +4,19 @@
 
 ### Requirement: Run-maintenance queries read in index order
 
-Ordered run-maintenance queries SHALL use a suitable index and SHALL NOT sort
-their result through a temporary B-tree.
+Run-maintenance queries SHALL use a suitable index and SHALL NOT sort through a
+temporary B-tree.
 
 #### Scenario: Startup reconciliation reads running runs in creation order
 
 - **WHEN** the startup reconciliation query is planned
 - **THEN** it uses the status/created-at index without a temporary B-tree
+
+#### Scenario: Startup reconciliation groups running phases without a global sort
+
+- **WHEN** reconciliation fetches running phases for several orphaned runs
+- **THEN** it uses the run/created-at index without a temporary B-tree because
+  no global phase order is required
 
 #### Scenario: Fleet cleanup reads eligible runs in update order
 

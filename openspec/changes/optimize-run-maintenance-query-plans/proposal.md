@@ -2,9 +2,9 @@
 
 ## Why
 
-The startup reconciliation, fleet cleanup, and retention paths read an
-unbounded `runs` table. Their ordered queries must not degrade into full scans
-or temporary B-tree sorts as run history grows.
+The startup reconciliation, fleet cleanup, and retention paths read unbounded
+`runs` and `phases` tables. Their queries must not degrade into full scans or
+unnecessary temporary B-tree sorts as history grows.
 
 ## What Changes
 
@@ -13,7 +13,9 @@ or temporary B-tree sorts as run history grows.
   deterministically.
 - Reuse the existing `(project, created_at DESC)` index for retention rotation;
   SQLite can scan it backward, so any duplicate ascending index is removed.
-- Pin all three production SQL statements with `EXPLAIN QUERY PLAN` tests.
+- Remove the unused global phase ordering from reconciliation's multi-run
+  bulk fetch.
+- Pin all four production SQL statements with `EXPLAIN QUERY PLAN` tests.
 
 ## Capabilities
 
