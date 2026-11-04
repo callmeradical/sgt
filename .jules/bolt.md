@@ -22,3 +22,6 @@
 ## 2026-10-24 - SQLite TEMP B-TREE penalty with IN clauses
 **Learning:** The reconciliation phase fetch used `run_id IN (...) ORDER BY created_at ASC`. The `(run_id, created_at)` index serves each run lookup but cannot provide one global `created_at` order across several run IDs, so SQLite added a TEMP B-TREE. Reconciliation groups the rows by run before updating them and does not require that global order.
 **Action:** Pin maintenance queries to their production SQL with `EXPLAIN QUERY PLAN`. Remove `ORDER BY` only when the consumer does not require it, and require the plan test to reject a TEMP B-TREE regression.
+## 2026-11-04 - SQLite Bulk Update Transactions
+**Learning:** Bulk modifications like iterating over runs and updating them via per-row `UPDATE` and `INSERT` commands triggers an expensive per-statement auto-commit and fsync penalty in SQLite if they aren't explicitly scoped within a transaction block.
+**Action:** Always wrap loops that iterate over rows and perform updates in an explicit `tx, _ := db.Begin()` transaction.
