@@ -10,7 +10,7 @@ import (
 // named const so the initial schema and the migration path for an
 // already-existing database share exactly one definition.
 //
-// dropped_count/dropped_reason default to 0/” for every row that represents
+// dropped_count/dropped_reason default to 0/'' for every row that represents
 // a real captured file. They are non-zero only on the one synthetic row
 // captureArtifacts writes per phase to report artifacts it could not keep
 // (over the count/byte cap, or a copy failure) — see internal/runner's
