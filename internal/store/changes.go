@@ -77,11 +77,19 @@ const defaultChangeReplayLimit = 500
 // processes writing the same file therefore cannot assign the same number, which
 // a counter held in Go would.
 func (s *Store) AppendChange(channel, entityID string, payload interface{}) (int64, error) {
+	seq, err := s.appendChangeTx(s.db, channel, entityID, payload)
+	if err == nil {
+		s.notifyChange(seq)
+	}
+	return seq, err
+}
+
+func (s *Store) appendChangeTx(ex execer, channel, entityID string, payload interface{}) (int64, error) {
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return 0, fmt.Errorf("encoding the payload of a %s change: %w", channel, err)
 	}
-	res, err := s.db.Exec(
+	res, err := ex.Exec(
 		`INSERT INTO changes (channel, entity_id, payload, created_at) VALUES (?, ?, ?, ?)`,
 		channel, entityID, string(body), time.Now().UTC(),
 	)
@@ -92,7 +100,6 @@ func (s *Store) AppendChange(channel, entityID string, payload interface{}) (int
 	if err != nil {
 		return 0, fmt.Errorf("reading back the sequence number of a %s change: %w", channel, err)
 	}
-	s.notifyChange(seq)
 	return seq, nil
 }
 
@@ -265,4 +272,8 @@ func (s *Store) notifyChange(seq int64) {
 func (s *Store) recordTransition(channel, entityID string, payload interface{}) error {
 	_, err := s.AppendChange(channel, entityID, payload)
 	return err
+}
+
+func (s *Store) recordTransitionTx(ex execer, channel, entityID string, payload interface{}) (int64, error) {
+	return s.appendChangeTx(ex, channel, entityID, payload)
 }

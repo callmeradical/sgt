@@ -118,40 +118,59 @@ func (s *Store) ReconcileOrphanedRuns() (ReconcileResult, error) {
 
 	var result ReconcileResult
 
+	tx, err := s.db.Begin()
+	if err != nil {
+		return result, err
+	}
+	defer tx.Rollback()
+
+	var seqs []int64
+
 	for _, run := range orphans {
 		// Move the run itself.
-		if err := s.reconcileRun(run.ID); err != nil {
+		seq, err := s.reconcileRun(tx, run.ID)
+		if err != nil {
 			return result, err
 		}
+		seqs = append(seqs, seq)
 		result.RunsReconciled++
 
 		// Move every running phase that belongs to this run.
 		phaseIDs := phasesByRun[run.ID]
 		if len(phaseIDs) > 0 {
-			n, err := s.reconcileRunningPhases(run.ID, phaseIDs)
+			n, pSeqs, err := s.reconcileRunningPhases(tx, run.ID, phaseIDs)
 			if err != nil {
 				return result, err
 			}
+			seqs = append(seqs, pSeqs...)
 			result.PhasesReconciled += n
 		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return result, err
+	}
+
+	for _, seq := range seqs {
+		s.notifyChange(seq)
 	}
 
 	return result, nil
 }
 
 // reconcileRun moves one run from running to interrupted and appends a change.
-func (s *Store) reconcileRun(runID string) error {
-	_, err := s.db.Exec(
+func (s *Store) reconcileRun(ex execer, runID string) (int64, error) {
+	_, err := ex.Exec(
 		`UPDATE runs SET status = 'interrupted', updated_at = datetime('now') WHERE id = ? AND status = 'running'`,
 		runID,
 	)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	// Record: nothing judged this run. The coordinator stopped; record the
 	// interruption, not a verdict. "reconciled" in the payload tells an operator
 	// reading the change log what caused the transition.
-	return s.recordTransition(ChannelRun, runID, map[string]interface{}{
+	return s.recordTransitionTx(ex, ChannelRun, runID, map[string]interface{}{
 		"transition": "status",
 		"id":         runID,
 		"status":     "interrupted",
@@ -170,23 +189,26 @@ func (s *Store) reconcileRun(runID string) error {
 //
 // A phase stuck at running is neither passed nor re-run on resume — resume skips
 // only phases holding a passed record. Leaving it would silently drop work.
-func (s *Store) reconcileRunningPhases(runID string, phaseIDs []string) (int, error) {
+func (s *Store) reconcileRunningPhases(ex execer, runID string, phaseIDs []string) (int, []int64, error) {
+	var seqs []int64
 	for _, phaseID := range phaseIDs {
-		if _, err := s.db.Exec(
+		if _, err := ex.Exec(
 			`UPDATE phases SET status = 'interrupted' WHERE id = ? AND status = 'running'`,
 			phaseID,
 		); err != nil {
-			return len(phaseIDs), err
+			return len(phaseIDs), seqs, err
 		}
-		if err := s.recordTransition(ChannelPhase, phaseID, map[string]interface{}{
+		seq, err := s.recordTransitionTx(ex, ChannelPhase, phaseID, map[string]interface{}{
 			"id":         phaseID,
 			"run_id":     runID,
 			"status":     "interrupted",
 			"reconciled": true,
-		}); err != nil {
-			return len(phaseIDs), err
+		})
+		if err != nil {
+			return len(phaseIDs), seqs, err
 		}
+		seqs = append(seqs, seq)
 	}
 
-	return len(phaseIDs), nil
+	return len(phaseIDs), seqs, nil
 }
