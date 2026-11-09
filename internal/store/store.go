@@ -21,6 +21,10 @@ import (
 	sqlite3 "modernc.org/sqlite/lib"
 )
 
+type execer interface {
+	Exec(query string, args ...interface{}) (sql.Result, error)
+}
+
 type Store struct {
 	db *sql.DB
 
