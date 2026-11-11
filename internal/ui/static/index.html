@@ -1341,7 +1341,27 @@
         </span>`]);
       }
       if (p.command) rows.push(['Command', `<code class="text-amber-300 break-all">${escapeHTML(p.command)}</code>`]);
-      if (p.agent) rows.push(['Agent', `<code class="text-teal-300">${escapeHTML(p.agent)}</code>`]);
+      // Harness provenance (decision 11). An agent phase always shows which
+      // harness ran it, which gauntlet role it ran as and that plugin's
+      // version, with an em dash saying what was not recorded. A role-less
+      // phase has no plugin, so it says nothing about a version. A gate
+      // (kind 'code') has no harness and shows none of this.
+      const fallback = text => `<span class="text-[#8b949e]">— ${escapeHTML(text)}</span>`;
+      if (phase.kind === 'agent') {
+        rows.push(['Harness', p.agent
+          ? `<code class="text-teal-300">${escapeHTML(p.agent)}</code>`
+          : fallback('harness unknown')]);
+        if (p.role) {
+          rows.push(['Role', `<code class="text-teal-300">${escapeHTML(p.role)}</code>`]);
+          rows.push(['Plugin', p.plugin_version
+            ? `<code class="text-teal-300">${escapeHTML(p.plugin_version)}</code>`
+            : fallback('version unknown')]);
+        } else {
+          rows.push(['Role', fallback('no gauntlet role')]);
+        }
+      } else if (phase.kind !== 'code' && p.agent) {
+        rows.push(['Agent', `<code class="text-teal-300">${escapeHTML(p.agent)}</code>`]);
+      }
       // R4.6: model/provider are derived from real evidence of what executed
       // the phase (e.g. an agent's own startup banner), not from requested
       // configuration — absent when that evidence could not be parsed
@@ -2414,7 +2434,9 @@
         return '<div class="text-[#8b949e]">No activity recorded for this run yet.</div>';
       }
       return envelopes.map(e => {
-        let isPR = e.stage === 'review' || (e.summary && e.summary.toLowerCase().includes('pr'));
+        // Only a recorded delivery earns the pull-request icon: a review
+        // envelope may be a HOLD, and a summary that mentions a PR proves none.
+        const isPR = e.type === 'run.delivered';
         let artifactsHTML = '';
         
         if (e.artifacts && e.artifacts.length) {
