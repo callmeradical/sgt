@@ -504,7 +504,21 @@ func BuildAgentCommandForRole(agentCLI, model, role, prompt string) (exe string,
 		// full agent-phase attempt with zero code changes. Safe here because
 		// every dispatch already runs in an isolated git worktree on its own
 		// branch (internal/dag/engine.go), never the operator's checkout.
-		args = []string{"--print", "--dangerously-skip-permissions"}
+		//
+		// --no-session-persistence and CLAUDE_CODE_DISABLE_AUTO_MEMORY=1:
+		// every phase of a run shares one worktree, and claude's auto memory
+		// is shared by every worktree of a repository, so without them one
+		// session's transcript and notes would reach the next session (and
+		// the operator's own) — a builder's reasoning would reach its critic
+		// (design decision 1).
+		//
+		// CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0: claude --print otherwise
+		// terminates a session after 600s of waiting on background tasks and
+		// still exits 0; the phase's own agent budget is the only limit.
+		//
+		// RunAgentPhase appends env after os.Environ(), and os/exec keeps the
+		// last value of a duplicated key, so these override inherited values.
+		args = []string{"--print", "--dangerously-skip-permissions", "--no-session-persistence"}
 		if model != "" {
 			args = append(args, "--model", model)
 		}
@@ -512,6 +526,10 @@ func BuildAgentCommandForRole(agentCLI, model, role, prompt string) (exe string,
 			args = append(args, "--agent", role)
 		}
 		args = append(args, prompt)
+		env = append(env,
+			"CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0",
+			"CLAUDE_CODE_DISABLE_AUTO_MEMORY=1",
+		)
 
 	case "goose":
 		// `goose run` takes -t/--text or -i/--instructions; it has no positional
@@ -567,6 +585,39 @@ func BuildAgentCommandForRole(agentCLI, model, role, prompt string) (exe string,
 	}
 
 	return exe, args, env, ""
+}
+
+// terminationNoticePattern matches the line claude --print emits when it gives
+// up waiting on background tasks and ends the session, still exiting 0. The
+// real line continues (" Set CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 to wait
+// indefinitely."), so the pattern anchors only at the start (design decision
+// 1).
+var terminationNoticePattern = regexp.MustCompile(`^Background tasks still running after \d+s; terminating\.`)
+
+// endsWithTerminationNotice reports whether one of the last three non-empty
+// lines of output begins with claude's termination notice. Looking only at
+// line starts near the end keeps an agent that quotes the notice mid-output
+// from being failed by mistake.
+func endsWithTerminationNotice(output string) bool {
+	for _, line := range lastNonEmptyLines(output, 3) {
+		if terminationNoticePattern.MatchString(line) {
+			return true
+		}
+	}
+	return false
+}
+
+// lastNonEmptyLines returns up to n of output's last non-blank lines, each
+// trimmed of surrounding whitespace, last line first.
+func lastNonEmptyLines(output string, n int) []string {
+	lines := strings.Split(output, "\n")
+	var out []string
+	for i := len(lines) - 1; i >= 0 && len(out) < n; i-- {
+		if line := strings.TrimSpace(lines[i]); line != "" {
+			out = append(out, line)
+		}
+	}
+	return out
 }
 
 // phaseRole reports the gauntlet role this runner's phase runs as: only when a
@@ -647,6 +698,12 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 		_ = os.MkdirAll(artifactDir, 0o755)
 		extraEnv = append(extraEnv, "SGT_ARTIFACT_DIR="+artifactDir)
 
+		// An envelope left in the worktree by an earlier phase or attempt has
+		// already been read, routed and stored; left in place, an attempt that
+		// writes none of its own would adopt it (design decision 12).
+		envelopePath := filepath.Join(stateDir, "envelope.json")
+		_ = os.Remove(envelopePath)
+
 		// A zero budget means unbounded: derive a cancellable child so operator
 		// cancellation still propagates, but attach no deadline. Passing 0 to
 		// context.WithTimeout would produce an already-expired context and kill the
@@ -675,7 +732,9 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 		cmd.Stdout = &outBuf
 		cmd.Stderr = &outBuf
 
+		attemptStarted := time.Now()
 		runErr := cmd.Run()
+		attemptEnded := time.Now()
 		provider, model := detectModelProvider(exe, outBuf.String(), pr.Model)
 		cancel()
 		duration := time.Since(start).Milliseconds()
@@ -702,6 +761,7 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 				Error:      fmt.Sprintf("cancelled: %v", ctx.Err()),
 				DurationMs: duration,
 				Attempt:    attemptNumber,
+				FixCycle:   pr.FixCycle,
 			})
 			return nil, "", ctx.Err()
 		}
@@ -710,25 +770,41 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 		// runErr was captured into lastErr and then ignored, phaseStatus was the
 		// constant "passed", and the function returned nil error — so an agent killed
 		// at its timeout produced a passed phase and a passed run.
+		//
+		// Rule 3 of design decision 1a: a process failure — a non-zero exit,
+		// the budget timeout, or claude's background-task termination notice
+		// (which claude prints and then exits 0) — fails the attempt whatever
+		// its output says.
+		output := stripANSI(outBuf.String())
 		timedOut := errors.Is(phaseCtx.Err(), context.DeadlineExceeded)
-		failed := runErr != nil
+		terminated := runErr == nil && filepath.Base(exe) == "claude" && endsWithTerminationNotice(output)
+		processFailed := runErr != nil || terminated
+		failed := processFailed
 
 		var failureReason string
 		switch {
 		case timedOut:
 			failureReason = fmt.Sprintf("agent %s exceeded its %s budget and was killed", exe, budget)
-		case failed:
+		case runErr != nil:
 			failureReason = fmt.Sprintf("agent %s exited with error: %v", exe, runErr)
+		case terminated:
+			failureReason = "agent claude terminated with background tasks still running"
 		}
 
-		// Read the agent's own envelope when it wrote one. Only synthesize a summary
-		// otherwise, and never describe a failed attempt as completed.
-		envelopePath := filepath.Join(stateDir, "envelope.json")
+		// Read the agent's own envelope when it wrote one — but only once rule 3
+		// has passed the attempt: a process failure records sgt's failure
+		// envelope, never an agent-written "completed" one (design decision
+		// 1a). Only synthesize a summary otherwise, and never describe a failed
+		// attempt as completed.
 		var env handoff.Envelope
-
-		if data, err := os.ReadFile(envelopePath); err == nil && !failed {
-			_ = json.Unmarshal(data, &env)
-		} else {
+		agentEnvelope := false
+		if !failed {
+			if data, err := os.ReadFile(envelopePath); err == nil {
+				_ = json.Unmarshal(data, &env)
+				agentEnvelope = true
+			}
+		}
+		if !agentEnvelope {
 			summary := fmt.Sprintf("Phase %s completed for %s", phaseName, pr.RepoName)
 			if failed {
 				summary = fmt.Sprintf("Phase %s failed for %s: %s", phaseName, pr.RepoName, failureReason)
@@ -774,6 +850,30 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 		// as the agent originally wrote it (design.md, "Where the reason comes
 		// from").
 		blockedReason := handoff.BlockedReason(env.Payload)
+
+		// Rules 4–6 of design decision 1a, after the envelope is read and
+		// redacted: the role's judgement, then a review's blocking findings.
+		// When they fail a review the agent's envelope stays the recorded one,
+		// so its findings still reach the bullet's blocked reason.
+		retryable := processFailed
+		if !processFailed {
+			var outcome attemptOutcome
+			env.Payload, outcome = judgeAttempt(roleAttempt{
+				Phase:    phaseName,
+				Role:     role,
+				Worktree: pr.Worktree,
+				Output:   output,
+				Started:  attemptStarted,
+				Ended:    attemptEnded,
+				Payload:  env.Payload,
+			})
+			if outcome.Failed {
+				failed, failureReason, retryable = true, outcome.Reason, outcome.Retry
+				if !agentEnvelope {
+					env.Summary = redact.Text(fmt.Sprintf("Phase %s failed for %s: %s", phaseName, pr.RepoName, failureReason))
+				}
+			}
+		}
 
 		env.Payload = annotatePayloadWithProvenance(env.Payload, phaseProvenance{
 			Model:         model,
@@ -859,8 +959,12 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 		captureArtifacts(pr.Store, pr.RunID, attemptID, pr.RepoName, artifactDir)
 
 		if failed {
-			lastErr = fmt.Errorf("%s (output: %s)", failureReason, redact.Text(stripANSI(strings.TrimSpace(outBuf.String()))))
-			if attempt < retries {
+			if processFailed {
+				lastErr = fmt.Errorf("%s (output: %s)", failureReason, redact.Text(strings.TrimSpace(output)))
+			} else {
+				lastErr = errors.New(failureReason)
+			}
+			if retryable && attempt < retries {
 				continue
 			}
 			return nil, blockedReason, lastErr

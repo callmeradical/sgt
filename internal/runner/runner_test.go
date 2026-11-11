@@ -1327,12 +1327,17 @@ exit 0
 	}
 	pr, st := newRunner(t, agent, 10*time.Second)
 
-	env, _, err := pr.RunAgentPhase(context.Background(), "review", "review this diff", 0)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	// A blocking finding fails the review (design decision 1a, rule 6); the
+	// agent's own envelope is still the one recorded, findings intact.
+	_, _, err := pr.RunAgentPhase(context.Background(), "review", "review this diff", 0)
+	if err == nil {
+		t.Fatal("expected an error for a review with a blocking finding")
 	}
-	if env == nil {
-		t.Fatal("expected an envelope")
+	if want := "review reported blocking findings: missing failing test"; err.Error() != want {
+		t.Errorf("error = %q, want %q", err, want)
+	}
+	if rec := finalAgentPhase(t, st, "run-1", "review"); rec.Status != "failed" {
+		t.Errorf("review phase status = %q, want failed", rec.Status)
 	}
 
 	envelopes, err := st.ListEnvelopesForRun("run-1")
