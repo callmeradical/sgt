@@ -179,6 +179,6 @@ func (srv *Server) handleRunResume(w http.ResponseWriter, r *http.Request) {
 		"task_id": run.ID,
 		"run_id":  run.ID,
 		"project": proj.Name,
-		"skipped": srv.passedPhaseNames(run.ID),
+		"skipped": srv.passedPhaseNames(run.ID, proj, pf.Roles),
 	})
 }

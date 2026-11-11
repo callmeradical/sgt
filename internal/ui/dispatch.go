@@ -792,14 +792,35 @@ func (srv *Server) reposForRun(runID string) []string {
 
 // passedPhaseNames reports which phases a resume will skip, so the response says
 // what it is not going to do rather than leaving the operator to infer it.
-func (srv *Server) passedPhaseNames(runID string) []string {
+//
+// A recorded phase or gate is named when it counts as passed by the same
+// freshness rule the engine's resume skips use (dag.PhasePassed, design
+// decision 8): a gate or review whose pass predates the repo's last code
+// change is not named, because resume re-runs it. Each repo's effective
+// pipeline comes from dag.PipelineFor with roles, which the caller sets the
+// way its resume would: the resume request's own preflight result, or
+// proj.GauntletRolesApply() where no preflight runs. A nil proj (a project
+// that no longer loads) judges every repo against the default pipeline.
+// Names appear once per repo, in the order they were first recorded.
+func (srv *Server) passedPhaseNames(runID string, proj *config.Project, roles bool) []string {
 	phases, err := srv.Store.ListPhasesForRun(runID)
 	if err != nil {
 		return nil
 	}
+	type key struct{ repo, name, kind string }
+	seen := map[key]bool{}
 	var out []string
 	for _, p := range phases {
-		if p.Status == "passed" {
+		k := key{p.Repo, p.Name, p.Kind}
+		if seen[k] {
+			continue
+		}
+		seen[k] = true
+		var repoCfg config.Repo
+		if proj != nil {
+			repoCfg = proj.Repos[p.Repo]
+		}
+		if dag.PhasePassed(phases, p.Repo, p.Name, p.Kind, dag.PipelineFor(repoCfg, roles)) {
 			out = append(out, p.Name)
 		}
 	}

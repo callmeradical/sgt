@@ -403,12 +403,24 @@ func (srv *Server) handleRunDetails(w http.ResponseWriter, r *http.Request) {
 		envelopes = []store.EnvelopeRecord{}
 	}
 
+	// The run's project, best effort: a run whose project no longer loads
+	// still serves its other fields (see fixRetriesLimit below).
+	var proj *config.Project
+	if run, err := srv.Store.GetRun(runID); err == nil && run != nil {
+		if p, err := config.LoadProject(run.Project); err == nil {
+			proj = p
+		}
+	}
+
 	// The phases a resume would skip, named before the operator commits rather
 	// than only reported afterwards by /api/run-resume. Both come from
 	// passedPhaseNames, so what the interface promises and what the resume does
-	// cannot disagree. It reads empty when no phase holds a passed record, which
-	// means "nothing will be skipped", never "unknown".
-	skips := srv.passedPhaseNames(runID)
+	// cannot disagree. This request runs no gauntlet preflight, so roles is
+	// proj.GauntletRolesApply(): what the next resume's preflight sets when it
+	// succeeds. It reads empty when no phase counts as passed, which means
+	// "nothing will be skipped", never "unknown".
+	roles := proj != nil && proj.GauntletRolesApply()
+	skips := srv.passedPhaseNames(runID, proj, roles)
 	if skips == nil {
 		skips = []string{}
 	}
@@ -425,14 +437,12 @@ func (srv *Server) handleRunDetails(w http.ResponseWriter, r *http.Request) {
 	// still serves its other fields; it just falls back to the built-in
 	// default rather than failing the whole request.
 	fixRetriesLimit := 5
-	if run, err := srv.Store.GetRun(runID); err == nil && run != nil {
-		if proj, err := config.LoadProject(run.Project); err == nil {
-			repoName := ""
-			if failure, ok := srv.lastFailedPhase(runID, ""); ok {
-				repoName = failure.Repo
-			}
-			fixRetriesLimit = proj.ResolvedFixRetries(repoName)
+	if proj != nil {
+		repoName := ""
+		if failure, ok := srv.lastFailedPhase(runID, ""); ok {
+			repoName = failure.Repo
 		}
+		fixRetriesLimit = proj.ResolvedFixRetries(repoName)
 	}
 
 	resp := map[string]interface{}{
