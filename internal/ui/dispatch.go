@@ -722,24 +722,31 @@ func (srv *Server) recordWikiEntry(runID, blockedReason string) {
 	wiki.RecordRun(wiki.Entry{Run: *run, Bullets: bullets, BlockedReason: blockedReason})
 }
 
+// genericBlockedReason is the last-resort reason for a failed run that has no
+// envelope reason and no current failed phase record to name.
+const genericBlockedReason = "gates did not pass; no further automatic attempt available"
+
+// maxPhaseBlockedReason bounds, in characters, a reason taken from a phase
+// record's Error (decision 8a).
+const maxPhaseBlockedReason = 300
+
 // blockedReasonForRun resolves the reason a run's bullets carry when they
 // become bulletStatus. It is only meaningful for "blocked" — every other
 // status carries no reason, because BlockedReason (D5(b)) exists to explain
 // why a bullet is stuck, not to annotate green or any other outcome.
 //
-// An agent's own envelope may have named why it could not proceed, in its
-// payload's blocked_reason key (design.md, "Where the reason comes from").
-// A "review" phase's envelope instead carries a findings array
-// (a-green-bullet-awaits-independent-review); when it contains any
-// severity:"error" finding, that finding's Summary (joined, if more than
-// one) is the reason instead of falling through to handoff.BlockedReason or
-// the synthesized string for that envelope. Envelopes are read in the order
-// they were recorded, and the last one naming a reason wins either way, so
-// the run's most recent word on why it is stuck is what a human sees. When
-// no envelope named one, a synthesized reason is used: sgt dispatches a
-// bullet's work exactly once per run and a run's own retry budget is already
-// exhausted by the time it concludes without passing, so a human is never
-// left with "blocked" and no explanation at all.
+// The order is design decision 8a's:
+//
+//  1. Envelopes are walked in the order they were recorded, and the last
+//     eligible reason wins. An agent's own blocked_reason (D5(b), "blocked
+//     on a human decision") is always eligible. A "review" envelope's
+//     blocking findings (a-green-bullet-awaits-independent-review) are
+//     eligible only while current (reviewFindingIsCurrent).
+//  2. Otherwise, the newest current failed phase record's sgt-authored
+//     Error, prefixed "<repo>: <phase>: " and cut to 300 characters. Error
+//     is the attempt's failure reason (or a gate's own redacted output);
+//     raw agent output never goes into it, so it cannot reach the reason.
+//  3. Otherwise, the generic text.
 func (srv *Server) blockedReasonForRun(runID, bulletStatus string) string {
 	if bulletStatus != "blocked" {
 		return ""
@@ -748,28 +755,93 @@ func (srv *Server) blockedReasonForRun(runID, bulletStatus string) string {
 	if err != nil {
 		log.Printf("sgt: loading envelopes for run %s to resolve a blocked reason: %v", runID, err)
 	}
+	phases, err := srv.Store.ListPhasesForRun(runID)
+	if err != nil {
+		log.Printf("sgt: loading phases for run %s to resolve a blocked reason: %v", runID, err)
+	}
+
+	// The newest review phase record per repo, and the newest review
+	// envelope per repo that belongs to a phase. Both lists are in recorded
+	// order, so the last one seen is the newest.
+	newestReview := map[string]store.PhaseRecord{}
+	for _, p := range phases {
+		if p.Name == "review" {
+			newestReview[p.Repo] = p
+		}
+	}
+	newestReviewEnvelope := map[string]string{}
+	for _, e := range envelopes {
+		if e.Stage == "review" && e.PhaseID != "" {
+			newestReviewEnvelope[e.Repo] = e.ID
+		}
+	}
+	// reviewFindingIsCurrent reports whether e's blocking findings still
+	// describe the repo's review. A repo with no review record at all is
+	// legacy data, whose findings count as before. Otherwise only the
+	// repo's newest phase-owned review envelope counts, and only while the
+	// repo's newest review record is failed: a later review, passed or not,
+	// supersedes it. An envelope with no PhaseID, such as run.delivered,
+	// never does.
+	reviewFindingIsCurrent := func(e store.EnvelopeRecord) bool {
+		latest, hasReview := newestReview[e.Repo]
+		if !hasReview {
+			return true
+		}
+		return e.PhaseID != "" && newestReviewEnvelope[e.Repo] == e.ID && latest.Status == "failed"
+	}
+
 	var reason string
 	for _, e := range envelopes {
 		if e.Stage == "review" {
 			if findings := handoff.ReviewFindings(e.Data); handoff.HasBlockingFinding(findings) {
-				var summaries []string
-				for _, f := range findings {
-					if f.Severity == "error" {
-						summaries = append(summaries, f.Summary)
+				if reviewFindingIsCurrent(e) {
+					var summaries []string
+					for _, f := range findings {
+						if f.Severity == "error" {
+							summaries = append(summaries, f.Summary)
+						}
 					}
+					reason = strings.Join(summaries, "; ")
+					continue
 				}
-				reason = strings.Join(summaries, "; ")
-				continue
 			}
 		}
 		if r := handoff.BlockedReason(e.Data); r != "" {
 			reason = r
 		}
 	}
-	if reason == "" {
-		reason = "gates did not pass; no further automatic attempt available"
+	if reason != "" {
+		return reason
 	}
-	return reason
+	if r := currentFailedPhaseReason(phases); r != "" {
+		return r
+	}
+	return genericBlockedReason
+}
+
+// currentFailedPhaseReason is decision 8a's phase fallback: the newest failed
+// record that is still the newest record of its repo, name and kind, rendered
+// as "<repo>: <phase>: <Error>" and cut to maxPhaseBlockedReason characters.
+// phases is in recorded order. It returns "" when no current failed record
+// carries an Error.
+func currentFailedPhaseReason(phases []store.PhaseRecord) string {
+	type phaseKey struct{ repo, name, kind string }
+	newest := map[phaseKey]int{}
+	for i, p := range phases {
+		newest[phaseKey{p.Repo, p.Name, p.Kind}] = i
+	}
+	for i := len(phases) - 1; i >= 0; i-- {
+		p := phases[i]
+		if p.Status != "failed" || p.Error == "" || newest[phaseKey{p.Repo, p.Name, p.Kind}] != i {
+			continue
+		}
+		reason := fmt.Sprintf("%s: %s: %s", p.Repo, p.Name, p.Error)
+		if runes := []rune(reason); len(runes) > maxPhaseBlockedReason {
+			reason = string(runes[:maxPhaseBlockedReason])
+		}
+		return reason
+	}
+	return ""
 }
 
 // reposForRun recovers which repositories a run touched from its phase records.
