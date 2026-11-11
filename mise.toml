@@ -163,15 +163,69 @@ _need bash     bash     "runs each configured quality gate"
 _need openspec openspec "dispatch resolves to a change (O3)"
 _need gh       gh       "opening a pull request"
 
+# claude is the default harness: a project that sets no defaults.agent runs
+# it, so it is looked for first.
 harness=""
-for h in opencode oc claude goose codex pi; do
+for h in claude opencode oc goose codex pi; do
   if command -v "$h" &>/dev/null; then harness="$h"; break; fi
 done
-if [[ -n "$harness" ]]; then
+if [[ "$harness" == claude ]]; then
+  printf "  %-10s  ok   %s\\n" "agent" "claude (the default harness)"
+elif [[ -n "$harness" ]]; then
   printf "  %-10s  ok   %s\\n" "agent" "$harness"
+  printf "  %-10s  note %s\\n" "" "claude is the default harness and is not on PATH; set defaults.agent in each project, or install claude"
 else
-  printf "  %-10s  MISSING  %s\\n" "agent" "one of: opencode oc claude goose codex pi"
+  printf "  %-10s  MISSING  %s\\n" "agent" "one of: claude opencode oc goose codex pi"
   ok=false
+fi
+
+# Gauntlet roles are on by default for claude, and a dispatch is refused when
+# claude reports no usable gauntlet plugin. That is a per-project choice
+# (defaults.gauntlet_roles: false opts out), so a problem here only warns. A
+# plugin counts when it mirrors the dispatch preflight: id gauntlet@*,
+# enabled, user or managed scope, with agents/alpha.md and agents/beta.md.
+_gauntlet_warn() {
+  printf "  %-10s  WARNING  %s\\n" "gauntlet" "$1"
+  printf "  %-10s           %s\\n" "" "projects with gauntlet roles on (the claude default) are refused at dispatch;"
+  printf "  %-10s           %s\\n" "" "install: /plugin install gauntlet@gauntlet, or set defaults.gauntlet_roles: false"
+}
+if [[ "$harness" == claude ]]; then
+  if ! command -v python3 &>/dev/null; then
+    _gauntlet_warn "could not check claude's plugin list: python3 not found"
+  elif ! plugin_json="$(claude plugin list --json 2>/dev/null)"; then
+    _gauntlet_warn "could not read claude's plugin list (claude plugin list --json failed)"
+  else
+    gauntlet="$(printf '%s' "$plugin_json" | python3 -I -c '
+import json, os, sys
+try:
+    entries = json.load(sys.stdin)
+except Exception:
+    entries = None
+if not isinstance(entries, list):
+    print("unreadable")
+    sys.exit(0)
+for e in entries:
+    if not isinstance(e, dict):
+        continue
+    if not str(e.get("id", "")).startswith("gauntlet@") or e.get("enabled") is not True:
+        continue
+    if e.get("scope") not in ("user", "managed"):
+        continue
+    path = e.get("installPath") or ""
+    if path and all(os.path.isfile(os.path.join(path, "agents", r)) for r in ("alpha.md", "beta.md")):
+        print("ok " + str(e.get("version", "")))
+        sys.exit(0)
+print("none")
+')"
+    case "$gauntlet" in
+      "ok "*)
+        printf "  %-10s  ok   %s\\n" "gauntlet" "plugin ${gauntlet#ok } (gauntlet:alpha builds, gauntlet:beta reviews)" ;;
+      none)
+        _gauntlet_warn "claude reports no enabled gauntlet plugin with both roles at user or managed scope" ;;
+      *)
+        _gauntlet_warn "could not read claude's plugin list (output is not a JSON plugin list)" ;;
+    esac
+  fi
 fi
 
 if [[ "$ok" == true ]]; then

@@ -195,10 +195,48 @@ not this list, as ground truth if the two ever disagree:
 - `bash` — runs each project's configured quality gates
 - [`openspec`](https://github.com/Fission-AI/OpenSpec) — a dispatch resolves to a change before any run, intent, or worktree exists
 - `gh` — opening a pull request
-- A supported agent harness on `PATH`: `opencode`, `oc`, `claude`, `goose`, `codex`, or `pi`
+- A supported agent harness on `PATH`: `claude` (the default), `opencode`, `oc`, `goose`, `codex`, or `pi`
+- With `claude`, the gauntlet plugin, unless the project sets `defaults.gauntlet_roles: false` (see below)
 
 tmux is explicitly **not** a dependency — v2 does not use it, drive it, or
 require it for any command.
+
+### Agent harness and gauntlet roles
+
+The default agent harness is claude. A dispatch or project that names no
+harness runs `claude`; to use another, pin it in the project YAML with
+`defaults.agent` (for example `agent: opencode` under `defaults:`). A missing
+harness fails with a reason that names it.
+
+When the harness is `claude`, phases run as the roles of the
+[gauntlet](https://github.com/callmeradical/gauntlet) plugin:
+
+- `build` and `fix` run as `gauntlet:alpha`, the test-first builder;
+- `review` runs as `gauntlet:beta`, the fresh-context critic, which judges the
+  run's diff against the intent and ends with `VERDICT: PASS` or
+  `VERDICT: HOLD: <gap>`. A HOLD fails the review and blocks the bullet with the
+  gap as its reason;
+- other phases, such as `plan`, run with no role;
+- a repo that lists no `pipeline` gets `review` added after `test`
+  (`plan, build, test, review`); a listed pipeline runs exactly as listed.
+
+Install the plugin inside claude, at user scope:
+
+```
+/plugin install gauntlet@gauntlet
+```
+
+Dispatch, plan approval, resume, run-fix and `sgt run` refuse a project with
+roles on, before creating anything, when claude reports no enabled gauntlet
+plugin. `mise run check` warns about the same. To opt a project out:
+
+```yaml
+defaults:
+  gauntlet_roles: false
+```
+
+Roles never apply to other harnesses. `sgt help gauntlet_roles` prints the
+manual's full description.
 
 ## License
 

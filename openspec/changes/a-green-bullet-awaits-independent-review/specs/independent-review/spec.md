@@ -4,17 +4,35 @@
 
 ### Requirement: A repo whose pipeline does not configure review is unaffected
 
-A repository's factory pipeline that does not list `"review"` SHALL behave
-exactly as it did before this change — no review phase is dispatched, no
-new store writes occur, and a bullet's path from green to sealed is
-unchanged. Decision D5 is not amended by this requirement: this proposal
-adds no interruption that did not already exist for such a repo.
+When gauntlet roles do not apply to a repository's project, or when its
+factory lists its pipeline explicitly, a pipeline that does not list
+`"review"` SHALL behave exactly as it did before this change — no review
+phase is dispatched, no new store writes occur, and a bullet's path from
+green to sealed is unchanged. Decision D5 is not amended by this
+requirement.
 
 #### Scenario: A pipeline with no review phase runs unchanged
 
-- **WHEN** a repo's `Factory.Pipeline` contains no `"review"` entry
+- **WHEN** a repo's `Factory.Pipeline` lists pipeline entries and contains
+  no `"review"` entry
 - **THEN** `RunStage` dispatches no review agent, and the run's pass/fail
-  outcome is determined exactly as before this change
+  outcome is determined exactly as before this change, whether or not
+  gauntlet roles apply
+
+#### Scenario: A default pipeline with roles off gains no review phase
+
+- **WHEN** a repo's factory lists no pipeline and gauntlet roles do not
+  apply to its project
+- **THEN** its effective pipeline is `plan, build, test`, and `RunStage`
+  dispatches no review agent
+
+#### Scenario: A default pipeline with roles on is outside this requirement
+
+- **WHEN** a repo's factory lists no pipeline and gauntlet roles apply to
+  its project
+- **THEN** its effective pipeline is `plan, build, test, review`, as
+  `claude-is-the-default-harness-and-runs-gauntlet-roles` specifies in "A
+  default pipeline gains a review phase when roles apply"
 
 ### Requirement: A configured review phase runs after other phases and before a bullet can seal
 

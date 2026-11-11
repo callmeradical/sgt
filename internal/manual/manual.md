@@ -40,8 +40,11 @@ directly from the engine's own `exec.Command` call sites):
 - [`openspec`](https://github.com/Fission-AI/OpenSpec) — a dispatch
   resolves to a change before any run, intent, or worktree exists
 - `gh` — opening a pull request
-- A supported agent harness on `PATH`: `opencode`, `oc`, `claude`,
-  `goose`, `codex`, or `pi`
+- A supported agent harness on `PATH`: `claude` (the default),
+  `opencode`, `oc`, `goose`, `codex`, or `pi`. With `claude`, the
+  gauntlet plugin too, unless the project opts out of gauntlet roles
+  (see "Agent harness and gauntlet roles" under Configuration
+  reference)
 
 tmux is explicitly **not** a dependency — Sgt does not use it, drive
 it, or require it for any command.
@@ -196,6 +199,70 @@ Every project field — `repos`, `groups`, `agent_instructions`,
 `schema/project.yaml.example`. This manual does not repeat that
 reference; treat `docs/schema.md` as the source of truth for field
 names, types, and defaults.
+
+### Agent harness and gauntlet roles
+
+The default agent harness is claude. A dispatch that names no `agent`,
+in a project whose YAML sets no `defaults.agent`, runs `claude`. If
+`claude` is not on `PATH`, the phase is recorded `failed` with a reason
+naming `claude` and `defaults.agent`, and no agent process starts. To
+use another harness, pin it per project; a harness named this way runs
+exactly as it did before claude became the default:
+
+```yaml
+defaults:
+  agent: opencode
+```
+
+When a project's harness is `claude`, its phases run as the roles of
+the gauntlet plugin by default:
+
+- `build` and `fix` run as `gauntlet:alpha`, the test-first builder.
+  If alpha hands off instead of finishing, the phase is recorded
+  `failed` with the handoff file's path, never `passed`.
+- `review` runs as `gauntlet:beta`, the fresh-context critic. Its
+  prompt carries the repo's intent brief and the run's whole diff from
+  its base branch, and nothing from earlier phases. Beta ends with
+  `VERDICT: PASS` or `VERDICT: HOLD: <gap>`. A PASS passes the review.
+  A HOLD records the review `failed` with the gap as a blocking
+  finding, and the bullet is blocked with the gap as its reason. A
+  review with no verdict is never a pass.
+- Every other phase, such as `plan`, runs with no role.
+- A repo whose factory lists no `pipeline` gets a `review` phase after
+  `test`, so its pipeline is `plan, build, test, review`. A repo that
+  lists a pipeline runs exactly that list.
+
+Gauntlet roles never apply to any other harness. Each agent phase
+records its `role` and `plugin_version`, and the dashboard shows them;
+a phase that ran without a role shows `— no gauntlet role`.
+
+A HOLD is corrected by the operator: `POST /api/run-fix` starts a fix
+cycle whose prompt is the intent brief and the gap only, never beta's
+reasoning, and the next review is judged by a fresh beta. Run-fix
+refuses a review that produced no verdict, or a build that handed off;
+resume those instead.
+
+**Installing the plugin.** Inside claude, run
+`/plugin install gauntlet@gauntlet` at user scope. A project-scope
+install does not count: it is keyed to your own checkout, and agents
+run in fleet worktrees. Dispatch, plan approval, resume, run-fix and
+`sgt run` each ask `claude plugin list --json` first. Unless claude
+reports an enabled `gauntlet@` plugin at user or managed scope that
+carries both roles, the request is refused before any run, intent,
+branch or worktree exists, with a message naming what is missing and
+the opt-out. If `claude` itself is missing, the refusal names `claude`
+and `defaults.agent` instead. `mise run check` warns, without failing,
+when claude reports no usable gauntlet plugin.
+
+**Opting out.** A project turns gauntlet roles off with:
+
+```yaml
+defaults:
+  gauntlet_roles: false
+```
+
+claude phases then run with no role, a repo that lists no pipeline
+keeps `plan, build, test`, and no request checks for the plugin.
 
 ## Troubleshooting
 
