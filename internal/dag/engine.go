@@ -167,7 +167,11 @@ func (e *Engine) prepareWorktree(ctx context.Context, repoPath, runID, repoName 
 	if err != nil {
 		return "", false, fmt.Errorf("loading run %q to name its branch: %w", runID, err)
 	}
-	branch := naming.BranchName(run.Type, run.ChangeID)
+	// BranchNameForRun, not BranchName: a run with no work type (`sgt run`,
+	// which carries no OpenSpec change, and runs recorded before O2) gets the
+	// per-run sgt/<run-id> branch that delivery and create-pr look for, rather
+	// than the invalid "/".
+	branch := naming.BranchNameForRun(run.ID, run.Type, run.ChangeID)
 
 	// Resolve the repository's real default branch exactly once, before the
 	// worktree is created. The run.BaseBranch == "" guard is what makes this
