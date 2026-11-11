@@ -109,7 +109,7 @@ dag:
 	engine := dag.NewEngine(proj, st, router)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	srv.executeRun(ctx, cancel, engine, proj, runID, "order test", nil, "")
+	srv.executeRun(ctx, cancel, engine, proj, runID, "order test", nil, "", preflightResult{})
 
 	run, err := st.GetRun(runID)
 	if err != nil {
@@ -206,7 +206,7 @@ func TestStageFailureCausedByCancellationRecordsCancelledNotFailed(t *testing.T)
 	ctx, cancel := context.WithCancel(context.Background())
 	fake := &cancellingStageRunner{}
 	fake.cancel = cancel
-	srv.executeRun(ctx, cancel, fake, proj, runID, "cancel race test", nil, "")
+	srv.executeRun(ctx, cancel, fake, proj, runID, "cancel race test", nil, "", preflightResult{})
 
 	run, err := st.GetRun(runID)
 	if err != nil {
@@ -256,7 +256,7 @@ func TestExecuteRunIsTestableWithAFakeStageRunner(t *testing.T) {
 
 	fake := &fakeStageRunner{}
 	ctx, cancel := context.WithCancel(context.Background())
-	srv.executeRun(ctx, cancel, fake, proj, runID, "fake stage runner test", nil, "")
+	srv.executeRun(ctx, cancel, fake, proj, runID, "fake stage runner test", nil, "", preflightResult{})
 
 	if got, want := fake.stagesRun(), []string{"stage-1", "stage-2"}; !equalStrings(got, want) {
 		t.Errorf("stages run = %v, want %v", got, want)

@@ -595,7 +595,7 @@ dag:
 	router := handoff.NewRouter(filepath.Join(dag.FleetRoot(), runID, "handoff"))
 	engine := dag.NewEngine(proj, st, router)
 	ctx, cancel := context.WithCancel(context.Background())
-	srv.executeRun(ctx, cancel, engine, proj, runID, "two stage test", nil, "")
+	srv.executeRun(ctx, cancel, engine, proj, runID, "two stage test", nil, "", preflightResult{})
 
 	if got := runStatus(t, st, runID); got != "failed" {
 		t.Fatalf("run status after the initial dispatch = %q, want failed (svc's gate must fail before any marker exists)", got)

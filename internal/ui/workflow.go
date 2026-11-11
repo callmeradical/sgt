@@ -111,7 +111,8 @@ func (c *chain) add(kind, label string) {
 //
 // Ordering is not this function's decision to make:
 //   - stages come from dag.PipelineFor, which is the same resolution the engine
-//     performs, including the default pipeline for a repo with no factory block;
+//     performs, including the default pipeline for a repo with no factory block
+//     and the review phase that pipeline gains when roles apply;
 //   - gates come from dag.SortedGateNames, which is the exact order the engine
 //     executes them in;
 //   - the lifecycle tail comes from store.BulletProgression, which excludes
@@ -125,10 +126,10 @@ func (c *chain) add(kind, label string) {
 // entry, which is where the engine actually runs them. That is a deliberate
 // simplification of a flat chain: the execution order the graph shows is
 // correct, but it does not express containment.
-func buildWorkflowGraph(projectName, repoName string, repoCfg config.Repo) WorkflowGraph {
+func buildWorkflowGraph(projectName, repoName string, repoCfg config.Repo, roles bool) WorkflowGraph {
 	c := newChain(repoName)
 
-	for _, stage := range dag.PipelineFor(repoCfg) {
+	for _, stage := range dag.PipelineFor(repoCfg, roles) {
 		c.add(NodeKindStage, stage)
 	}
 	for _, gate := range dag.SortedGateNames(repoCfg) {
@@ -189,7 +190,9 @@ func (srv *Server) handleWorkflow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, buildWorkflowGraph(proj.Name, repoName, repoCfg))
+	// The view shows the project's saved configuration, so roles are those
+	// the project itself asks for (design decision 9).
+	writeJSON(w, http.StatusOK, buildWorkflowGraph(proj.Name, repoName, repoCfg, proj.GauntletRolesApply()))
 }
 
 // describeRepoSet lists a project's repos for an error message, sorted so the

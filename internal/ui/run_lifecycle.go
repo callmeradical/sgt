@@ -125,6 +125,7 @@ func (srv *Server) handleRunResume(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("loading project %s: %v", run.Project, err), http.StatusBadRequest)
 		return
 	}
+	pf := preflightResult{} // roles off: this entry point does not run the gauntlet preflight yet
 
 	// Resume runs the same body as a dispatch. The repository list is recovered
 	// from the phase records where possible, so a resume targets what the original
@@ -161,6 +162,8 @@ func (srv *Server) handleRunResume(w http.ResponseWriter, r *http.Request) {
 	router := handoff.NewRouter(filepath.Join(dag.FleetRoot(), run.ID, "handoff"))
 	engine := dag.NewEngine(proj, srv.Store, router)
 	engine.Resume = true
+	engine.GauntletRoles = pf.Roles
+	engine.GauntletVersion = pf.Version
 
 	_ = srv.Store.UpdateRunStatus(run.ID, "running")
 
@@ -169,7 +172,7 @@ func (srv *Server) handleRunResume(w http.ResponseWriter, r *http.Request) {
 	// Resume does not carry the change dir: the worktree (and its seeded
 	// plan.json) already exists from the original dispatch. Pass empty so
 	// SeedPlan is not re-run on resume, which would overwrite agent progress.
-	go srv.executeRun(ctx, cancel, engine, proj, run.ID, run.Brief, repos, "")
+	go srv.executeRun(ctx, cancel, engine, proj, run.ID, run.Brief, repos, "", pf)
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"status":  "resumed",
