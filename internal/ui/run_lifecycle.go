@@ -125,7 +125,15 @@ func (srv *Server) handleRunResume(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("loading project %s: %v", run.Project, err), http.StatusBadRequest)
 		return
 	}
-	pf := preflightResult{} // roles off: this entry point does not run the gauntlet preflight yet
+	// The gauntlet plugin preflight (design decision 5), before the
+	// blocked-bullet reconciliation and UpdateRunStatus, so a refusal leaves
+	// the run and its bullets exactly as they were.
+	roles, version, err := srv.gauntletPreflight(r.Context(), proj)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	pf := preflightResult{Roles: roles, Version: version}
 
 	// Resume runs the same body as a dispatch. The repository list is recovered
 	// from the phase records where possible, so a resume targets what the original

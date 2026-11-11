@@ -77,7 +77,15 @@ func (srv *Server) handleRunFix(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("loading project %s: %v", run.Project, err), http.StatusBadRequest)
 		return
 	}
-	pf := preflightResult{} // roles off: this entry point does not run the gauntlet preflight yet
+	// The gauntlet plugin preflight (design decision 5), before
+	// UpdateRunStatus and before any bullet leaves "blocked", so a refusal
+	// leaves the run and its bullets exactly as they were.
+	roles, version, err := srv.gauntletPreflight(r.Context(), proj)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	pf := preflightResult{Roles: roles, Version: version}
 
 	failure, ok := srv.lastFailedPhase(runID, "")
 	if !ok {
