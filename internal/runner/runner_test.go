@@ -1218,31 +1218,30 @@ func TestAnnotatePayloadWithProvenanceLeavesNonObjectPayloadUnchanged(t *testing
 		json.RawMessage(`"a string"`),
 	}
 	for _, payload := range cases {
-		got := annotatePayloadWithProvenance(payload, "some-model", "some-provider")
+		got := annotatePayloadWithProvenance(payload, phaseProvenance{Model: "some-model", Provider: "some-provider"})
 		if string(got) != string(payload) {
 			t.Errorf("annotatePayloadWithProvenance(%q, ...) = %q, want unchanged", payload, got)
 		}
 	}
 }
 
-// annotatePayloadWithProvenance sets model/provider even when both are empty
-// strings — an explicit empty is the honest "not knowable" signal, distinct
-// from the key being absent.
+// annotatePayloadWithProvenance sets every provenance key even when it is an
+// empty string — an explicit empty is the honest "not knowable" (or, for
+// role and plugin_version, "none ran") signal, distinct from the key being
+// absent.
 func TestAnnotatePayloadWithProvenanceSetsEmptyKeysExplicitly(t *testing.T) {
-	got := annotatePayloadWithProvenance(json.RawMessage(`{"agent":"opencode"}`), "", "")
+	got := annotatePayloadWithProvenance(json.RawMessage(`{"raw_output":"kept"}`), phaseProvenance{})
 	var m map[string]interface{}
 	if err := json.Unmarshal(got, &m); err != nil {
 		t.Fatalf("result is not valid JSON: %v", err)
 	}
-	modelVal, hasModel := m["model"]
-	providerVal, hasProvider := m["provider"]
-	if !hasModel || modelVal != "" {
-		t.Errorf("model = %v (present=%v), want present and empty", modelVal, hasModel)
+	for _, key := range []string{"model", "provider", "agent", "role", "plugin_version"} {
+		val, present := m[key]
+		if !present || val != "" {
+			t.Errorf("%s = %v (present=%v), want present and empty", key, val, present)
+		}
 	}
-	if !hasProvider || providerVal != "" {
-		t.Errorf("provider = %v (present=%v), want present and empty", providerVal, hasProvider)
-	}
-	if m["agent"] != "opencode" {
+	if m["raw_output"] != "kept" {
 		t.Errorf("existing key was lost: %+v", m)
 	}
 }
@@ -1255,7 +1254,7 @@ func TestAnnotatePayloadWithProvenanceHandlesJSONNull(t *testing.T) {
 			t.Fatalf("annotatePayloadWithProvenance panicked on JSON null payload: %v", r)
 		}
 	}()
-	got := annotatePayloadWithProvenance(json.RawMessage(`null`), "m", "p")
+	got := annotatePayloadWithProvenance(json.RawMessage(`null`), phaseProvenance{Model: "m", Provider: "p"})
 	model, provider := payloadProvenance(t, got)
 	if model != "m" || provider != "p" {
 		t.Errorf("model/provider = %q/%q, want m/p", model, provider)

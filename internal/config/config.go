@@ -15,6 +15,12 @@ import (
 // enumerates project files must skip it.
 const GlobalConfigFileName = "config.yaml"
 
+// DefaultAgent is the harness a project that names no agent runs with. It is
+// the one literal for that default: runner.DefaultAgent is defined as this
+// constant, so command building, provenance and GauntletRolesApply cannot
+// disagree about which harness an empty name means.
+const DefaultAgent = "opencode"
+
 // Project represents a Sgt multi-repo project definition.
 type Project struct {
 	Name        string          `yaml:"name" json:"name"`
@@ -99,6 +105,28 @@ type ProjectDefaults struct {
 	// against the built-in default of 5 by ResolvedFixRetries, the same
 	// "zero anywhere means unset" rule Retries/ResolvedRetries already uses.
 	FixRetries int `yaml:"fix_retries,omitempty" json:"fix_retries"`
+	// GauntletRoles is the gauntlet-roles opt-out (design decision 3). nil
+	// means on; only an explicit false turns roles off. A pointer, so an
+	// absent key and an explicit false stay distinguishable.
+	GauntletRoles *bool `yaml:"gauntlet_roles,omitempty" json:"gauntlet_roles"`
+}
+
+// GauntletRolesApply reports whether gauntlet roles apply to the project
+// (design decision 3): its resolved agent — Defaults.Agent, or DefaultAgent
+// when that is empty — has the base name "claude", and Defaults.GauntletRoles
+// is unset or true. Roles never apply to any other harness.
+//
+// This only says roles are wanted. Whether a run actually gets them is decided
+// by the caller's plugin preflight, never by the engine reading this itself.
+func (p *Project) GauntletRolesApply() bool {
+	agent := p.Defaults.Agent
+	if agent == "" {
+		agent = DefaultAgent
+	}
+	if filepath.Base(agent) != "claude" {
+		return false
+	}
+	return p.Defaults.GauntletRoles == nil || *p.Defaults.GauntletRoles
 }
 
 // Repo represents a single repository managed in the project.
