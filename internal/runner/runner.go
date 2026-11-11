@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/callmeradical/sgt/internal/config"
 	"github.com/callmeradical/sgt/internal/handoff"
 	"github.com/callmeradical/sgt/internal/naming"
 	"github.com/callmeradical/sgt/internal/redact"
@@ -122,12 +123,31 @@ func truthyEnv(key string) bool {
 	return v == "1" || v == "true"
 }
 
-// annotatePayloadWithProvenance adds model and provider to an existing
-// envelope payload without disturbing whatever else it carries. If payload is
-// not a JSON object (an agent-authored envelope could in principle write
-// something else), it is returned unchanged — provenance is additive
-// metadata, not a reason to reject a payload sgt did not itself produce.
-func annotatePayloadWithProvenance(payload json.RawMessage, model, provider string) json.RawMessage {
+// phaseProvenance is what sgt itself knows about how an agent phase ran, as
+// opposed to anything the agent reported about itself.
+//
+//   - Model and Provider: what detectModelProvider derived.
+//   - Agent: the resolved harness executable (BuildAgentCommandForRole's exe).
+//   - Role: the --agent value the phase ran with, or "" when it ran with none.
+//   - PluginVersion: the probed gauntlet version when Role is non-empty, and
+//     "" otherwise — a phase that ran no role used no plugin.
+type phaseProvenance struct {
+	Model         string
+	Provider      string
+	Agent         string
+	Role          string
+	PluginVersion string
+}
+
+// annotatePayloadWithProvenance adds sgt's provenance keys (model, provider,
+// agent, role, plugin_version) to an existing envelope payload without
+// disturbing whatever else it carries. sgt's keys replace same-named keys an
+// agent-written envelope carried, so a payload can never claim a harness or
+// role that did not run. If payload is not a JSON object (an agent-authored
+// envelope could in principle write something else), it is returned
+// unchanged — provenance is additive metadata, not a reason to reject a
+// payload sgt did not itself produce.
+func annotatePayloadWithProvenance(payload json.RawMessage, p phaseProvenance) json.RawMessage {
 	var m map[string]interface{}
 	if err := json.Unmarshal(payload, &m); err != nil {
 		return payload
@@ -137,8 +157,11 @@ func annotatePayloadWithProvenance(payload json.RawMessage, model, provider stri
 		// assignment into a nil map panics, so it must be allocated first.
 		m = map[string]interface{}{}
 	}
-	m["model"] = model
-	m["provider"] = provider
+	m["model"] = p.Model
+	m["provider"] = p.Provider
+	m["agent"] = p.Agent
+	m["role"] = p.Role
+	m["plugin_version"] = p.PluginVersion
 	b, err := json.Marshal(m)
 	if err != nil {
 		return payload
@@ -176,6 +199,20 @@ type PhaseRunner struct {
 	// dispatch or plain Resume (every existing caller), 1 is the first
 	// corrective cycle, 2 the second, and so on.
 	FixCycle int
+
+	// GauntletRoles and GauntletVersion are set only by a caller whose
+	// gauntlet plugin preflight succeeded (design decision 4); the runner
+	// never derives them from the project. With GauntletRoles set, a claude
+	// phase named by roleFor runs as that gauntlet role, and its record
+	// carries GauntletVersion as plugin_version. Every other harness ignores
+	// both fields.
+	GauntletRoles   bool
+	GauntletVersion string
+
+	// BaseBranch is the branch the run's worktree was created from, as
+	// recorded on the run (RunRecord.BaseBranch). Empty for runs recorded
+	// before it existed.
+	BaseBranch string
 
 	// Budgets per attempt. Zero means "resolve from the environment default".
 	AgentTimeout time.Duration
@@ -405,15 +442,51 @@ func (pr *PhaseRunner) DiffAgainstBase(ctx context.Context) (string, error) {
 	return string(out), nil
 }
 
-// BuildAgentCommand formats CLI arguments for any supported agent harness with proper non-interactive headless flags.
-func BuildAgentCommand(agentCLI, model, prompt string) (string, []string, []string) {
-	exe := agentCLI
-	if exe == "" {
-		exe = "opencode"
-	}
+// DefaultAgent is the harness an empty agent name resolves to, both for the
+// command BuildAgentCommandForRole builds and for the agent a phase records.
+// It is defined as config.DefaultAgent so there is exactly one literal.
+const DefaultAgent = config.DefaultAgent
 
-	var args []string
-	var env []string
+// Gauntlet role names passed to claude's --agent (design decision 4).
+const (
+	roleAlpha = "gauntlet:alpha"
+	roleBeta  = "gauntlet:beta"
+)
+
+// roleFor maps a phase name to the gauntlet role it runs as when roles are
+// on: build and fix are the builder (alpha), review is the critic (beta), and
+// every other phase runs with no role.
+func roleFor(phase string) string {
+	switch phase {
+	case "build", "fix":
+		return roleAlpha
+	case "review":
+		return roleBeta
+	default:
+		return ""
+	}
+}
+
+// BuildAgentCommand formats CLI arguments for any supported agent harness with
+// proper non-interactive headless flags. It is BuildAgentCommandForRole with
+// no role; the stdin it discards is always empty for a role-less command.
+func BuildAgentCommand(agentCLI, model, prompt string) (string, []string, []string) {
+	exe, args, env, _ := BuildAgentCommandForRole(agentCLI, model, "", prompt)
+	return exe, args, env
+}
+
+// BuildAgentCommandForRole formats a harness invocation that runs as role.
+// role is passed as claude's --agent and is ignored by every other harness,
+// so no other harness ever receives a gauntlet role. An empty agentCLI
+// resolves to DefaultAgent.
+//
+// stdin is the text to feed the process's standard input, or "" when the
+// prompt travels as an argument (always, today).
+func BuildAgentCommandForRole(agentCLI, model, role, prompt string) (exe string, args, env []string, stdin string) {
+	exe = agentCLI
+	if exe == "" {
+		exe = DefaultAgent
+	}
 
 	switch filepath.Base(exe) {
 	case "opencode", "oc":
@@ -434,6 +507,9 @@ func BuildAgentCommand(agentCLI, model, prompt string) (string, []string, []stri
 		args = []string{"--print", "--dangerously-skip-permissions"}
 		if model != "" {
 			args = append(args, "--model", model)
+		}
+		if role != "" {
+			args = append(args, "--agent", role)
 		}
 		args = append(args, prompt)
 
@@ -490,7 +566,20 @@ func BuildAgentCommand(agentCLI, model, prompt string) (string, []string, []stri
 		args = []string{prompt}
 	}
 
-	return exe, args, env
+	return exe, args, env, ""
+}
+
+// phaseRole reports the gauntlet role this runner's phase runs as: only when a
+// caller turned roles on, only for claude, and only for a phase roleFor maps.
+func (pr *PhaseRunner) phaseRole(phaseName string) string {
+	agent := pr.AgentCLI
+	if agent == "" {
+		agent = DefaultAgent
+	}
+	if !pr.GauntletRoles || filepath.Base(agent) != "claude" {
+		return ""
+	}
+	return roleFor(phaseName)
 }
 
 // RunAgentPhase executes a bounded headless agent session and validates output
@@ -538,9 +627,15 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 	promptFile := filepath.Join(stateDir, fmt.Sprintf("prompt_%s.txt", phaseName))
 	_ = os.WriteFile(promptFile, []byte(prompt), 0644)
 
+	role := pr.phaseRole(phaseName)
+	pluginVersion := ""
+	if role != "" {
+		pluginVersion = pr.GauntletVersion
+	}
+
 	var lastErr error
 	for attempt := 0; attempt <= retries; attempt++ {
-		exe, args, extraEnv := BuildAgentCommand(pr.AgentCLI, pr.Model, prompt)
+		exe, args, extraEnv, stdin := BuildAgentCommandForRole(pr.AgentCLI, pr.Model, role, prompt)
 
 		// artifactDir is cleared and recreated for every attempt, not just
 		// once: each retry is its own command execution and its own phase
@@ -572,6 +667,9 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 		// since setting cmd.Env at all replaces the inherited environment
 		// entirely rather than extending it.
 		cmd.Env = append(os.Environ(), extraEnv...)
+		if stdin != "" {
+			cmd.Stdin = strings.NewReader(stdin)
+		}
 
 		var outBuf bytes.Buffer
 		cmd.Stdout = &outBuf
@@ -677,7 +775,13 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 		// from").
 		blockedReason := handoff.BlockedReason(env.Payload)
 
-		env.Payload = annotatePayloadWithProvenance(env.Payload, model, provider)
+		env.Payload = annotatePayloadWithProvenance(env.Payload, phaseProvenance{
+			Model:         model,
+			Provider:      provider,
+			Agent:         exe,
+			Role:          role,
+			PluginVersion: pluginVersion,
+		})
 
 		// Generate the envelope id before the SaveEnvelope call so both the
 		// delivery record (DeliverEnvelope) and the envelope record (RecordEnvelope)

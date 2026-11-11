@@ -44,6 +44,20 @@ type Engine struct {
 	// implementation it describes, and does not get duplicated into other
 	// repos' worktrees in a multi-repo stage.
 	ChangeRepo string
+
+	// GauntletRoles and GauntletVersion are the caller's gauntlet plugin
+	// preflight result (design decision 4). Only a caller whose preflight
+	// succeeded sets them; the engine never derives roles from Project, so a
+	// caller that skipped the preflight runs role-less and no record can name
+	// a role that did not run. GauntletRoles also selects the effective
+	// pipeline (PipelineFor).
+	GauntletRoles   bool
+	GauntletVersion string
+
+	// FixCycle is the corrective cycle (a-failed-gate-is-corrected-in-place)
+	// this engine runs for, copied into every PhaseRunner it builds so every
+	// phase it records carries it. 0 for a dispatch or a plain resume.
+	FixCycle int
 }
 
 // phasePassed reports whether this run already earned a pass for a phase.
@@ -429,11 +443,18 @@ func DefaultPipeline() []string { return []string{"plan", "build", "test"} }
 //
 // This is the single place the "configured pipeline, else the default" rule
 // lives, so a description of the workflow cannot disagree with its execution.
-func PipelineFor(repoCfg config.Repo) []string {
+// When gauntletRoles is set and the repo lists no pipeline, the default is
+// followed by "review" (design decision 9); a listed pipeline is returned
+// exactly as configured.
+func PipelineFor(repoCfg config.Repo, gauntletRoles bool) []string {
 	if repoCfg.Factory != nil && len(repoCfg.Factory.Pipeline) > 0 {
 		return append([]string(nil), repoCfg.Factory.Pipeline...)
 	}
-	return DefaultPipeline()
+	pipeline := DefaultPipeline()
+	if gauntletRoles {
+		pipeline = append(pipeline, "review")
+	}
+	return pipeline
 }
 
 // RunStage executes a single multi-repo stage and its constituent intra-repo factories.
@@ -509,18 +530,31 @@ func (e *Engine) RunStage(ctx context.Context, runID string, stage *config.DAGSt
 			}
 		}
 
+		// BaseBranch comes from the run record, read after prepareWorktree
+		// (which records it on first use) — not from prepareWorktree itself,
+		// which returns early, before reading the run, when the worktree
+		// already exists.
+		baseBranch := ""
+		if run, err := e.Store.GetRun(runID); err == nil {
+			baseBranch = run.BaseBranch
+		}
+
 		pr := &runner.PhaseRunner{
-			Store:    e.Store,
-			Router:   e.Router,
-			Worktree: worktreePath,
-			RepoName: repoName,
-			RunID:    runID,
-			AgentCLI: e.Project.Defaults.Agent,
-			Model:    e.Project.Defaults.Model,
+			Store:           e.Store,
+			Router:          e.Router,
+			Worktree:        worktreePath,
+			RepoName:        repoName,
+			RunID:           runID,
+			AgentCLI:        e.Project.Defaults.Agent,
+			Model:           e.Project.Defaults.Model,
+			FixCycle:        e.FixCycle,
+			GauntletRoles:   e.GauntletRoles,
+			GauntletVersion: e.GauntletVersion,
+			BaseBranch:      baseBranch,
 		}
 
 		// Run factory pipeline phases
-		pipeline := PipelineFor(repoCfg)
+		pipeline := PipelineFor(repoCfg, e.GauntletRoles)
 
 		for _, phase := range pipeline {
 			switch phase {
@@ -756,6 +790,7 @@ func (e *Engine) recordGateStage(ctx context.Context, runID, repoName, stage str
 		RunID:    runID,
 		AgentCLI: e.Project.Defaults.Agent,
 		Model:    e.Project.Defaults.Model,
+		FixCycle: e.FixCycle,
 	}
 
 	evidence := make([]GateEvidence, 0, len(gateNames))

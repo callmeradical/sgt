@@ -38,6 +38,12 @@ type Server struct {
 	// swap-a-dependency shape GHPRCreate above already uses.
 	RunShippingGate func(ctx context.Context, name, command string, worktrees []string) (*runner.GateResult, error)
 
+	// GauntletProbe reports claude's installed plugins for the gauntlet
+	// preflight (preflight.go). NewServer installs the real
+	// `claude plugin list --json` probe; a test substitutes a stub so no test
+	// can reach the real claude. nil falls back to the default probe.
+	GauntletProbe ProbeFunc
+
 	// cancels holds one CancelFunc per in-flight run so that a cancel request can
 	// actually stop the work. Without it "Stop Run" only writes a status column
 	// that the dispatch goroutine later overwrites, and agents keep writing to
@@ -120,6 +126,7 @@ func NewServer(s *store.Store, port int) *Server {
 		Port:            port,
 		cancels:         map[string]context.CancelFunc{},
 		RunShippingGate: runner.RunShippingGate,
+		GauntletProbe:   defaultGauntletProbe,
 		fleet:           newFleetCleaner(s),
 		retention:       newRetentionRotator(s),
 		delivery:        newDeliveryReporter(s),

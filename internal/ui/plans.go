@@ -91,6 +91,7 @@ func (srv *Server) handleApprovePlan(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("loading project %q: %v", intent.Project, err), http.StatusInternalServerError)
 		return
 	}
+	pf := preflightResult{} // roles off: this entry point does not run the gauntlet preflight yet
 
 	// Decision O3 still applies, but the change was already resolved once, at
 	// proposal time, and is reused here verbatim — not re-resolved. Calling
@@ -124,7 +125,7 @@ func (srv *Server) handleApprovePlan(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	srv.createRunAndDispatch(w, proj, intent.Statement, targetRepos, change, "", changeRepoName, changeRepoPath, intentID, intent.Type)
+	srv.createRunAndDispatch(w, proj, intent.Statement, targetRepos, change, "", changeRepoName, changeRepoPath, intentID, intent.Type, pf)
 }
 
 // handleRejectPlan is decision D2/D5(a)'s explicit rejection path. Rejecting

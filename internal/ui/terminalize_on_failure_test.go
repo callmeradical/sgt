@@ -90,7 +90,7 @@ defaults:
 	engine := dag.NewEngine(proj, st, router)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	srv.executeRun(ctx, cancel, engine, proj, runID, "terminalize on failure test", nil, "")
+	srv.executeRun(ctx, cancel, engine, proj, runID, "terminalize on failure test", nil, "", preflightResult{})
 
 	run, err := st.GetRun(runID)
 	if err != nil {

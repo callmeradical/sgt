@@ -77,6 +77,7 @@ func (srv *Server) handleRunFix(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("loading project %s: %v", run.Project, err), http.StatusBadRequest)
 		return
 	}
+	pf := preflightResult{} // roles off: this entry point does not run the gauntlet preflight yet
 
 	failure, ok := srv.lastFailedPhase(runID, "")
 	if !ok {
@@ -101,7 +102,7 @@ func (srv *Server) handleRunFix(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(context.Background())
 	srv.registerRun(run.ID, cancel)
 
-	go srv.runFixCycles(ctx, cancel, proj, run.ID, failure.Repo)
+	go srv.runFixCycles(ctx, cancel, proj, run.ID, failure.Repo, pf)
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"status":  "fixing",
@@ -129,7 +130,11 @@ func (srv *Server) handleRunFix(w http.ResponseWriter, r *http.Request) {
 // existing failed/blocked outcome, with a reason that says the fix budget
 // was exhausted rather than repeating the original gate-failure text as if
 // no correction had been attempted.
-func (srv *Server) runFixCycles(ctx context.Context, cancel context.CancelFunc, proj *config.Project, runID, repoName string) {
+//
+// pf is the caller's gauntlet preflight result: every cycle's fix phase and
+// re-run stage carry its roles and version, and each cycle's engine its
+// FixCycle.
+func (srv *Server) runFixCycles(ctx context.Context, cancel context.CancelFunc, proj *config.Project, runID, repoName string, pf preflightResult) {
 	defer cancel()
 	defer srv.finishRun(runID)
 
@@ -162,6 +167,9 @@ func (srv *Server) runFixCycles(ctx context.Context, cancel context.CancelFunc, 
 			AgentCLI: proj.Defaults.Agent,
 			Model:    proj.Defaults.Model,
 			FixCycle: cycle,
+
+			GauntletRoles:   pf.Roles,
+			GauntletVersion: pf.Version,
 		}
 
 		if _, _, err := pr.RunAgentPhase(ctx, "fix", fixPrompt(failure), proj.ResolvedRetries(repoName)); err != nil {
@@ -192,6 +200,9 @@ func (srv *Server) runFixCycles(ctx context.Context, cancel context.CancelFunc, 
 
 		engine := dag.NewEngine(proj, srv.Store, router)
 		engine.Resume = true
+		engine.GauntletRoles = pf.Roles
+		engine.GauntletVersion = pf.Version
+		engine.FixCycle = cycle
 
 		cycleFailed := engine.RunStage(ctx, runID, &stage) != nil
 

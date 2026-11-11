@@ -150,6 +150,27 @@ func (srv *Server) handleDispatch(w http.ResponseWriter, r *http.Request) {
 		proj.Defaults.Agent = req.Agent
 	}
 
+	requestID := strings.TrimSpace(req.RequestID)
+
+	// The gauntlet plugin preflight (design decision 5), against the effective
+	// project — after the agent override, since that decides whether roles
+	// apply — and before change resolution, so a refusal writes nothing, not
+	// even a scaffolded change. It is skipped when no repos are named: that
+	// path only records a proposed plan and starts no work, and approval runs
+	// its own preflight. It is also skipped, and nothing else is, for a
+	// request whose request_id already names a run: that repeat creates no
+	// run, worktree or phase, and must be answered exactly as the original
+	// was (D10) even if the plugin check has started failing since.
+	pf := preflightResult{}
+	if len(req.Repos) > 0 && !srv.requestAlreadyServed(requestID) {
+		roles, version, err := srv.gauntletPreflight(r.Context(), proj)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		pf = preflightResult{Roles: roles, Version: version}
+	}
+
 	// Decision O3: resolve the OpenSpec change BEFORE anything else exists. No run
 	// row, no branch and no worktree may precede it, or a failure here would leave
 	// behind dispatched work with no planning record — exactly what O3 forbids.
@@ -170,7 +191,6 @@ func (srv *Server) handleDispatch(w http.ResponseWriter, r *http.Request) {
 	targetRepos := targetRepositories(proj, req.Repos)
 
 	brief := strings.TrimSpace(req.Brief)
-	requestID := strings.TrimSpace(req.RequestID)
 
 	// Decision D2: a decomposition the caller did not state explicitly — the
 	// literal case D2 calls "inferred" — must be recorded as a plan awaiting
@@ -220,7 +240,18 @@ func (srv *Server) handleDispatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	srv.createRunAndDispatch(w, proj, brief, targetRepos, change, requestID, changeRepoName, changeRepoPath, "", req.Type)
+	srv.createRunAndDispatch(w, proj, brief, targetRepos, change, requestID, changeRepoName, changeRepoPath, "", req.Type, pf)
+}
+
+// requestAlreadyServed reports whether requestID already names a run, i.e.
+// this request is a repeat of one already served (decision D10). An empty
+// key never matches.
+func (srv *Server) requestAlreadyServed(requestID string) bool {
+	if requestID == "" {
+		return false
+	}
+	_, err := srv.Store.GetRunByRequestID(requestID)
+	return err == nil
 }
 
 // createRunAndDispatch is the run-creation-and-dispatch sequence a dispatch
@@ -241,6 +272,9 @@ func (srv *Server) handleDispatch(w http.ResponseWriter, r *http.Request) {
 // disconnected intent silently became the one actually tracked, doubling
 // the dashboard's primary object (D8) for what a human considers one piece
 // of work.
+//
+// pf is the caller's gauntlet preflight result; it lands on the engine as
+// the only source of the run's roles and plugin version (design decision 4).
 func (srv *Server) createRunAndDispatch(
 	w http.ResponseWriter,
 	proj *config.Project,
@@ -252,6 +286,7 @@ func (srv *Server) createRunAndDispatch(
 	changeRepoPath string,
 	existingIntentID string,
 	workType string,
+	pf preflightResult,
 ) {
 	taskID := naming.RunID()
 
@@ -340,13 +375,15 @@ func (srv *Server) createRunAndDispatch(
 	// 1-method interface), which does not expose ChangeDir or ChangeRepo.
 	engine.ChangeDir = change.Dir
 	engine.ChangeRepo = changeRepoName
+	engine.GauntletRoles = pf.Roles
+	engine.GauntletVersion = pf.Version
 
 	// Async run dispatch. The context is cancellable so that handleRunCancel can
 	// actually stop in-flight agent work rather than just relabelling the row.
 	ctx, cancel := context.WithCancel(context.Background())
 	srv.registerRun(taskID, cancel)
 
-	go srv.executeRun(ctx, cancel, engine, proj, taskID, brief, targetRepos, change.Dir)
+	go srv.executeRun(ctx, cancel, engine, proj, taskID, brief, targetRepos, change.Dir, pf)
 
 	writeJSON(w, http.StatusOK, dispatchResponse(taskID, proj.Name, changeRepoName, change))
 }
@@ -444,6 +481,10 @@ func marshalRaw(v interface{}) json.RawMessage {
 //
 // changeDir is the absolute path to the OpenSpec change directory (may be empty
 // for resume paths that do not carry it — those runs report no progress).
+//
+// pf is the gauntlet preflight result the run was started with — the same
+// value already set on the engine — carried here for run-level decisions
+// that depend on whether the run has roles.
 func (srv *Server) executeRun(
 	ctx context.Context,
 	cancel context.CancelFunc,
@@ -453,6 +494,7 @@ func (srv *Server) executeRun(
 	brief string,
 	repos []string,
 	changeDir string,
+	pf preflightResult,
 ) {
 	defer cancel()
 	defer srv.finishRun(taskID)

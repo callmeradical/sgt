@@ -171,6 +171,7 @@ description: before
 defaults:
   agent: opencode
   model: anthropic/claude-opus-5 # pinned deliberately
+  gauntlet_roles: false
 repos:
   - name: svc
     path: /tmp/svc
@@ -219,6 +220,7 @@ dag:
 		"# hand-maintained, comments must survive", // comments
 		"model: anthropic/claude-opus-5",           // defaults.model
 		"# pinned deliberately",                    // inline comment
+		"gauntlet_roles: false",                    // the gauntlet-roles opt-out
 		"path: /tmp/svc",                           // repo path
 		"group: backend",                           // repo group
 		"pipeline:",                                // factory.pipeline
@@ -270,6 +272,14 @@ dag:
 	}
 	if proj.DAG == nil || len(proj.DAG.Stages) != 1 {
 		t.Errorf("DAG lost after save: %+v", proj.DAG)
+	}
+	// Scenario: Saving the project preserves the opt-out. The save switched
+	// the agent to claude, so the surviving key is what keeps roles off.
+	if proj.Defaults.GauntletRoles == nil || *proj.Defaults.GauntletRoles {
+		t.Errorf("gauntlet_roles opt-out lost after save: %v", proj.Defaults.GauntletRoles)
+	}
+	if proj.GauntletRolesApply() {
+		t.Error("the saved claude project has roles on; its gauntlet_roles: false did not survive")
 	}
 }
 
