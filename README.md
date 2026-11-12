@@ -263,7 +263,8 @@ Every harness, `claude` included, gets this behaviour, by design:
 
 - **Every gate in a repo re-runs after a fix.** A gate or review counts only if
   its newest record passed after the repo's last `fix` and after every agent
-  phase placed before it in the pipeline, such as `build`; a run is recorded
+  phase other than `review` placed before it in the pipeline, such as
+  `build`; a run is recorded
   `passed` only when every required phase passes by that rule.
 - **Reviews see the run's whole diff** from its base branch: committed,
   uncommitted and untracked work. A very large diff is cut to a

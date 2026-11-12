@@ -41,8 +41,8 @@ directly from the engine's own `exec.Command` call sites):
   resolves to a change before any run, intent, or worktree exists
 - `gh` — opening a pull request
 - A supported agent harness on `PATH`: `claude` (the default),
-  `opencode`, `oc`, `goose`, `codex`, `pi`, or `copilot` (see Supported
-  agents). With `claude`, the
+  `opencode`, `oc`, `goose`, `codex`, `pi`, or `copilot` (the harness
+  table follows Configuration reference). With `claude`, the
   gauntlet plugin too, unless the project opts out of gauntlet roles
   (see "Agent harness and gauntlet roles" under Configuration
   reference)
@@ -210,8 +210,8 @@ in a project whose YAML sets no `defaults.agent`, runs `claude`. If
 agent process starts. (With gauntlet roles on, the plugin check below
 refuses a checked request first.) To use another harness, pin it per project;
 a harness named this way is invoked with the same command as before
-claude became the default, and gets the run-level changes listed under
-Supported agents:
+claude became the default, and gets the every-harness run changes
+listed with the harness table after this section:
 
 ```yaml
 defaults:
@@ -327,8 +327,8 @@ behind it.
 
 - **Every gate in a repo re-runs after a fix.** A gate or review counts
   as passed only if its newest record passed after the repo's last
-  `fix` and after every agent phase placed before it in the pipeline,
-  such as `build`.
+  `fix` and after every agent phase other than `review` placed before
+  it in the pipeline, such as `build`.
   After a fix, all of that repo's gates run again, not only the one
   that failed, and a run is recorded `passed` only when every required
   phase passes by that rule.
