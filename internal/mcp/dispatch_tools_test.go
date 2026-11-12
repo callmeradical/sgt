@@ -93,7 +93,10 @@ func mcpDispatchFixture(t *testing.T, repos ...string) (s *mcp.MCPServer, st *st
 	t.Setenv("SGT_FLEET_DIR", filepath.Join(base, "fleet"))
 
 	repoPaths = map[string]string{}
-	projYAML := "name: mcpo\nrepos:\n"
+	// The project names no agent, so it resolves to claude; gauntlet_roles: false
+	// pins this fixture, which is not about the default harness, to its
+	// role-less behaviour (design decision 5).
+	projYAML := "name: mcpo\ndefaults:\n  gauntlet_roles: false\nrepos:\n"
 	for _, name := range repos {
 		p := filepath.Join(base, name)
 		if err := os.MkdirAll(p, 0o755); err != nil {
