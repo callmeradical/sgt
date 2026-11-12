@@ -93,7 +93,11 @@ func NewRouter(baseDir string) *Router {
 	return &Router{BaseDir: baseDir}
 }
 
-// SaveEnvelope writes an envelope to disk under the repo's handoff namespace.
+// SaveEnvelope writes an envelope to disk under the repo's handoff namespace,
+// as envelope_<stage>.json and, for every stage but "review", as
+// envelope_latest.json. A review is a judgement of the repo's work, not work
+// a downstream repo builds on, so envelope_latest.json keeps pointing at the
+// repo's last non-review phase.
 func (r *Router) SaveEnvelope(env *Envelope) error {
 	repoDir := filepath.Join(r.BaseDir, env.Repo)
 	if err := os.MkdirAll(repoDir, 0755); err != nil {
@@ -110,7 +114,9 @@ func (r *Router) SaveEnvelope(env *Envelope) error {
 		return fmt.Errorf("writing envelope file: %w", err)
 	}
 
-	// Also write latest
+	if env.Stage == "review" {
+		return nil
+	}
 	latest := filepath.Join(repoDir, "envelope_latest.json")
 	return os.WriteFile(latest, data, 0644)
 }
