@@ -204,7 +204,16 @@ Tests must not need a real `claude`: use a stub executable on `PATH`, the
 - [ ] 10.1 `README.md` (around line 198), `internal/manual/manual.md` and
   `.agents/skills/sgt-setup/SKILL.md` state that claude is the default and
   describe gauntlet roles, `gauntlet_roles: false`, and installing the
-  plugin.
+  plugin. They also include a **Supported agents** section (PRD R6), which:
+  - lists every name in `runner.SupportedAgents`;
+  - marks `claude` as the default and as the only harness that runs gauntlet
+    roles;
+  - for every harness, lists the behaviour that applies to all runs:
+    - every gate in a repo re-runs after a fix;
+    - reviews see the run's whole diff;
+    - a review with a blocking finding is recorded `failed`;
+    - a blocked bullet shows its failed phase's own error;
+    - `sgt run` follows the dispatch path.
 - [ ] 10.2 Amend the requirement "A repo whose pipeline does not configure
   review is unaffected" in
   `openspec/changes/a-green-bullet-awaits-independent-review/specs/independent-review/spec.md`.
@@ -233,9 +242,12 @@ Tests must not need a real `claude`: use a stub executable on `PATH`, the
     "resume to continue", not `passed`;
   - the `sgt run` changes: commits, delivery, empty DAG refused, exit code;
   - HOLD auto-correction and handoff successors arrive with change 2.
-- Verify: a new `internal/manual` test asserts that the manual contains the
-  sentence `The default agent harness is claude.` and the
-  `gauntlet_roles: false` opt-out. It fails before the docs change. Also
+- Verify: a new `internal/manual` test asserts that the manual contains:
+  - the sentence `The default agent harness is claude.`;
+  - the `gauntlet_roles: false` opt-out;
+  - a `Supported agents` section that names every entry of
+    `runner.SupportedAgents`, built from that slice so that adding a harness
+    without documenting it fails the test. It fails before the docs change. Also
   `grep -q 'default agent harness is claude' README.md` must exit 0.
   `openspec validate a-green-bullet-awaits-independent-review --strict`
   must pass after 10.2.
