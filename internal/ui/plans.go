@@ -91,7 +91,15 @@ func (srv *Server) handleApprovePlan(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("loading project %q: %v", intent.Project, err), http.StatusInternalServerError)
 		return
 	}
-	pf := preflightResult{} // roles off: this entry point does not run the gauntlet preflight yet
+	// The gauntlet plugin preflight (design decision 5), before change
+	// resolution, the intent's status change and any bullet write, so a
+	// refusal leaves the plan proposed exactly as it was.
+	roles, version, err := srv.gauntletPreflight(r.Context(), proj)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	pf := preflightResult{Roles: roles, Version: version}
 
 	// Decision O3 still applies, but the change was already resolved once, at
 	// proposal time, and is reused here verbatim — not re-resolved. Calling
