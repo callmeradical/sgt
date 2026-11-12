@@ -247,7 +247,10 @@ func gitDispatchFixtureStandaloneServer(t *testing.T) (srv *Server, st *store.St
 	repoPath = filepath.Join(base, "svc")
 	initGitRepo(t, repoPath)
 
-	projYAML := "name: o3\nrepos:\n" +
+	// The project names no agent, so it resolves to claude; gauntlet_roles: false
+	// pins this fixture, which is not about the default harness, to its
+	// role-less behaviour (design decision 5).
+	projYAML := "name: o3\ndefaults:\n  gauntlet_roles: false\nrepos:\n" +
 		"  - name: svc\n" +
 		"    path: " + repoPath + "\n" +
 		"    factory:\n" +

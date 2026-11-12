@@ -59,7 +59,12 @@ func TestExecuteRunRunsConfiguredStagesInOrder(t *testing.T) {
 	orderLog := filepath.Join(base, "order.log")
 	t.Setenv("ORDER_LOG", orderLog)
 
+	// The project names no agent, so it resolves to claude; gauntlet_roles: false
+	// pins this fixture, which is not about the default harness, to its
+	// role-less behaviour (design decision 5).
 	projYAML := fmt.Sprintf(`name: ordered-proj
+defaults:
+  gauntlet_roles: false
 repos:
   - name: repoA
     path: %s

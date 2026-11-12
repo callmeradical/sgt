@@ -19,7 +19,7 @@ const GlobalConfigFileName = "config.yaml"
 // the one literal for that default: runner.DefaultAgent is defined as this
 // constant, so command building, provenance and GauntletRolesApply cannot
 // disagree about which harness an empty name means.
-const DefaultAgent = "opencode"
+const DefaultAgent = "claude"
 
 // Project represents a Sgt multi-repo project definition.
 type Project struct {
@@ -97,7 +97,7 @@ type Export struct {
 
 // ProjectDefaults defines shared settings across repos.
 type ProjectDefaults struct {
-	Agent   string `yaml:"agent,omitempty" json:"agent"`     // e.g. "pi", "opencode", "claude"
+	Agent   string `yaml:"agent,omitempty" json:"agent"`     // e.g. "pi", "opencode", "claude"; empty runs DefaultAgent (claude)
 	Model   string `yaml:"model,omitempty" json:"model"`     // e.g. "anthropic/claude-3-7-sonnet"
 	Retries int    `yaml:"retries,omitempty" json:"retries"` // agent phase retry count (0 = one attempt, no retry)
 	// FixRetries is the corrective-cycle bound a failed gate may be re-attempted
@@ -163,11 +163,11 @@ type DAGConfig struct {
 
 // DAGStage defines a single stage in the cross-repo workflow.
 type DAGStage struct {
-	Name   string   `yaml:"name" json:"name"`
-	Repos  []string `yaml:"repos" json:"repos"`
-	After  []string `yaml:"after,omitempty" json:"after"`
-	Brief  string   `yaml:"brief,omitempty" json:"brief"`
-	TD     string   `yaml:"td,omitempty" json:"td"`
+	Name  string   `yaml:"name" json:"name"`
+	Repos []string `yaml:"repos" json:"repos"`
+	After []string `yaml:"after,omitempty" json:"after"`
+	Brief string   `yaml:"brief,omitempty" json:"brief"`
+	TD    string   `yaml:"td,omitempty" json:"td"`
 }
 
 // LoadProject reads and parses a project YAML from ~/.config/sgt/<name>.yaml or a custom path.

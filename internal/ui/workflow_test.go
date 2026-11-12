@@ -150,7 +150,9 @@ repos:
 
 // A repo with no factory block still has a workflow — the engine's default — and
 // an operator must be able to see it. The expected list is read from
-// dag.DefaultPipeline so this test cannot drift from the engine either.
+// dag.PipelineFor so this test cannot drift from the engine either. A bare
+// project names no agent, so it resolves to claude with gauntlet roles on, and
+// its default pipeline is plan/build/test followed by review (design decision 9).
 func TestWorkflowGraphUsesTheEngineDefaultPipelineWhenNoFactoryIsConfigured(t *testing.T) {
 	mux := workflowFixture(t, "bare.yaml", `
 name: bare
@@ -164,12 +166,12 @@ repos:
 		t.Fatalf("status = %d, want 200; body=%s", w.Code, w.Body.String())
 	}
 
-	want := dag.DefaultPipeline()
+	want := dag.PipelineFor(config.Repo{}, true)
 	if got := labelsOfKind(graph.Nodes, NodeKindStage); !equalStrings(got, want) {
-		t.Errorf("stage nodes = %v, want the engine default %v", got, want)
+		t.Errorf("stage nodes = %v, want the engine default with roles %v", got, want)
 	}
-	if want[0] != "plan" || want[len(want)-1] != "test" {
-		t.Errorf("dag.DefaultPipeline() = %v, which no longer matches the documented plan/build/test default", want)
+	if !equalStrings(want, append(dag.DefaultPipeline(), "review")) || !equalStrings(dag.DefaultPipeline(), []string{"plan", "build", "test"}) {
+		t.Errorf("dag.PipelineFor(bare, roles) = %v, which no longer matches the documented plan/build/test/review default", want)
 	}
 
 	if got := labelsOfKind(graph.Nodes, NodeKindGate); len(got) != 0 {
@@ -189,6 +191,8 @@ repos:
 func TestWorkflowGraphGateOrderMatchesTheEngineExecutionOrder(t *testing.T) {
 	mux := workflowFixture(t, "gates.yaml", `
 name: gates
+defaults:
+  gauntlet_roles: false
 repos:
   - name: svc
     path: /tmp/svc

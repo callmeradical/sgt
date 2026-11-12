@@ -45,7 +45,10 @@ func cliDispatchFixture(t *testing.T, repos ...string) (st *store.Store, repoPat
 	t.Setenv("SGT_FLEET_DIR", filepath.Join(base, "fleet"))
 
 	repoPaths = map[string]string{}
-	projYAML := "name: clio\nrepos:\n"
+	// The project names no agent, so it resolves to claude; gauntlet_roles: false
+	// pins this fixture, which is not about the default harness, to its
+	// role-less behaviour (design decision 5).
+	projYAML := "name: clio\ndefaults:\n  gauntlet_roles: false\nrepos:\n"
 	for _, name := range repos {
 		p := filepath.Join(base, name)
 		if err := os.MkdirAll(p, 0o755); err != nil {

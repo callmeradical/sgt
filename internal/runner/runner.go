@@ -620,6 +620,25 @@ func lastNonEmptyLines(output string, n int) []string {
 	return out
 }
 
+// harnessMissingReason is the error an attempt records when its harness
+// executable is not on PATH (design decision 2). It names the executable and
+// the project setting that chooses another.
+func harnessMissingReason(exe string) string {
+	return fmt.Sprintf("agent harness %q not found on PATH; install it or set defaults.agent in the project", exe)
+}
+
+// harnessOnPath reports whether exe resolves to an executable the attempt can
+// start. A bare name is looked up on PATH; a relative path with a separator is
+// resolved against the worktree, where the process runs.
+func harnessOnPath(exe, worktree string) bool {
+	target := exe
+	if strings.ContainsRune(exe, filepath.Separator) && !filepath.IsAbs(exe) {
+		target = filepath.Join(worktree, exe)
+	}
+	_, err := exec.LookPath(target)
+	return err == nil
+}
+
 // phaseRole reports the gauntlet role this runner's phase runs as: only when a
 // caller turned roles on, only for claude, and only for a phase roleFor maps.
 func (pr *PhaseRunner) phaseRole(phaseName string) string {
@@ -704,6 +723,12 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 		envelopePath := filepath.Join(stateDir, "envelope.json")
 		_ = os.Remove(envelopePath)
 
+		// Rule 1 of design decision 1a: a harness missing from PATH fails the
+		// attempt before any process starts, and before cancellation is
+		// considered. It is never retried: no retry can change the outcome
+		// (design decision 2).
+		harnessMissing := !harnessOnPath(exe, pr.Worktree)
+
 		// A zero budget means unbounded: derive a cancellable child so operator
 		// cancellation still propagates, but attach no deadline. Passing 0 to
 		// context.WithTimeout would produce an already-expired context and kill the
@@ -716,24 +741,26 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 		} else {
 			phaseCtx, cancel = context.WithCancel(ctx)
 		}
-		cmd := exec.CommandContext(phaseCtx, exe, args...)
-		superviseGroup(cmd)
-		cmd.Dir = pr.Worktree
-		// extraEnv always has at least SGT_ARTIFACT_DIR now, so cmd.Env
-		// is always set — and must be os.Environ() plus these additions,
-		// since setting cmd.Env at all replaces the inherited environment
-		// entirely rather than extending it.
-		cmd.Env = append(os.Environ(), extraEnv...)
-		if stdin != "" {
-			cmd.Stdin = strings.NewReader(stdin)
-		}
 
 		var outBuf bytes.Buffer
-		cmd.Stdout = &outBuf
-		cmd.Stderr = &outBuf
-
+		var runErr error
 		attemptStarted := time.Now()
-		runErr := cmd.Run()
+		if !harnessMissing {
+			cmd := exec.CommandContext(phaseCtx, exe, args...)
+			superviseGroup(cmd)
+			cmd.Dir = pr.Worktree
+			// extraEnv always has at least SGT_ARTIFACT_DIR now, so cmd.Env
+			// is always set — and must be os.Environ() plus these additions,
+			// since setting cmd.Env at all replaces the inherited environment
+			// entirely rather than extending it.
+			cmd.Env = append(os.Environ(), extraEnv...)
+			if stdin != "" {
+				cmd.Stdin = strings.NewReader(stdin)
+			}
+			cmd.Stdout = &outBuf
+			cmd.Stderr = &outBuf
+			runErr = cmd.Run()
+		}
 		attemptEnded := time.Now()
 		provider, model := detectModelProvider(exe, outBuf.String(), pr.Model)
 		cancel()
@@ -745,7 +772,7 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 		// at the top of this function: a run cancelled mid-phase left it there
 		// forever, indistinguishable from a phase actually still executing
 		// (issue #20).
-		if ctx.Err() != nil {
+		if !harnessMissing && ctx.Err() != nil {
 			attemptNumber := attempt + 1
 			attemptID := phaseID
 			if attempt > 0 {
@@ -778,11 +805,13 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 		output := stripANSI(outBuf.String())
 		timedOut := errors.Is(phaseCtx.Err(), context.DeadlineExceeded)
 		terminated := runErr == nil && filepath.Base(exe) == "claude" && endsWithTerminationNotice(output)
-		processFailed := runErr != nil || terminated
+		processFailed := harnessMissing || runErr != nil || terminated
 		failed := processFailed
 
 		var failureReason string
 		switch {
+		case harnessMissing:
+			failureReason = harnessMissingReason(exe)
 		case timedOut:
 			failureReason = fmt.Sprintf("agent %s exceeded its %s budget and was killed", exe, budget)
 		case runErr != nil:
@@ -855,7 +884,7 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 		// redacted: the role's judgement, then a review's blocking findings.
 		// When they fail a review the agent's envelope stays the recorded one,
 		// so its findings still reach the bullet's blocked reason.
-		retryable := processFailed
+		retryable := processFailed && !harnessMissing
 		if !processFailed {
 			var outcome attemptOutcome
 			env.Payload, outcome = judgeAttempt(roleAttempt{
@@ -959,7 +988,7 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 		captureArtifacts(pr.Store, pr.RunID, attemptID, pr.RepoName, artifactDir)
 
 		if failed {
-			if processFailed {
+			if processFailed && !harnessMissing {
 				lastErr = fmt.Errorf("%s (output: %s)", failureReason, redact.Text(strings.TrimSpace(output)))
 			} else {
 				lastErr = errors.New(failureReason)
