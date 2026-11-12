@@ -966,8 +966,10 @@ func (srv *Server) appendRunProgress(runID string) {
 		if !entry.IsDir() {
 			continue
 		}
-		// Skip the shared handoff directory, which is not a repo worktree.
-		if entry.Name() == "handoff" {
+		// Skip the shared handoff directory and every dot-directory (the
+		// run's .prompts, where role-phase prompts live): none is a repo
+		// worktree.
+		if entry.Name() == "handoff" || strings.HasPrefix(entry.Name(), ".") {
 			continue
 		}
 		worktree := filepath.Join(runDir, entry.Name())
