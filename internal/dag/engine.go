@@ -628,7 +628,10 @@ func (e *Engine) RunStage(ctx context.Context, runID string, stage *config.DAGSt
 					return fmt.Errorf("collecting diff for review phase on %s: %w", repoName, err)
 				}
 				brief := e.phaseBrief(runID, "build", stage, repoName, repoCfg)
-				prompt := reviewPrompt(diff, brief, stage, repoName, pr.PhaseRole("review") != "")
+				roles := pr.PhaseRole("review") != ""
+				prompt := boundedReviewPrompt(diff, pr.AgentCLI, pr.BaseBranch != "", runner.PromptSuffix(pr.Worktree), func(diff string) string {
+					return reviewPrompt(diff, brief, stage, repoName, roles)
+				})
 				env, _, err := pr.RunAgentPhase(ctx, "review", prompt, e.Project.ResolvedRetries(repoName))
 				if err != nil {
 					return fmt.Errorf("review phase failed on repo %s: %w", repoName, err)

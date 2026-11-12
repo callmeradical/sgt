@@ -428,20 +428,6 @@ func RunShippingGate(ctx context.Context, name, command string, worktrees []stri
 	}, nil
 }
 
-// DiffAgainstBase returns the unified diff of the worktree's current HEAD
-// against the branch it was created from, for a review phase's prompt.
-// Shells to git directly, the same way internal/dag/engine.go already
-// creates and inspects worktrees (os/exec, no library dependency) — no new
-// pattern introduced.
-func (pr *PhaseRunner) DiffAgainstBase(ctx context.Context) (string, error) {
-	cmd := exec.CommandContext(ctx, "git", "-C", pr.Worktree, "diff", "--merge-base", "HEAD")
-	out, err := cmd.Output()
-	if err != nil {
-		return "", fmt.Errorf("git diff in %s: %w", pr.Worktree, err)
-	}
-	return string(out), nil
-}
-
 // DefaultAgent is the harness an empty agent name resolves to, both for the
 // command BuildAgentCommandForRole builds and for the agent a phase records.
 // It is defined as config.DefaultAgent so there is exactly one literal.
@@ -469,9 +455,15 @@ func roleFor(phase string) string {
 
 // BuildAgentCommand formats CLI arguments for any supported agent harness with
 // proper non-interactive headless flags. It is BuildAgentCommandForRole with
-// no role; the stdin it discards is always empty for a role-less command.
+// no role. Having no stdin to return, it never drops a prompt: a claude
+// prompt that BuildAgentCommandForRole would put on stdin is passed as the
+// last argument instead, exactly as it would be at or under
+// MaxClaudeArgPrompt.
 func BuildAgentCommand(agentCLI, model, prompt string) (string, []string, []string) {
-	exe, args, env, _ := BuildAgentCommandForRole(agentCLI, model, "", prompt)
+	exe, args, env, stdin := BuildAgentCommandForRole(agentCLI, model, "", prompt)
+	if stdin != "" {
+		args = append(args, stdin)
+	}
 	return exe, args, env
 }
 
@@ -481,7 +473,8 @@ func BuildAgentCommand(agentCLI, model, prompt string) (string, []string, []stri
 // resolves to DefaultAgent.
 //
 // stdin is the text to feed the process's standard input, or "" when the
-// prompt travels as an argument (always, today).
+// prompt travels as an argument: always for every harness but claude, and for
+// claude whenever the prompt is at most MaxClaudeArgPrompt bytes.
 func BuildAgentCommandForRole(agentCLI, model, role, prompt string) (exe string, args, env []string, stdin string) {
 	exe = agentCLI
 	if exe == "" {
@@ -525,7 +518,11 @@ func BuildAgentCommandForRole(agentCLI, model, role, prompt string) (exe string,
 		if role != "" {
 			args = append(args, "--agent", role)
 		}
-		args = append(args, prompt)
+		if len(prompt) > MaxClaudeArgPrompt {
+			stdin = prompt
+		} else {
+			args = append(args, prompt)
+		}
 		env = append(env,
 			"CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0",
 			"CLAUDE_CODE_DISABLE_AUTO_MEMORY=1",
@@ -584,7 +581,7 @@ func BuildAgentCommandForRole(agentCLI, model, role, prompt string) (exe string,
 		args = []string{prompt}
 	}
 
-	return exe, args, env, ""
+	return exe, args, env, stdin
 }
 
 // terminationNoticePattern matches the line claude --print emits when it gives
@@ -694,13 +691,7 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 	// prompt. The plan file itself is not modified here; sgt only seeds it
 	// (in Engine.RunStage) and thereafter only reads it. The agent is the sole
 	// writer after seeding.
-	planPath := filepath.Join(stateDir, "plan.json")
-	if _, planErr := os.Stat(planPath); planErr == nil {
-		prompt = prompt + planPromptExtension
-	}
-
-	promptFile := filepath.Join(stateDir, fmt.Sprintf("prompt_%s.txt", phaseName))
-	_ = os.WriteFile(promptFile, []byte(prompt), 0644)
+	prompt += PromptSuffix(pr.Worktree)
 
 	role := pr.phaseRole(phaseName)
 	pluginVersion := ""
@@ -708,9 +699,25 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 		pluginVersion = pr.GauntletVersion
 	}
 
+	// A role-less phase keeps its prompt at .sgt/prompt_<phase>.txt. A role
+	// phase's prompt is written per attempt outside the worktree (see
+	// rolePromptPath), because CommitRunOutput stages the whole worktree:
+	// beta's bar would reach the next alpha, and an alpha fix brief carrying
+	// a HOLD gap would reach the next beta (design decision 6).
+	promptArtifact := fmt.Sprintf(".sgt/prompt_%s.txt", phaseName)
+	if role == "" {
+		_ = os.WriteFile(filepath.Join(stateDir, fmt.Sprintf("prompt_%s.txt", phaseName)), []byte(prompt), 0644)
+	}
+
 	var lastErr error
 	for attempt := 0; attempt <= retries; attempt++ {
 		exe, args, extraEnv, stdin := BuildAgentCommandForRole(pr.AgentCLI, pr.Model, role, prompt)
+
+		if role != "" {
+			promptArtifact = pr.rolePromptPath(phaseName, attempt+1)
+			_ = os.MkdirAll(filepath.Dir(promptArtifact), 0o755)
+			_ = os.WriteFile(promptArtifact, []byte(prompt), 0o644)
+		}
 
 		// artifactDir is cleared and recreated for every attempt, not just
 		// once: each retry is its own command execution and its own phase
@@ -838,6 +845,12 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 				agentEnvelope = true
 			}
 		}
+		// A role phase's own envelope file is consumed here, read or not, so
+		// a later commit never carries it onto the run branch where the next
+		// role could read it from history (design decision 6).
+		if role != "" {
+			_ = os.Remove(envelopePath)
+		}
 		if !agentEnvelope {
 			summary := fmt.Sprintf("Phase %s completed for %s", phaseName, pr.RepoName)
 			if failed {
@@ -848,7 +861,7 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 				Repo:      pr.RepoName,
 				Stage:     phaseName,
 				Summary:   summary,
-				Artifacts: []string{fmt.Sprintf(".sgt/prompt_%s.txt", phaseName)},
+				Artifacts: []string{promptArtifact},
 				Payload: marshalPayload(map[string]string{
 					"raw_output": redact.Truncate(redact.Text(stripANSI(outBuf.String())), maxRawOutputBytes),
 					"agent":      exe,

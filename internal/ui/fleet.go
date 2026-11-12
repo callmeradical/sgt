@@ -70,7 +70,8 @@ func (fc *fleetCleaner) handleFleet(w http.ResponseWriter, r *http.Request) {
 	var leases []WorktreeLease
 	entries, _ := os.ReadDir(fleetDir)
 	for _, entry := range entries {
-		if !entry.IsDir() {
+		// A dot-directory is never a run (git metadata, editor state).
+		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
 			continue
 		}
 		taskID := entry.Name()
@@ -93,7 +94,10 @@ func (fc *fleetCleaner) handleFleet(w http.ResponseWriter, r *http.Request) {
 		repoEntries, _ := os.ReadDir(runDir)
 		found := false
 		for _, repoEntry := range repoEntries {
-			if !repoEntry.IsDir() {
+			// A dot-directory beside the worktrees (the run's .prompts, where
+			// role-phase prompts live) is never a repo, even when git would
+			// answer for it from an enclosing checkout.
+			if !repoEntry.IsDir() || strings.HasPrefix(repoEntry.Name(), ".") {
 				continue
 			}
 			repoWT := filepath.Join(runDir, repoEntry.Name())
