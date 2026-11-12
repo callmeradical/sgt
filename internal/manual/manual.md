@@ -40,8 +40,12 @@ directly from the engine's own `exec.Command` call sites):
 - [`openspec`](https://github.com/Fission-AI/OpenSpec) — a dispatch
   resolves to a change before any run, intent, or worktree exists
 - `gh` — opening a pull request
-- A supported agent harness on `PATH`: `opencode`, `oc`, `claude`,
-  `goose`, `codex`, or `pi`
+- A supported agent harness on `PATH`: `claude` (the default),
+  `opencode`, `oc`, `goose`, `codex`, `pi`, or `copilot` (the harness
+  table follows Configuration reference). With `claude`, the
+  gauntlet plugin too, unless the project opts out of gauntlet roles
+  (see "Agent harness and gauntlet roles" under Configuration
+  reference)
 
 tmux is explicitly **not** a dependency — Sgt does not use it, drive
 it, or require it for any command.
@@ -196,6 +200,158 @@ Every project field — `repos`, `groups`, `agent_instructions`,
 `schema/project.yaml.example`. This manual does not repeat that
 reference; treat `docs/schema.md` as the source of truth for field
 names, types, and defaults.
+
+### Agent harness and gauntlet roles
+
+The default agent harness is claude. A dispatch that names no `agent`,
+in a project whose YAML sets no `defaults.agent`, runs `claude`. If
+`claude` is not on `PATH`, an agent phase that runs is recorded
+`failed` with a reason naming `claude` and `defaults.agent`, and no
+agent process starts. (With gauntlet roles on, the plugin check below
+refuses a checked request first.) To use another harness, pin it per project;
+a harness named this way is invoked with the same command as before
+claude became the default, and gets the every-harness run changes
+listed with the harness table after this section:
+
+```yaml
+defaults:
+  agent: opencode
+```
+
+When a project's harness is `claude`, its phases run as the roles of
+the gauntlet plugin by default:
+
+- `build` and `fix` run as `gauntlet:alpha`, the test-first builder.
+  If alpha hands off instead of finishing, the phase is recorded
+  `failed` with the handoff file's path, never `passed`.
+- `review` runs as `gauntlet:beta`, the fresh-context critic. Its
+  prompt carries the repo's intent brief and the run's whole diff from
+  its base branch, and nothing from earlier phases. Beta is told to end
+  with `VERDICT: PASS` or `VERDICT: HOLD: <gap>`, and the last such
+  line in its output decides. A PASS passes the review. A HOLD records
+  the review `failed` with the gap as a blocking finding; when the run
+  ends `failed`, the bullet's blocked reason contains the gap. A review
+  with no verdict is never a pass.
+- Every other phase, such as `plan`, runs with no role.
+- A repo whose factory lists no `pipeline` gets a `review` phase after
+  `test`, so its pipeline is `plan, build, test, review`. A repo that
+  lists a pipeline runs exactly that list.
+
+Gauntlet roles never apply to any other harness. Each agent phase
+records its `role` and `plugin_version`, and the dashboard shows them;
+a phase that ran without a role shows `— no gauntlet role`.
+
+A HOLD is corrected by the operator: `POST /api/run-fix` starts a fix
+cycle whose prompt is the intent brief and the gap only, never beta's
+reasoning, and the next review's brief does not carry the previous
+verdict. Run-fix
+refuses a review that produced no verdict, or a build that handed off;
+resume those instead.
+
+**Installing the plugin.** Inside claude, run
+`/plugin install gauntlet@gauntlet` at user scope. A project-scope
+install does not count: it is keyed to your own checkout, and agents
+run in fleet worktrees.
+
+**When sgt checks for the plugin.** Only for a project whose gauntlet
+roles apply, judged after a dispatch's `agent` override. For such a
+project, these requests ask
+`claude plugin list --json` before they write anything: a dispatch that
+names repos, plan approval, resume, run-fix, and `sgt run`. Two
+requests are not checked:
+
+- a dispatch that names no repos only records a `proposed` plan (an
+  intent); the plugin is checked when the plan is approved;
+- a dispatch that repeats a `request_id` which already created a run is
+  answered with the original response.
+
+Unless claude reports an enabled `gauntlet@` plugin at user or managed
+scope that carries both roles, a checked request is refused with a
+message naming what is missing and the opt-out. If claude's plugin list
+cannot be read, the message says so. If `claude` itself is missing, the
+message names `claude` and `defaults.agent` instead. A refusal is made
+before any write:
+
+- a refused dispatch or `sgt run` leaves no new run, intent, branch or
+  worktree;
+- a refused approval leaves the plan `proposed`, its bullets unchanged,
+  and no run;
+- a refused resume or run-fix leaves the run's status, its blocked
+  bullet and its phase records as they were.
+
+`mise run check` warns, without failing, when claude reports no usable
+gauntlet plugin.
+
+**Opting out.** A project turns gauntlet roles off with:
+
+```yaml
+defaults:
+  gauntlet_roles: false
+```
+
+claude phases then run with no role, a repo that lists no pipeline
+keeps `plan, build, test`, and no request checks for the plugin.
+
+## Supported agents
+
+Sgt drives these agent harnesses. A harness is named by its executable
+on `PATH` (a path whose base name is one of these also works), per
+project with `defaults.agent` or per dispatch with `agent`. Only the
+dispatch request is validated: an `agent` on a dispatch request that is
+not in this table is refused before anything is created. A project's
+`defaults.agent` is not checked up front; a name outside this table is
+run as `<name> <prompt>` when a phase starts, and fails if no such
+executable is on `PATH`.
+
+| Harness | Default | Gauntlet roles |
+|---|---|---|
+| `claude` | default | on by default, with an opt-out; the only harness that runs gauntlet roles |
+| `opencode` | — | never |
+| `oc` | — | never (invoked with the same arguments as `opencode`) |
+| `goose` | — | never |
+| `codex` | — | never |
+| `pi` | — | never |
+| `copilot` | — | never |
+
+`claude` is what runs when nothing names a harness. Only `claude` runs
+`build` and `fix` as `gauntlet:alpha` and `review` as `gauntlet:beta`,
+and only a request whose harness, after any dispatch `agent` override,
+is `claude` with roles on is ever checked for the gauntlet plugin (see
+"Agent harness and gauntlet roles" under Configuration reference).
+Every other harness runs its phases with no role, and a repo that lists
+no pipeline keeps `plan, build, test`.
+
+Every harness, `claude` included, gets the following. This is intended
+behaviour: a run's recorded outcome is only as good as the evidence
+behind it.
+
+- **Every gate in a repo re-runs after a fix.** A gate or review counts
+  as passed only if its newest record passed after the repo's last
+  `fix` and after every agent phase other than `review` placed before
+  it in the pipeline, such as `build`.
+  After a fix, all of that repo's gates run again, not only the one
+  that failed, and a run is recorded `passed` only when every required
+  phase passes by that rule.
+- **Reviews see the run's whole diff.** A `review` phase is given the
+  diff from the run's base branch: committed, uncommitted and untracked
+  work, with `.sgt/` left out. A very large diff is cut, and a marker
+  in the prompt names the cap that applied: 256 KiB for `claude`, whose
+  large prompts go on stdin; for every other harness, whose prompt is
+  one command-line argument, whatever keeps the whole prompt under
+  120 KiB, and at most 96 KiB.
+- **A review with a blocking finding is recorded `failed`.** A finding of
+  severity `error` fails the review phase, so a resume runs the review
+  again instead of skipping it.
+- **A blocked bullet shows its failed phase's own error.** When no agent
+  named a reason and no current review finding applies, a blocked
+  bullet's reason is the newest failed phase's error, prefixed with its
+  repo and phase and cut to 300 characters. For a failed gate that
+  includes redacted gate output; it never includes raw agent output.
+- **`sgt run` follows the dispatch path.** `sgt run <project>` runs
+  through the same execution as `POST /api/dispatch`: it commits agent
+  output, records delivery, applies the final pass check, refuses a
+  project with no DAG stages, and exits 0 only when the stored run
+  status is `passed`.
 
 ## Troubleshooting
 

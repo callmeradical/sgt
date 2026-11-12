@@ -4,6 +4,9 @@ One repository, `sgt-v2`, so one task.
 
 ## Task 1 — special-case a review phase, route blocking findings through the existing blocked path
 
+- [x] 1.1 Special-case a review phase and route blocking findings through
+  the existing blocked path, as detailed below.
+
 Repository: `sgt-v2`. Depends on: nothing (reuses
 `a-stuck-bullet-is-blocked-not-failed`'s already-merged mechanism as-is,
 does not modify it). Read first: `internal/dag/engine.go`'s `RunStage`

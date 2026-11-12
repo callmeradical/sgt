@@ -72,12 +72,60 @@ Required:
 - [`openspec`](https://github.com/Fission-AI/OpenSpec) — a dispatch resolves
   to a change before any run, intent, or worktree exists
 - `gh` (GitHub CLI) — opening pull requests
-- At least one supported agent harness on `PATH`: `opencode`, `oc`, `claude`,
-  `goose`, `codex`, or `pi`
+- At least one supported agent harness on `PATH`: `claude`, `opencode`, `oc`,
+  `goose`, `codex`, `pi`, or `copilot` (see Supported agents below). The
+  default agent harness is claude: a project that sets no `defaults.agent`
+  runs `claude` unless a dispatch names another harness, so check for it
+  first
 - Go 1.21+ — to build the `sgt` binary
 
 Optional (skip, do not fail, if absent):
 - `mise` (for `mise run check`, `mise run build`, `mise run install`)
+- `python3` (`mise run check` uses it to read claude's plugin list; without
+  it the check warns that it could not check the gauntlet plugin)
+
+Gauntlet plugin (warn, do not fail): when `claude` is present, check that
+`claude plugin list --json` reports an enabled `gauntlet@` plugin at `user` or
+`managed` scope whose install path holds `agents/alpha.md` and
+`agents/beta.md`. `mise run check` reports this as a `gauntlet` line. With
+roles on (the claude default), sgt runs `build` and `fix` as `gauntlet:alpha`
+and `review` as `gauntlet:beta`. When the plugin is missing, sgt refuses a
+dispatch that names repos, plan approval, resume, run-fix and `sgt run` for
+the project, before writing anything. A dispatch that names no repos still
+records a `proposed` plan; its approval is refused. If it is missing, tell
+the user to install it themselves inside claude, at user scope:
+
+```
+/plugin install gauntlet@gauntlet
+```
+
+Do not install it for them: that writes under `~/.claude/`, which this skill
+never touches. The alternative is to opt the project out of roles in Phase 4
+(`defaults.gauntlet_roles: false`).
+
+### Supported agents
+
+Use this table when telling the user which harnesses Sgt can run (Phase 1)
+and when asking about `defaults.agent` (Phase 4). Sgt does not check a
+project's `defaults.agent` against it up front (only a dispatch request's
+`agent` is refused when not listed), so write only a name from this table.
+
+| Harness | Default | Gauntlet roles |
+|---|---|---|
+| `claude` | default | on by default; the only harness that runs gauntlet roles |
+| `opencode` | — | never |
+| `oc` | — | never (invoked with the same arguments as `opencode`) |
+| `goose` | — | never |
+| `codex` | — | never |
+| `pi` | — | never |
+| `copilot` | — | never |
+
+Whichever harness the user picks, Sgt applies the same checks to every run,
+by design: every gate in a repo re-runs after a fix; reviews see the run's
+whole diff (a very large one is cut to a harness-specific limit, with a marker
+naming it); a review with a blocking finding is recorded `failed`; a blocked
+bullet shows its failed phase's own error; and `sgt run` follows the dispatch
+path. `sgt help "Supported agents"` prints the full description.
 
 `tmux` is explicitly **not** a dependency — v2 does not use it, drive it, or
 require it for any command. Do not install it or check for it.
@@ -168,6 +216,18 @@ For a new project, interview the user for the fields documented in
 4. Optional groups, with shared `agent_instructions`
 5. Optional Graphify block (`output`, `include_groups`, `exclude_patterns`) —
    only ask if the user wants cross-repo knowledge graph generation
+6. Agent harness. The default agent harness is claude. Ask whether the
+   project should run a different harness; only if the user names one, write
+   it as `defaults.agent` (for example `agent: opencode` under `defaults:`).
+   Do not write `defaults.agent` otherwise.
+7. Gauntlet roles, only when the harness is claude. Roles are on unless the
+   project opts out: `build` and `fix` run as `gauntlet:alpha`, `review` runs
+   as `gauntlet:beta`, and a repo that lists no `pipeline` gets `review` after
+   `test` (`plan, build, test, review`). Ask whether to keep them; only if the
+   user declines, write `gauntlet_roles: false` under `defaults:`. If Phase 1
+   found no usable gauntlet plugin and the user keeps roles on, remind them
+   that dispatches naming repos, plan approvals, resumes, run-fix and
+   `sgt run` are refused until it is installed.
 
 Do not invent repository paths, groups, or instructions the user did not
 provide. Refuse to register a repo whose `path` does not exist; report it and
@@ -221,6 +281,9 @@ If the target project YAML exists but is invalid or incomplete:
 | Project absent from `/api/projects` | YAML missing, misnamed, or invalid | Re-run Phase 4/5 |
 | Repo path in YAML does not exist on disk | v2 does not clone repos automatically | Ask the user to clone it manually, then re-validate |
 | `openspec`, `gh`, or an agent harness missing | Prerequisite not installed | Re-run Phase 1; do not substitute a different tool silently |
+| Request refused with `agent harness "claude" not found on PATH`, or (with `defaults.gauntlet_roles: false`) agent phases recorded `failed` with an error naming `claude` and `defaults.agent` | The project names no harness, so it runs claude, the default, and claude is not on `PATH`. With gauntlet roles on, the plugin check refuses the request; with roles off, each agent phase fails at run time instead | Install claude, or set `defaults.agent` in the project (Phase 5) |
+| Request refused: `claude reports no enabled gauntlet plugin` | Roles are on and the plugin is missing, disabled, not installed at user or managed scope, or lacks `agents/alpha.md` or `agents/beta.md` | The user runs `/plugin install gauntlet@gauntlet` in claude, or set `defaults.gauntlet_roles: false` (Phase 5) |
+| Request refused: `could not read claude's plugin list` | `claude plugin list --json` failed, timed out, or printed something other than a JSON plugin list | Retry; if it persists, check claude itself, or set `defaults.gauntlet_roles: false` |
 
 See `docs/troubleshooting.md` for problems with an already-registered project
 or an in-flight dispatch — those are out of scope for this skill.
