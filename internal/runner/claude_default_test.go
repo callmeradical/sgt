@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -95,9 +96,18 @@ func TestProvenanceNamesTheResolvedDefault(t *testing.T) {
 func TestClaudeAbsentFromPathFailsWithAReasonThatNamesIt(t *testing.T) {
 	bin := t.TempDir()
 	isolatedPath(t, bin)
+	// A stub claude that exists on disk but outside the PATH the test set. If
+	// the runner started any claude process the stub would leave its marker.
+	offPath := t.TempDir()
+	marker := filepath.Join(t.TempDir(), "claude-ran")
+	fakeAgent(t, offPath, "claude", "touch '"+marker+"'")
 
 	pr, st := newRunner(t, "", 10*time.Second)
 	env, _, err := pr.RunAgentPhase(context.Background(), "build", "do the thing", 2)
+	if _, statErr := os.Stat(marker); !os.IsNotExist(statErr) {
+		t.Errorf("the off-PATH claude stub ran (marker %s stat err %v): a missing harness must start no process", marker, statErr)
+	}
+
 	if err == nil || env != nil {
 		t.Fatalf("RunAgentPhase with claude absent returned env=%v err=%v, want a failure", env, err)
 	}
@@ -171,5 +181,35 @@ func TestAMissingHarnessIsDecidedBeforeCancellation(t *testing.T) {
 	phases, _ := st.ListPhasesForRun("run-1")
 	if len(phases) != 1 || phases[0].Status != "failed" {
 		t.Fatalf("phases = %+v, want one failed record", phases)
+	}
+}
+
+// A relative agent path with a separator is resolved against the worktree,
+// where the process runs, not the test's own working directory or PATH: an
+// agent script checked into the repository is found, run, and passes.
+func TestARelativeAgentPathInTheWorktreeRunsAndIsNotReportedMissing(t *testing.T) {
+	bin := t.TempDir()
+	isolatedPath(t, bin)
+
+	pr, st := newRunner(t, "./scripts/agent.sh", 10*time.Second)
+	scripts := filepath.Join(pr.Worktree, "scripts")
+	if err := os.MkdirAll(scripts, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	marker := filepath.Join(t.TempDir(), "agent-ran")
+	fakeAgent(t, scripts, "agent.sh", "touch '"+marker+"'")
+
+	if _, _, err := pr.RunAgentPhase(context.Background(), "build", "do the thing", 0); err != nil {
+		t.Fatalf("RunAgentPhase with a relative agent path in the worktree: %v", err)
+	}
+	if _, err := os.Stat(marker); err != nil {
+		t.Errorf("the worktree agent did not run: %v", err)
+	}
+	phases, err := st.ListPhasesForRun("run-1")
+	if err != nil || len(phases) != 1 {
+		t.Fatalf("phases = %v (err %v), want one", phases, err)
+	}
+	if phases[0].Status != "passed" || strings.Contains(phases[0].Error, "not found on PATH") {
+		t.Errorf("phase = status %q error %q, want passed with no harness-missing reason", phases[0].Status, phases[0].Error)
 	}
 }
