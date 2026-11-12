@@ -116,7 +116,12 @@ pass to every run that does not name an agent.
 4. A project or dispatch that names no harness runs Claude Code.
 5. When Claude Code is not installed where Sgt can run it, the failure names
    the missing harness and how to choose another, rather than an opaque error.
-6. Operator-facing docs and setup list Claude Code as the default.
+6. Operator-facing docs and setup list Claude Code as the default, and
+   state which agent harnesses are supported and what each gets. Claude Code
+   is the default and the only harness that runs gauntlet roles. Every other
+   supported harness still runs, and gets the every-harness truthfulness
+   behaviour (R9a, R11a, R11b and R11c). The docs list that behaviour, so an
+   operator on another harness knows what changed.
 
 ### R-C — Claude Code phases run as gauntlet roles
 
@@ -255,3 +260,8 @@ so the first can be gated and built while the second settles.
     *Recorded (2026-11-11): yes, as R9a and R11b, under the operator's
     earlier choice (question 8) to apply truthfulness rules to every
     harness.*
+11. The truthfulness fixes change behaviour on every harness, not only
+    Claude Code. Is that intended, and how is it communicated?
+    *Decided (2026-11-11): yes. The operator confirmed it, to give a much
+    better out-of-the-box experience. The docs must state which agents are
+    supported and what each gets (R6).*
