@@ -1,6 +1,11 @@
 package dag
 
-import "github.com/callmeradical/sgt/internal/store"
+import (
+	"fmt"
+
+	"github.com/callmeradical/sgt/internal/config"
+	"github.com/callmeradical/sgt/internal/store"
+)
 
 // PhasePassed reports whether repo's phase or gate called name, of the given
 // record kind ("agent" for pipeline phases, "code" for gates), counts as
@@ -89,4 +94,122 @@ func recordBefore(phases []store.PhaseRecord, i, j int) bool {
 		return i < j
 	}
 	return a.Before(b)
+}
+
+// RunVerified is design decision 8's terminal guard: it reports whether a
+// run may be recorded passed, and when it may not, the reason naming the
+// phase and repo that stop it. Every entry point that ends a run passed
+// (dispatch, resume, an operator fix cycle, sgt run) asks it first.
+//
+// repos are the repos the run is accountable for, in the order a reason
+// should name them. For each, every phase of its effective pipeline
+// (PipelineFor(repoCfg, roles)) must count as passed by PhasePassed:
+//
+//   - "fix" is never required;
+//   - "test" is satisfied by the repo's configured gate records (kind
+//     "code"), or by the placeholder "test" gate record when it configures
+//     none, so gates are required only when the pipeline has "test";
+//   - every other entry is the agent phase of that name.
+//
+// A DAG project's repo that is in none of its stages can never run, so it is
+// reported first, with a reason that never says to resume. A repo with no
+// records at all has not run. Otherwise the first phase that does not count
+// is named, as a verification with no fresh pass or a work phase that did
+// not pass; when the repo's newest "fix" failed, the reason also points at
+// POST /api/run-fix.
+func RunVerified(phases []store.PhaseRecord, proj *config.Project, repos []string, roles bool) (ok bool, reason string) {
+	for _, repo := range repos {
+		if !inSomeStage(proj, repo) {
+			return false, fmt.Sprintf("repo %s has a bullet but is in no stage of this project's DAG; it cannot run", repo)
+		}
+	}
+	for _, repo := range repos {
+		if reason := repoUnverified(phases, proj, repo, roles); reason != "" {
+			return false, reason
+		}
+	}
+	return true, ""
+}
+
+// repoUnverified is RunVerified for one repo: "" when every required phase
+// counts as passed, else the reason it does not.
+func repoUnverified(phases []store.PhaseRecord, proj *config.Project, repo string, roles bool) string {
+	ran := false
+	for i := range phases {
+		if phases[i].Repo == repo {
+			ran = true
+			break
+		}
+	}
+	if !ran {
+		return fmt.Sprintf("repo %s has not run", repo)
+	}
+
+	var repoCfg config.Repo
+	if proj != nil {
+		repoCfg = proj.Repos[repo]
+	}
+	pipeline := PipelineFor(repoCfg, roles)
+
+	type required struct{ name, kind string }
+	var reqs []required
+	for _, phase := range pipeline {
+		switch phase {
+		case "fix":
+		case "test":
+			gates := SortedGateNames(repoCfg)
+			if len(gates) == 0 {
+				gates = []string{"test"}
+			}
+			for _, g := range gates {
+				reqs = append(reqs, required{g, "code"})
+			}
+		default:
+			reqs = append(reqs, required{phase, "agent"})
+		}
+	}
+
+	for _, r := range reqs {
+		if PhasePassed(phases, repo, r.name, r.kind, pipeline) {
+			continue
+		}
+		reason := fmt.Sprintf("phase %s on %s did not pass", r.name, repo)
+		if isVerification(r.name, r.kind) {
+			reason = fmt.Sprintf("phase %s on %s has no passing result since the last code change", r.name, repo)
+		}
+		if newestFixFailed(phases, repo) {
+			reason += " (start a corrective cycle with POST /api/run-fix)"
+		}
+		return reason
+	}
+	return ""
+}
+
+// inSomeStage reports whether repo can be run by proj: always for a project
+// with no DAG stages (a dispatch builds its own stage over its repos), else
+// only when some stage lists it.
+func inSomeStage(proj *config.Project, repo string) bool {
+	if proj == nil || proj.DAG == nil || len(proj.DAG.Stages) == 0 {
+		return true
+	}
+	for _, stage := range proj.DAG.Stages {
+		for _, r := range stage.Repos {
+			if r == repo {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// newestFixFailed reports whether repo's newest "fix" record failed.
+func newestFixFailed(phases []store.PhaseRecord, repo string) bool {
+	newest := -1
+	for i := range phases {
+		p := &phases[i]
+		if p.Repo == repo && p.Name == "fix" && p.Kind == "agent" && (newest < 0 || !recordBefore(phases, i, newest)) {
+			newest = i
+		}
+	}
+	return newest >= 0 && phases[newest].Status == "failed"
 }
