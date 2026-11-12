@@ -693,7 +693,12 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 	// writer after seeding.
 	prompt += PromptSuffix(pr.Worktree)
 
+	// A builder's handoff contract goes last, after the plan instructions, so
+	// it ends every gauntlet:alpha prompt whoever built it, and every form the
+	// prompt is delivered in below carries it (design decision 13).
 	role := pr.phaseRole(phaseName)
+	prompt = withHandoffContract(prompt, role)
+
 	pluginVersion := ""
 	if role != "" {
 		pluginVersion = pr.GauntletVersion
