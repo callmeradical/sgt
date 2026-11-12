@@ -585,11 +585,17 @@ func BuildAgentCommandForRole(agentCLI, model, role, prompt string) (exe string,
 }
 
 // terminationNoticePattern matches the line claude --print emits when it gives
-// up waiting on background tasks and ends the session, still exiting 0. The
-// real line continues (" Set CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 to wait
-// indefinitely."), so the pattern anchors only at the start (design decision
-// 1).
-var terminationNoticePattern = regexp.MustCompile(`^Background tasks still running after \d+s; terminating\.`)
+// up waiting on background tasks and ends the session, still exiting 0. Two
+// wordings are known:
+//
+//	earlier:  "Background tasks still running after 600s; terminating."
+//	2.1.322:  "Background tasks still running 10m after the last turn (<tasks>); stopping them."
+//
+// Both continue with " Set CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 to wait
+// indefinitely.", so the pattern anchors only at the start (design decision
+// 1). 2.1.322 writes the line to stderr, which RunAgentPhase captures with
+// stdout.
+var terminationNoticePattern = regexp.MustCompile(`^Background tasks still running (?:after \d+s; terminating\.|\S+ after the last turn \(.*\); stopping them\.)`)
 
 // endsWithTerminationNotice reports whether one of the last three non-empty
 // lines of output begins with claude's termination notice. Looking only at

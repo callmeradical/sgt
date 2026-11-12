@@ -126,6 +126,31 @@ func TestClaudeZeroExitWithTerminationNoticeIsAFailedPhase(t *testing.T) {
 	}
 }
 
+// claude 2.1.322 words the notice differently from the earlier
+// "after <N>s; terminating." form, and writes it to stderr. Both forms are a
+// termination (strings in the 2.1.322 binary: "Background tasks still running
+// <duration> after the last turn (<tasks>); stopping them.").
+const terminationNotice2_1_322 = `Background tasks still running 10m after the last turn (agent "zeta"); stopping them. Set CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 to wait indefinitely.`
+
+// Scenario: A zero exit with the termination notice is a failed phase
+// (claude 2.1.322 wording, on stderr).
+func TestClaudeZeroExitWithTheCurrentTerminationNoticeIsAFailedPhase(t *testing.T) {
+	dir := t.TempDir()
+	agent := fakeAgent(t, dir, "claude", "echo 'did some work'\necho '"+terminationNotice2_1_322+"' >&2\nexit 0")
+	pr, st := newRunner(t, agent, 10*time.Second)
+
+	if _, _, err := pr.RunAgentPhase(context.Background(), "build", "brief", 0); err == nil {
+		t.Fatal("RunAgentPhase returned nil error for a session claude 2.1.322 stopped")
+	}
+	rec := finalAgentPhase(t, st, "run-1", "build")
+	if rec.Status != "failed" {
+		t.Errorf("phase status = %q, want failed", rec.Status)
+	}
+	if want := "agent claude terminated with background tasks still running"; rec.Error != want {
+		t.Errorf("phase error = %q, want %q", rec.Error, want)
+	}
+}
+
 // The notice counts on any of the last three non-empty lines, followed only
 // by blank lines or up to two more lines.
 func TestClaudeTerminationNoticeNearTheEndIsDetected(t *testing.T) {

@@ -91,8 +91,11 @@ value of a duplicated key, so this override wins over an inherited value.
 `RunAgentPhase` also fails a claude attempt, with reason
 `agent claude terminated with background tasks still running`, when one of
 the last three non-empty lines of its output **begins** with the notice. The
-regex is `^Background tasks still running after \d+s; terminating\.`, with
-no `$`. The real CLI line continues with
+regex is
+`^Background tasks still running (?:after \d+s; terminating\.|\S+ after the last turn \(.*\); stopping them\.)`,
+with no `$`. It covers the earlier wording, `… after 600s; terminating.`,
+and claude 2.1.322's, `… 10m after the last turn (<tasks>); stopping
+them.`. 2.1.322 writes the line to stderr, which is captured with stdout. The real CLI line continues with
 ` Set CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 to wait indefinitely.`, so the
 match must not require the line to end there. Matching only at line start,
 and only near the end of the output, means an agent that quotes the notice
@@ -256,7 +259,14 @@ When the attempt's role is `gauntlet:beta`, `RunAgentPhase` calls
 `outBuf`. It scans lines from the end. Before matching, it strips leading
 `>`, `-`, `*`, `#`, whitespace and backticks, and any wrapping `**`, `__` or
 backtick emphasis. It then matches
-`^VERDICT:\s*(PASS|HOLD)\s*(?::\s*(.*))?$`, case-sensitive on `VERDICT`.
+`^VERDICT:(?:\*\*|__)?\s*(?:\*\*|__)?(PASS|HOLD)(?:\*\*|__)?(.*)$`
+(`internal/runner/verdict.go`), case-sensitive on `VERDICT`.
+
+- **PASS:** any trailing text is allowed, as in `VERDICT: PASS.` or
+  `VERDICT: PASS — meets the bar`.
+- **HOLD:** the gap is the trailing text with a leading separator (`:`, `—`,
+  `–`, `-` or whitespace) removed, and must not be empty.
+- A line that offers an alternative or quotes the contract is not a verdict.
 
 | Verdict | Phase status | Error | Payload |
 |---|---|---|---|

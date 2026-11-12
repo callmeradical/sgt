@@ -44,8 +44,10 @@ its environment, overriding any inherited value, and with
 A `claude` attempt SHALL be recorded `failed`, with a failure reason that
 names the termination, even when the process exited 0, when one of the last
 three non-empty lines of its output begins with the CLI's termination
-notice, `Background tasks still running after <N>s; terminating.` The line
-may continue after that text.
+notice, in either of its known wordings:
+`Background tasks still running after <N>s; terminating.` or (claude
+2.1.322) `Background tasks still running <duration> after the last turn
+(<tasks>); stopping them.` The line may continue after that text.
 
 #### Scenario: A zero exit with the termination notice is a failed phase
 
@@ -53,6 +55,13 @@ may continue after that text.
   `Background tasks still running after 600s; terminating. Set CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 to wait indefinitely.`
 - **THEN** that attempt's phase record has status `failed`, its error names the
   background-task termination, and `RunAgentPhase` returns an error
+
+#### Scenario: claude 2.1.322's notice on stderr is a failed phase
+
+- **WHEN** a `claude` agent attempt exits 0 and writes to stderr
+  `Background tasks still running 10m after the last turn (agent "zeta"); stopping them. Set CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 to wait indefinitely.`
+- **THEN** that attempt's phase record has status `failed` and its error
+  names the background-task termination
 
 #### Scenario: A quoted notice mid-output is not a termination
 

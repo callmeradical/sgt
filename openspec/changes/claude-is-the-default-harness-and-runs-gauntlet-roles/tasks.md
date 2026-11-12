@@ -16,7 +16,7 @@ Tests must not need a real `claude`: use a stub executable on `PATH`, the
   and `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`, plus `--no-session-persistence`, for
   claude (design decision 1).
   Both are checked against the 2.1.322 binary.
-- [ ] 1.2 Fail a claude attempt when one of its last three non-empty output
+- [x] 1.2 Fail a claude attempt when one of its last three non-empty output
   lines begins with the termination notice. The fixture uses the CLI's full
   real line.
 - [x] 1.3 Remove `.sgt/envelope.json` before each attempt (design decision
@@ -30,7 +30,7 @@ Tests must not need a real `claude`: use a stub executable on `PATH`, the
 - Verify: `specs/agent-harness/spec.md`:
   - "claude's background-wait ceiling is disabled" (2 scenarios);
   - "claude sessions share no auto memory" (2);
-  - "A cut-off claude session never records a passed phase" (3);
+  - "A cut-off claude session never records a passed phase" (4);
   - "A phase never adopts another phase's envelope" (1);
   - "Process failure decides an attempt before its output does" (4).
 
