@@ -132,7 +132,11 @@ func (srv *Server) handleRunFix(w http.ResponseWriter, r *http.Request) {
 // Resume=true, exactly as plain Resume does, so phasePassed skips whatever
 // already passed and only the failing phase onward re-runs.
 //
-// If the re-attempted stage now passes, the run concludes passed. If it
+// If the re-attempted stage now passes, the terminal guard (verifyFix) runs
+// over every repo the run is accountable for: when it holds, the run records
+// its run.delivered envelope and concludes passed; otherwise it concludes
+// failed with the guard's reason, which says to resume when the only gap is
+// repos that have not run yet. If it
 // fails again and cycles remain under the configured bound, the loop repeats
 // automatically. If the bound is exhausted, the run falls back to its
 // existing failed/blocked outcome, with a reason that says the fix budget
@@ -226,15 +230,16 @@ func (srv *Server) runFixCycles(ctx context.Context, cancel context.CancelFunc, 
 				srv.recordTerminalRun(runID, "cancelled")
 				return
 			}
-			// Known boundary: in a multi-stage DAG project where the
-			// original dispatch failed before a downstream stage ever ran
-			// (that stage's repos have no phases at all yet, not merely
-			// "already passed"), passing repoName's own stage concludes the
-			// whole run here rather than continuing on into that downstream
-			// stage. This is deliberate scope, not an oversight: a
-			// corrective cycle corrects one repo's own gate, nothing more.
-			// Reaching a downstream stage that depended on this fix is a
-			// separate action (a plain Resume, or its own corrective cycle).
+			// The cycle corrected repoName's own stage, and only that
+			// stage: a corrective cycle never advances into another repo
+			// (the "just the repo stage" decision). Before the run may be
+			// passed, the terminal guard checks every repo it is
+			// accountable for (design decisions 7 and 8).
+			if ok, reason := srv.verifyFix(run, proj, repoName, pf.Roles); !ok {
+				srv.recordTerminalRunWithReason(runID, "failed", reason)
+				return
+			}
+			srv.recordDelivery(proj, runID)
 			srv.recordTerminalRun(runID, "passed")
 			return
 		}
@@ -242,6 +247,42 @@ func (srv *Server) runFixCycles(ctx context.Context, cancel context.CancelFunc, 
 
 	srv.recordTerminalRunWithReason(runID, "failed", fmt.Sprintf(
 		"corrective fix budget exhausted (%d/%d attempts); gate still failing", limit, limit))
+}
+
+// verifyFix is the terminal guard for a corrective cycle that passed
+// repoName's stage. Accountable repos with no records that a resume can run
+// are not failures of the correction: when every other repo verifies, the
+// reason names repoName as corrected and those repos as left for a resume.
+// Any other guard failure, including a bullet repo no stage can run, is
+// reported as dag.RunVerified words it.
+func (srv *Server) verifyFix(run *store.RunRecord, proj *config.Project, repoName string, roles bool) (bool, string) {
+	phases, err := srv.Store.ListPhasesForRun(run.ID)
+	if err != nil {
+		return false, fmt.Sprintf("the phases of run %s could not be read to verify them: %v", run.ID, err)
+	}
+	accountable := srv.accountableRepos(run, proj)
+	stages := resolveStages(proj, accountable, run.Brief)
+
+	hasRecords := map[string]bool{}
+	for _, p := range phases {
+		hasRecords[p.Repo] = true
+	}
+	var checked, unrun []string
+	for _, r := range accountable {
+		if _, runnable := stageForRepo(stages, r); runnable && r != repoName && !hasRecords[r] {
+			unrun = append(unrun, r)
+			continue
+		}
+		checked = append(checked, r)
+	}
+
+	if ok, reason := dag.RunVerified(phases, proj, checked, roles); !ok {
+		return false, reason
+	}
+	if len(unrun) > 0 {
+		return false, fmt.Sprintf("corrected %s; %s have not run yet — resume the run to continue", repoName, strings.Join(unrun, ", "))
+	}
+	return true, ""
 }
 
 // stageForRepo finds the one stage among stages that repoName belongs to,

@@ -607,14 +607,54 @@ func (srv *Server) executeRun(
 
 	commitAll()
 
-	// Delivery. This reports what actually happened on disk. It does NOT claim a
-	// pull request exists — nothing in this path pushes a branch or calls the
-	// GitHub API. Opening the PR is an explicit human action via /api/create-pr.
-	delivery := srv.delivery.describeDelivery(proj, taskID)
+	// The terminal guard (design decision 8), after the last stage and before
+	// delivery: every stage returning nil is not proof that every repo the run
+	// is accountable for has a fresh pass for every required phase. A run the
+	// guard refuses is failed with its reason and never carries a delivery
+	// record.
+	if ok, reason := srv.verifyRun(taskID, proj, pf.Roles); !ok {
+		if ctx.Err() != nil {
+			srv.recordTerminalRun(taskID, "cancelled")
+			return
+		}
+		srv.recordTerminalRunWithReason(taskID, "failed", reason)
+		return
+	}
+
+	srv.recordDelivery(proj, taskID)
+
+	setTerminal("passed")
+}
+
+// verifyRun applies the terminal guard (dag.RunVerified) to runID's records
+// over the repos it is accountable for, with the effective pipelines roles
+// selects. A store read failure fails closed: a run whose records cannot be
+// read has nothing to prove it passed.
+func (srv *Server) verifyRun(runID string, proj *config.Project, roles bool) (bool, string) {
+	run, err := srv.Store.GetRun(runID)
+	if err != nil {
+		return false, fmt.Sprintf("run %s could not be read to verify its phases: %v", runID, err)
+	}
+	phases, err := srv.Store.ListPhasesForRun(runID)
+	if err != nil {
+		return false, fmt.Sprintf("the phases of run %s could not be read to verify them: %v", runID, err)
+	}
+	return dag.RunVerified(phases, proj, srv.accountableRepos(run, proj), roles)
+}
+
+// recordDelivery records runID's run.delivered envelope. Every path to
+// passed (executeRun and the corrective-fix loop) records it here, after its
+// commits, so each passed run has the same delivery record.
+//
+// It reports what actually happened on disk. It does NOT claim a pull
+// request exists — nothing in this path pushes a branch or calls the GitHub
+// API. Opening the PR is an explicit human action via /api/create-pr.
+func (srv *Server) recordDelivery(proj *config.Project, runID string) {
+	delivery := srv.delivery.describeDelivery(proj, runID)
 	deliveryNow := time.Now().UTC()
 	_ = srv.Store.RecordEnvelope(&store.EnvelopeRecord{
-		ID:            fmt.Sprintf("delivery-%s-%d", taskID, deliveryNow.UnixNano()),
-		RunID:         taskID,
+		ID:            fmt.Sprintf("delivery-%s-%d", runID, deliveryNow.UnixNano()),
+		RunID:         runID,
 		Repo:          delivery.Repo,
 		Stage:         "review",
 		Summary:       delivery.Summary,
@@ -624,11 +664,9 @@ func (srv *Server) executeRun(
 		SchemaVersion: "1",
 		OccurredAt:    deliveryNow,
 		Producer:      "sgt/ui",
-		CorrelationID: taskID,
-		CausationID:   srv.Store.CausationFromLatest(taskID, delivery.Repo),
+		CorrelationID: runID,
+		CausationID:   srv.Store.CausationFromLatest(runID, delivery.Repo),
 	})
-
-	setTerminal("passed")
 }
 
 // recordTerminalRun writes a run's terminal status and advances the bullets that

@@ -135,11 +135,12 @@ func (srv *Server) handleRunResume(w http.ResponseWriter, r *http.Request) {
 	}
 	pf := preflightResult{Roles: roles, Version: version}
 
-	// Resume runs the same body as a dispatch. The repository list is recovered
-	// from the phase records where possible, so a resume targets what the original
-	// run targeted rather than re-deriving it from configuration that may have
-	// changed since.
-	repos := srv.reposForRun(run.ID)
+	// Resume runs the same body as a dispatch, over the repos the run is
+	// accountable for (design decision 8): its intent's bullets, else its DAG
+	// stages' repos, else the repos its phase records name. A repo that never
+	// ran is therefore run now, and the terminal guard waits on the same set,
+	// so "resume the run to continue" is true.
+	repos := srv.accountableRepos(run, proj)
 
 	// Clear a stale "blocked" disposition on the bullets this resume targets
 	// before anything else, synchronously, in this handler — never inside

@@ -524,7 +524,9 @@ func phaseCountByRepo(t *testing.T, st *store.Store, runID string) map[string]in
 // repo regardless of how the stages are scoped), but genuinely never
 // attempted. Fixing svc's gate and letting the corrective cycle pass must
 // NOT then advance into stage-other within that same cycle: a corrective
-// cycle corrects one repo's gate, nothing more.
+// cycle corrects one repo's gate, nothing more. Since the terminal guard
+// (design decision 7), the run then ends failed, saying other has not run
+// yet, rather than passed.
 func TestRunFixNeverAdvancesToADownstreamRepoThatHasNotRunYet(t *testing.T) {
 	base := t.TempDir()
 	cfgDir := filepath.Join(base, "config")
@@ -612,13 +614,23 @@ dag:
 	// corrective cycle's re-attempt genuinely passes.
 	writeFixAgent(t, agentPath, "touch .sgt/svc-ok")
 
+	srv.awaitTerminalReason(runID)
 	w := postJSON(t, mux, "/api/run-fix", fmt.Sprintf(`{"id":%q}`, runID))
 	if w.Code != http.StatusOK {
 		t.Fatalf("run-fix status = %d, want 200; body=%s", w.Code, w.Body.String())
 	}
 	status := waitForRunFixTerminal(t, st, runID)
-	if status != "passed" {
-		t.Fatalf("run status = %q, want passed once svc's marker makes its gate pass", status)
+	for deadline := time.Now().Add(30 * time.Second); srv.isRunActive(runID); time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("run-fix goroutine did not finish after the terminal status")
+		}
+	}
+	if status != "failed" {
+		t.Fatalf("run status = %q, want failed: svc is corrected but other has not run", status)
+	}
+	reason, _ := srv.takeTerminalReason(runID)
+	if want := "corrected svc; other have not run yet — resume the run to continue"; reason != want {
+		t.Errorf("terminal reason = %q, want %q", reason, want)
 	}
 
 	after := phaseCountByRepo(t, st, runID)

@@ -132,15 +132,28 @@ dag:
 // fakeStageRunner implements stageRunner without touching git or spawning an
 // agent process. It records which stages it was asked to run, in order, so a
 // test can assert on executeRun's behavior without a real *dag.Engine.
+//
+// When st is set, it also records a passed "build" phase for each repo of the
+// stage, the evidence the terminal guard needs before a run may pass.
 type fakeStageRunner struct {
 	mu  sync.Mutex
 	ran []string
+	st  *store.Store
 }
 
 func (f *fakeStageRunner) RunStage(ctx context.Context, runID string, stage *config.DAGStage) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.ran = append(f.ran, stage.Name)
+	if f.st != nil {
+		for _, repo := range stage.Repos {
+			if err := f.st.RecordPhase(&store.PhaseRecord{
+				ID: runID + "-" + repo + "-build", RunID: runID, Repo: repo, Name: "build", Kind: "agent", Status: "passed",
+			}); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
@@ -228,8 +241,10 @@ func TestExecuteRunIsTestableWithAFakeStageRunner(t *testing.T) {
 	fleetRoot := filepath.Join(base, "fleet")
 	t.Setenv("SGT_FLEET_DIR", fleetRoot)
 
+	buildOnly := config.Repo{Factory: &config.FactoryConfig{Pipeline: []string{"build"}}}
 	proj := &config.Project{
-		Name: "fake-proj",
+		Name:  "fake-proj",
+		Repos: map[string]config.Repo{"repoA": buildOnly, "repoB": buildOnly},
 		DAG: &config.DAGConfig{
 			Name: "fake-pipeline",
 			Stages: []config.DAGStage{
@@ -254,7 +269,7 @@ func TestExecuteRunIsTestableWithAFakeStageRunner(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fake := &fakeStageRunner{}
+	fake := &fakeStageRunner{st: st}
 	ctx, cancel := context.WithCancel(context.Background())
 	srv.executeRun(ctx, cancel, fake, proj, runID, "fake stage runner test", nil, "", preflightResult{})
 
