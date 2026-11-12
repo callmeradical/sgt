@@ -60,12 +60,15 @@ type Engine struct {
 	FixCycle int
 }
 
-// phasePassed reports whether this run already earned a pass for a phase.
+// phasePassed reports whether this run already earned a pass for a phase, by
+// the freshness rule (PhasePassed): name and kind both match, and a gate or
+// review counts only if it passed after the repo's last code change.
 //
 // A passed phase is a fact, and re-running it on resume would spend an agent
 // invocation re-deriving it — or worse, turn an earned pass into a fresh failure
-// on a flaky gate.
-func (e *Engine) phasePassed(runID, repo, phase string) bool {
+// on a flaky gate. A verification that passed before the code changed again
+// is not that fact any more, so it runs.
+func (e *Engine) phasePassed(runID, repo, name, kind string, pipeline []string) bool {
 	if !e.Resume {
 		return false
 	}
@@ -73,12 +76,7 @@ func (e *Engine) phasePassed(runID, repo, phase string) bool {
 	if err != nil {
 		return false // cannot prove it passed, so run it
 	}
-	for _, p := range phases {
-		if p.Repo == repo && p.Name == phase && p.Status == "passed" {
-			return true
-		}
-	}
-	return false
+	return PhasePassed(phases, repo, name, kind, pipeline)
 }
 
 func NewEngine(proj *config.Project, s *store.Store, r *handoff.Router) *Engine {
@@ -564,7 +562,7 @@ func (e *Engine) RunStage(ctx context.Context, runID string, stage *config.DAGSt
 						// A gate is named individually in the phase record, so resume
 						// skips per gate rather than per pipeline phase. A run that got
 						// through four of five gates re-runs only the fifth.
-						if e.phasePassed(runID, repoName, gateName) {
+						if e.phasePassed(runID, repoName, gateName, "code", pipeline) {
 							continue
 						}
 						res, err := pr.RunCodeGate(ctx, gateName, repoCfg.Factory.Gates[gateName])
@@ -572,12 +570,12 @@ func (e *Engine) RunStage(ctx context.Context, runID string, stage *config.DAGSt
 							return fmt.Errorf("deterministic code gate %s failed on %s", gateName, repoName)
 						}
 					}
-				} else if !e.phasePassed(runID, repoName, "test") {
+				} else if !e.phasePassed(runID, repoName, "test", "code", pipeline) {
 					_, _ = pr.RunCodeGate(ctx, "test", "echo 'Deterministic gate passed'")
 				}
 
 			case "review":
-				if e.phasePassed(runID, repoName, "review") {
+				if e.phasePassed(runID, repoName, "review", "agent", pipeline) {
 					continue
 				}
 				diff, err := pr.DiffAgainstBase(ctx)
@@ -595,7 +593,7 @@ func (e *Engine) RunStage(ctx context.Context, runID string, stage *config.DAGSt
 				}
 
 			default:
-				if e.phasePassed(runID, repoName, phase) {
+				if e.phasePassed(runID, repoName, phase, "agent", pipeline) {
 					continue
 				}
 				prompt := stage.Brief
