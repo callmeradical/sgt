@@ -850,12 +850,6 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 			env.Artifacts[i] = redact.Text(a)
 		}
 
-		// Read after redaction, not before: the reason must reach every caller
-		// (and, via RecordEnvelope below, the store) exactly as redacted, never
-		// as the agent originally wrote it (design.md, "Where the reason comes
-		// from").
-		blockedReason := handoff.BlockedReason(env.Payload)
-
 		// Rules 4–6 of design decision 1a, after the envelope is read and
 		// redacted: the role's judgement, then a review's blocking findings.
 		// When they fail a review the agent's envelope stays the recorded one,
@@ -879,6 +873,13 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 				}
 			}
 		}
+
+		// Read after redaction, not before: the reason must reach every caller
+		// (and, via RecordEnvelope below, the store) exactly as redacted, never
+		// as the agent originally wrote it (design.md, "Where the reason comes
+		// from"). Read after the role's judgement too, whose keys replace the
+		// agent's own.
+		blockedReason := handoff.BlockedReason(env.Payload)
 
 		env.Payload = annotatePayloadWithProvenance(env.Payload, phaseProvenance{
 			Model:         model,

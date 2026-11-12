@@ -53,6 +53,19 @@ func TestParseVerdictReadsTheLastVerdictLine(t *testing.T) {
 		{"lowercase label", "verdict: pass", "", "", false},
 		{"word that only starts with PASS", "VERDICT: PASSED", "", "", false},
 		{"last verdict line is malformed", "VERDICT: PASS\nVERDICT: maybe\n", "", "", false},
+		{"pass with en dash remark", "VERDICT: PASS – fine", "pass", "", true},
+		{"pass with spaced hyphen remark", "VERDICT: PASS - fine", "pass", "", true},
+		{"emphasised pass with remark", "**VERDICT: PASS** — meets the bar.", "pass", "", true},
+		{"pass or hold alternative", "VERDICT: PASS/HOLD", "", "", false},
+		{"pass or hold alternative with gap", "VERDICT: PASS/HOLD: <gap>", "", "", false},
+		{"pass pipe hold", "VERDICT: PASS | HOLD", "", "", false},
+		{"pass then changes its mind", "VERDICT: PASS — no wait, HOLD: missing test", "", "", false},
+		{"quoted contract line", "`VERDICT: PASS`, or `VERDICT: HOLD: <gap>`", "", "", false},
+		{"pass remark with a slash", "VERDICT: PASS — see a/b", "", "", false},
+		{"pass remark naming pass", "VERDICT: PASS: PASS", "", "", false},
+		{"pass glued to text", "VERDICT: PASS.", "", "", false},
+		{"pass glued to a hyphen", "VERDICT: PASS-ish", "", "", false},
+		{"hold quoting the contract", "VERDICT: HOLD: end with VERDICT: PASS", "", "", false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -305,6 +318,30 @@ func TestBetaWrittenVerdictKeysDoNotSurviveAMissingVerdict(t *testing.T) {
 	}
 }
 
+// Beta's "incomplete" report that quotes the contract but gives no verdict
+// is no verdict: failed with the no-verdict error, and retried.
+func TestBetaIncompleteReportQuotingTheContractIsNoVerdict(t *testing.T) {
+	body := "echo 'I was asked to end with one of:'\n" +
+		"echo '`VERDICT: PASS`, or `VERDICT: HOLD: <gap>`'\n" +
+		"echo 'Status: incomplete — I ran out of budget before reading the tests.'\n" +
+		"exit 0"
+	pr, st := betaRunner(t, body)
+
+	_, _, err := pr.RunAgentPhase(context.Background(), "review", "review it", 1)
+	if err == nil || err.Error() != noVerdictReason {
+		t.Fatalf("error = %v, want %q", err, noVerdictReason)
+	}
+	attempts := phaseAttempts(t, st, "review")
+	if len(attempts) != 2 {
+		t.Fatalf("review attempts = %d, want 2 (no verdict is retried)", len(attempts))
+	}
+	for _, a := range attempts {
+		if a.Status != "failed" || a.Error != noVerdictReason {
+			t.Errorf("attempt %d status/error = %q/%q, want failed/%s", a.Attempt, a.Status, a.Error, noVerdictReason)
+		}
+	}
+}
+
 // Scenario: A review with no verdict is retried.
 func TestBetaWithNoVerdictIsRetried(t *testing.T) {
 	dir := t.TempDir()
@@ -380,5 +417,52 @@ func TestReviewEnvelopeRouterCopyHasNoRawOutput(t *testing.T) {
 	envs := reviewEnvelopes(t, st)
 	if len(envs) != 1 || !strings.Contains(string(envs[0].Data), "BETA-REASONING") {
 		t.Errorf("store review envelope should keep the full redacted payload, got %+v", envs)
+	}
+}
+
+// The router copy of a beta-written review envelope carries only sgt's
+// verdict, gap and findings: neither beta's own summary nor its other
+// payload keys travel to a downstream worktree.
+func TestReviewRouterCopyCarriesOnlyTheVerdictGapAndFindings(t *testing.T) {
+	body := writeEnvelopeScript("BETA-SUMMARY", `{"notes":"BETA-NOTES"}`) + "echo 'VERDICT: HOLD: G'\nexit 0"
+	pr, _ := betaRunner(t, body)
+	if _, _, err := pr.RunAgentPhase(context.Background(), "review", "review it", 0); err == nil {
+		t.Fatal("expected a HOLD")
+	}
+
+	data, err := os.ReadFile(filepath.Join(pr.Router.BaseDir, "svc", "envelope_review.json"))
+	if err != nil {
+		t.Fatalf("no router copy of the review envelope: %v", err)
+	}
+	for _, leaked := range []string{"BETA-SUMMARY", "BETA-NOTES"} {
+		if strings.Contains(string(data), leaked) {
+			t.Errorf("router copy carries %s: %s", leaked, data)
+		}
+	}
+	var env handoff.Envelope
+	if err := json.Unmarshal(data, &env); err != nil {
+		t.Fatal(err)
+	}
+	m := payloadMap(t, env.Payload)
+	if len(m) != 3 || m["gauntlet_verdict"] != "hold" || m["gauntlet_gap"] != "G" || len(handoff.ReviewFindings(env.Payload)) != 1 {
+		t.Errorf("router copy payload = %s, want exactly the verdict, gap and findings", env.Payload)
+	}
+}
+
+// A blocked_reason beta wrote into its own envelope is not the attempt's
+// blocked reason: the verdict is beta's only judgement.
+func TestBetaWrittenBlockedReasonIsNotReturned(t *testing.T) {
+	body := writeEnvelopeScript("held", `{"blocked_reason":"BETA-BLOCKED"}`) + "echo 'VERDICT: HOLD: G'\nexit 0"
+	pr, st := betaRunner(t, body)
+
+	_, reason, err := pr.RunAgentPhase(context.Background(), "review", "review it", 0)
+	if err == nil {
+		t.Fatal("expected a HOLD")
+	}
+	if reason != "" {
+		t.Errorf("returned blocked reason = %q, want none", reason)
+	}
+	if got := handoff.BlockedReason(finalAgentPhase(t, st, "run-1", "review").Payload); got != "" {
+		t.Errorf("recorded payload blocked_reason = %q, want none", got)
 	}
 }

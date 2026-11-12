@@ -2,6 +2,7 @@ package runner
 
 import (
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -22,9 +23,9 @@ const noVerdictReason = "gauntlet:beta produced no PASS/HOLD verdict"
 func init() { roleJudges[roleBeta] = judgeVerdict }
 
 // judgeVerdict records beta's verdict. sgt always writes gauntlet_verdict,
-// gauntlet_gap and findings, replacing any same-named keys beta wrote into
-// its own envelope, so the review record's judgement comes only from the
-// verdict line:
+// gauntlet_gap and findings, and clears blocked_reason, replacing any
+// same-named keys beta wrote into its own envelope, so the review record's
+// judgement comes only from the verdict line:
 //
 //   - HOLD with a gap: failed with "gauntlet:beta HOLD: <gap>", one blocking
 //     finding carrying the gap, and no retry;
@@ -61,6 +62,7 @@ func verdictKeys(verdict, gap string, findings []handoff.ReviewFinding) map[stri
 		"gauntlet_verdict": verdict,
 		"gauntlet_gap":     gap,
 		"findings":         findings,
+		"blocked_reason":   "",
 	}
 }
 
@@ -69,16 +71,31 @@ func verdictKeys(verdict, gap string, findings []handoff.ReviewFinding) map[stri
 // emphasised, then the rest of the line.
 var verdictPattern = regexp.MustCompile(`^VERDICT:(?:\*\*|__)?\s*(?:\*\*|__)?(PASS|HOLD)(?:\*\*|__)?(.*)$`)
 
-// parseVerdict reads beta's verdict from its complete output. The last line
-// that begins with "VERDICT:" (after verdictLine strips its decoration)
-// decides, so a verdict quoted earlier in the output never wins over the one
-// beta ended with.
+// passRemark matches what may follow PASS: a colon, an em or en dash, or a
+// spaced hyphen, then a remark.
+var passRemark = regexp.MustCompile(`^(?:\s*[:—–]|\s+-(?:\s|$))(.*)$`)
+
+// holdGap matches what must follow HOLD: a colon, then the gap.
+var holdGap = regexp.MustCompile(`^\s*:(.*)$`)
+
+// verdictWord finds a PASS or HOLD token in a PASS remark, which makes the
+// line an alternative or a change of mind rather than a verdict.
+var verdictWord = regexp.MustCompile(`\b(?:PASS|HOLD)\b`)
+
+// parseVerdict reads beta's verdict from its complete output.
 //
-// verdict is "pass" or "hold", and gap is a HOLD's gap. ok is false when no
-// line begins with "VERDICT:", or when the last one is not a PASS or a HOLD
-// with a non-empty gap — that is no verdict, never a pass. A PASS may be
-// followed by any text ("VERDICT: PASS — meets the bar."); a HOLD's gap
-// follows a colon.
+// The rule: the last line that begins with "VERDICT:" (after verdictLine
+// strips its decoration) decides, and it is a verdict only when it contains
+// "VERDICT:" once and is either "VERDICT: PASS", optionally followed by a
+// colon, an em or en dash, or a spaced hyphen and a remark that names
+// neither PASS nor HOLD and contains no "|" or "/", or "VERDICT: HOLD: <gap>"
+// with a non-empty gap.
+//
+// verdict is "pass" or "hold", and gap is a HOLD's gap. ok is false for
+// everything else — no VERDICT: line, a quoted contract, an alternative such
+// as "PASS/HOLD", or a HOLD with no gap — which is no verdict, never a pass.
+// A verdict quoted earlier in the output never wins over the line beta
+// ended with.
 func parseVerdict(full string) (verdict, gap string, ok bool) {
 	lines := strings.Split(full, "\n")
 	for i := len(lines) - 1; i >= 0; i-- {
@@ -86,25 +103,29 @@ func parseVerdict(full string) (verdict, gap string, ok bool) {
 		if !strings.HasPrefix(line, "VERDICT:") {
 			continue
 		}
+		if strings.Count(line, "VERDICT:") != 1 {
+			return "", "", false // a quoted contract, not a verdict
+		}
 		m := verdictPattern.FindStringSubmatch(line)
 		if m == nil {
 			return "", "", false
 		}
-		rest := strings.TrimSpace(m[2])
-		if rest != "" && isWordByte(rest[0]) {
-			return "", "", false // VERDICT: PASSED, VERDICT: HOLDING
-		}
+		rest := m[2]
 		if m[1] == "PASS" {
+			if strings.TrimSpace(rest) == "" {
+				return "pass", "", true
+			}
+			r := passRemark.FindStringSubmatch(rest)
+			if r == nil || strings.ContainsAny(r[1], "|/") || verdictWord.MatchString(r[1]) {
+				return "", "", false
+			}
 			return "pass", "", true
 		}
-		if !strings.HasPrefix(rest, ":") {
+		g := holdGap.FindStringSubmatch(rest)
+		if g == nil || strings.TrimSpace(g[1]) == "" {
 			return "", "", false
 		}
-		gap = strings.TrimSpace(strings.TrimPrefix(rest, ":"))
-		if gap == "" {
-			return "", "", false
-		}
-		return "hold", gap, true
+		return "hold", strings.TrimSpace(g[1]), true
 	}
 	return "", "", false
 }
@@ -132,29 +153,33 @@ func verdictLine(line string) string {
 	return trimmed
 }
 
-func isWordByte(b byte) bool {
-	return b == '_' || ('0' <= b && b <= '9') || ('a' <= b && b <= 'z') || ('A' <= b && b <= 'Z')
-}
-
 // routerCopy is the envelope saved to the router for phase, whose files are
 // copied into downstream worktrees (InjectHandoffToWorktree) where another
-// repo's builder can read them. A review's copy carries no raw_output, so a
-// reviewer's output never reaches another builder; only its verdict, gap and
-// findings travel. It is staged "review" whatever stage an agent-written
-// envelope named, so the router files it as a review and leaves
-// envelope_latest.json alone. The store's envelope record keeps the full
-// redacted payload for the operator. Every other phase's envelope is saved
-// as is.
+// repo's builder can read them. A review's copy carries only its verdict,
+// gap and findings, under an sgt-authored summary, so nothing else a
+// reviewer wrote or printed reaches another builder. It is staged "review"
+// whatever stage an agent-written envelope named, so the router files it as
+// a review and leaves envelope_latest.json alone. The store's envelope
+// record keeps the full redacted payload for the operator. Every other
+// phase's envelope is saved as is.
 func routerCopy(phase string, env *handoff.Envelope) *handoff.Envelope {
 	if phase != "review" {
 		return env
 	}
-	c := *env
-	c.Stage = phase
+	kept := map[string]interface{}{}
 	var m map[string]interface{}
-	if err := json.Unmarshal(env.Payload, &m); err == nil && m != nil {
-		delete(m, "raw_output")
-		c.Payload = marshalPayload(m)
+	if err := json.Unmarshal(env.Payload, &m); err == nil {
+		for _, k := range []string{"gauntlet_verdict", "gauntlet_gap", "findings"} {
+			if v, ok := m[k]; ok {
+				kept[k] = v
+			}
+		}
 	}
-	return &c
+	return &handoff.Envelope{
+		TaskID:  env.TaskID,
+		Repo:    env.Repo,
+		Stage:   phase,
+		Summary: fmt.Sprintf("Phase review for %s", env.Repo),
+		Payload: marshalPayload(kept),
+	}
 }
