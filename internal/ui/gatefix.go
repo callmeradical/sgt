@@ -17,6 +17,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -93,6 +94,18 @@ func (srv *Server) handleRunFix(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A failure a fix cannot correct is refused before anything changes
+	// (design decision 7): the run stays as it was, and no fix is recorded.
+	phases, err := srv.Store.ListPhasesForRun(runID)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("reading the phases of run %s: %v", runID, err), http.StatusInternalServerError)
+		return
+	}
+	if refusal := srv.fixRefusal(run, proj, phases, failure.Repo, pf.Roles); refusal != "" {
+		http.Error(w, refusal, http.StatusConflict)
+		return
+	}
+
 	// A corrective cycle re-enters the exact worktree the failure happened
 	// in; it never creates one. If the fleet has already reclaimed it, there
 	// is nothing to fix in place — a fresh dispatch is the existing answer.
@@ -104,6 +117,12 @@ func (srv *Server) handleRunFix(w http.ResponseWriter, r *http.Request) {
 			http.StatusConflict)
 		return
 	}
+
+	// Before cycle 1, the repo's blocked bullet goes back to pending, the
+	// same reconciliation resume does (issue #20): RenderIntentBrief reads
+	// the bullet's live status, so otherwise the next beta's brief would
+	// carry the previous HOLD as its "Blocked reason".
+	srv.clearBlockedBullet(run, failure.Repo)
 
 	_ = srv.Store.UpdateRunStatus(run.ID, "running")
 
@@ -165,10 +184,32 @@ func (srv *Server) runFixCycles(ctx context.Context, cancel context.CancelFunc, 
 			return
 		}
 
-		failure, ok := srv.lastFailedPhase(runID, repoName)
+		// Each cycle follows the failure it finds, re-derived from the store
+		// (design decision 7), so a failed fix never replaces the failure it
+		// was correcting, within this correction or across a repeated
+		// run-fix.
+		phases, err := srv.Store.ListPhasesForRun(runID)
+		if err != nil {
+			break
+		}
+		basis, ok := fixBasis(phases, repoName)
 		if !ok {
 			break
 		}
+
+		// Re-run only repoName's own stage, scoped to repoName alone -- never
+		// the run's full multi-repo DAG. A corrective cycle is bound to one
+		// repo for its entire lifetime (Review 043/044); re-running every
+		// repo's stage each cycle let the loop's attention silently drift to
+		// a repo it wasn't actually correcting. stageForRepo finds the one
+		// stage repoName belongs to and returns a copy scoped to just that
+		// repo, leaving every other repo in that stage (and every other
+		// stage entirely) untouched by this cycle.
+		stages := resolveStages(proj, srv.reposForRun(runID), run.Brief)
+		stage, inStage := stageForRepo(stages, repoName)
+		// A HOLD is corrected against the bar the review judged by: the
+		// brief the build was given.
+		brief := dag.PhaseBrief(srv.Store, runID, "build", &stage, repoName, proj.Repos[repoName])
 
 		pr := &runner.PhaseRunner{
 			Store:    srv.Store,
@@ -184,7 +225,7 @@ func (srv *Server) runFixCycles(ctx context.Context, cancel context.CancelFunc, 
 			GauntletVersion: pf.Version,
 		}
 
-		if _, _, err := pr.RunAgentPhase(ctx, "fix", fixPrompt(failure), proj.ResolvedRetries(repoName)); err != nil {
+		if _, _, err := pr.RunAgentPhase(ctx, "fix", basisFixPrompt(basis, brief), proj.ResolvedRetries(repoName)); err != nil {
 			// The fix phase itself errored (not the gate it was meant to
 			// address). Treat this as this cycle's failure and let the loop
 			// continue to the next cycle rather than aborting the whole
@@ -192,17 +233,7 @@ func (srv *Server) runFixCycles(ctx context.Context, cancel context.CancelFunc, 
 			continue
 		}
 
-		// Re-run only repoName's own stage, scoped to repoName alone -- never
-		// the run's full multi-repo DAG. A corrective cycle is bound to one
-		// repo for its entire lifetime (Review 043/044); re-running every
-		// repo's stage each cycle let the loop's attention silently drift to
-		// a repo it wasn't actually correcting. stageForRepo finds the one
-		// stage repoName belongs to and returns a copy scoped to just that
-		// repo, leaving every other repo in that stage (and every other
-		// stage entirely) untouched by this cycle.
-		stages := resolveStages(proj, srv.reposForRun(runID), run.Brief)
-		stage, ok := stageForRepo(stages, repoName)
-		if !ok {
+		if !inStage {
 			// repoName isn't in any resolved stage -- should not happen,
 			// since the run's own failure was recorded against repoName.
 			// Treat it as this cycle's failure rather than running nothing
@@ -245,8 +276,74 @@ func (srv *Server) runFixCycles(ctx context.Context, cancel context.CancelFunc, 
 		}
 	}
 
-	srv.recordTerminalRunWithReason(runID, "failed", fmt.Sprintf(
-		"corrective fix budget exhausted (%d/%d attempts); gate still failing", limit, limit))
+	srv.recordTerminalRunWithReason(runID, "failed", srv.exhaustionReason(runID, repoName, limit))
+}
+
+// exhaustionReason is the reason a correction that ran out of cycles is
+// failed with: it names the repo and the failure the last cycle left, a HOLD
+// by its gap, anything else as today's gate failure.
+func (srv *Server) exhaustionReason(runID, repoName string, limit int) string {
+	reason := fmt.Sprintf("corrective fix budget exhausted (%d/%d attempts) on %s", limit, limit, repoName)
+	if phases, err := srv.Store.ListPhasesForRun(runID); err == nil {
+		if basis, ok := fixBasis(phases, repoName); ok {
+			if gap, held := holdGap(basis); held {
+				return reason + "; review still HOLD: " + gap
+			}
+		}
+	}
+	return reason + "; gate still failing"
+}
+
+// fixRefusal is why handleRunFix refuses to start a correction on repoName,
+// or "" when a fix can correct its failure (design decision 7):
+//
+//   - the repo already passes the terminal guard on its own, so the run
+//     failed only because other repos have not run, which a resume does;
+//   - its failure is a gauntlet:beta review with no verdict, which a resume
+//     reviews again (a process-level reviewer failure included);
+//   - its failure is a build that handed off, which a resume continues.
+func (srv *Server) fixRefusal(run *store.RunRecord, proj *config.Project, phases []store.PhaseRecord, repoName string, roles bool) string {
+	if ok, _ := dag.RunVerified(phases, proj, []string{repoName}, roles); ok {
+		if _, unrun := srv.unrunRepos(run, proj, phases, repoName); len(unrun) > 0 {
+			return fmt.Sprintf("nothing to fix in %s; %s have not run yet — resume the run", repoName, strings.Join(unrun, ", "))
+		}
+		return fmt.Sprintf("nothing to fix in %s; resume the run", repoName)
+	}
+	basis, ok := fixBasis(phases, repoName)
+	if !ok {
+		return ""
+	}
+	switch {
+	case isReview(basis) && payloadString(basis, "role") == betaRole && payloadString(basis, "gauntlet_verdict") == "":
+		return fmt.Sprintf("the review on %s produced no verdict; resume the run to review again", repoName)
+	case basis.Name == "build" && payloadString(basis, "handoff_path") != "":
+		return fmt.Sprintf("the build on %s handed off; resume the run to continue", repoName)
+	}
+	return ""
+}
+
+// betaRole is the gauntlet role a review records as its payload "role".
+const betaRole = "gauntlet:beta"
+
+// clearBlockedBullet moves repoName's bullet on run's intent from blocked to
+// pending. Any other bullet, and a bullet in any other status, is left
+// alone.
+func (srv *Server) clearBlockedBullet(run *store.RunRecord, repoName string) {
+	if run.IntentID == "" {
+		return
+	}
+	bullets, err := srv.Store.ListBulletsForIntent(run.IntentID)
+	if err != nil {
+		log.Printf("sgt: run-fix: loading the bullets of run %s: %v", run.ID, err)
+		return
+	}
+	for _, b := range bullets {
+		if b.Repo == repoName && b.Status == "blocked" {
+			if err := srv.Store.AdvanceBulletStatus(b.ID, "pending", ""); err != nil {
+				log.Printf("sgt: run-fix: clearing blocked state for bullet %q: %v", b.ID, err)
+			}
+		}
+	}
 }
 
 // verifyFix is the terminal guard for a corrective cycle that passed
@@ -260,20 +357,16 @@ func (srv *Server) verifyFix(run *store.RunRecord, proj *config.Project, repoNam
 	if err != nil {
 		return false, fmt.Sprintf("the phases of run %s could not be read to verify them: %v", run.ID, err)
 	}
-	accountable := srv.accountableRepos(run, proj)
-	stages := resolveStages(proj, accountable, run.Brief)
-
-	hasRecords := map[string]bool{}
-	for _, p := range phases {
-		hasRecords[p.Repo] = true
+	accountable, unrun := srv.unrunRepos(run, proj, phases, repoName)
+	left := map[string]bool{}
+	for _, r := range unrun {
+		left[r] = true
 	}
-	var checked, unrun []string
+	var checked []string
 	for _, r := range accountable {
-		if _, runnable := stageForRepo(stages, r); runnable && r != repoName && !hasRecords[r] {
-			unrun = append(unrun, r)
-			continue
+		if !left[r] {
+			checked = append(checked, r)
 		}
-		checked = append(checked, r)
 	}
 
 	if ok, reason := dag.RunVerified(phases, proj, checked, roles); !ok {
@@ -283,6 +376,24 @@ func (srv *Server) verifyFix(run *store.RunRecord, proj *config.Project, repoNam
 		return false, fmt.Sprintf("corrected %s; %s have not run yet — resume the run to continue", repoName, strings.Join(unrun, ", "))
 	}
 	return true, ""
+}
+
+// unrunRepos returns the repos run is accountable for and, of those, the
+// ones other than repoName that have no phase records but that a stage can
+// run: the repos a resume would run next.
+func (srv *Server) unrunRepos(run *store.RunRecord, proj *config.Project, phases []store.PhaseRecord, repoName string) (accountable, unrun []string) {
+	accountable = srv.accountableRepos(run, proj)
+	stages := resolveStages(proj, accountable, run.Brief)
+	hasRecords := map[string]bool{}
+	for _, p := range phases {
+		hasRecords[p.Repo] = true
+	}
+	for _, r := range accountable {
+		if _, runnable := stageForRepo(stages, r); runnable && r != repoName && !hasRecords[r] {
+			unrun = append(unrun, r)
+		}
+	}
+	return accountable, unrun
 }
 
 // stageForRepo finds the one stage among stages that repoName belongs to,
@@ -344,6 +455,11 @@ func fixPrompt(failure store.PhaseRecord) string {
 		kind = "gate"
 	}
 	output := phaseOutputText(failure)
+	if isReview(failure) {
+		// A review's output is the critic's; the builder never receives it
+		// (design decision 7). sgt's own error text says why it failed.
+		output = failure.Error
+	}
 	if output == "" {
 		output = "(no output was recorded for this failure)"
 	}
@@ -353,6 +469,80 @@ func fixPrompt(failure store.PhaseRecord) string {
 			"itself; make the real change it demands.\n\nRecorded output from the failing %s:\n%s",
 		kind, failure.Name, failure.Repo, failure.Name, kind, kind, output,
 	)
+}
+
+// fixBasis is the failed phase a corrective cycle on repoName corrects
+// (design decision 7): the repo's newest failed phase, unless that is a fix,
+// in which case the newest failed phase before it that is not a fix. So a
+// failed fix never replaces the failure it was correcting, and the basis
+// survives a repeated run-fix because it is read from the records. When the
+// repo has only failed fixes, the newest of them is the basis. phases is in
+// recorded order.
+func fixBasis(phases []store.PhaseRecord, repoName string) (store.PhaseRecord, bool) {
+	var newest store.PhaseRecord
+	found := false
+	for i := len(phases) - 1; i >= 0; i-- {
+		p := phases[i]
+		if p.Repo != repoName || p.Status != "failed" {
+			continue
+		}
+		if p.Name != "fix" {
+			return p, true
+		}
+		if !found {
+			newest, found = p, true
+		}
+	}
+	return newest, found
+}
+
+// basisFixPrompt is the fix agent's prompt for basis: holdFixPrompt for a
+// review that held with a gap, else fixPrompt. brief is the canonical brief
+// the HOLD was judged against.
+func basisFixPrompt(basis store.PhaseRecord, brief string) string {
+	if gap, held := holdGap(basis); held {
+		return holdFixPrompt(brief, gap)
+	}
+	return fixPrompt(basis)
+}
+
+// holdGap returns the gap of a review that recorded a HOLD verdict with a
+// gap.
+func holdGap(p store.PhaseRecord) (string, bool) {
+	if !isReview(p) || payloadString(p, "gauntlet_verdict") != "hold" {
+		return "", false
+	}
+	gap := payloadString(p, "gauntlet_gap")
+	return gap, gap != ""
+}
+
+// holdFixPrompt is the builder's prompt for correcting a HOLD: the
+// canonical brief, then the gap as the task. It carries nothing else from the
+// review — no output and no verdict contract — so the builder never sees
+// the critic's bar or reasoning beyond the gap (design decision 7).
+func holdFixPrompt(brief, gap string) string {
+	return brief + "\n" +
+		"## The gap to close\n\n" +
+		"A review of this work against the brief above found this gap between the work and the brief. " +
+		"Close it in this worktree; it is your task now:\n\n" +
+		gap + "\n\n" +
+		"Do not weaken or remove tests or gates to close it; make the real change the brief asks for.\n"
+}
+
+func isReview(p store.PhaseRecord) bool { return p.Name == "review" && p.Kind != "code" }
+
+// payloadString reads a string key from p's recorded payload, "" when the
+// payload or key is absent.
+func payloadString(p store.PhaseRecord, key string) string {
+	if len(p.Payload) == 0 {
+		return ""
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(p.Payload, &m); err != nil {
+		return ""
+	}
+	s, _ := m[key].(string)
+	return s
 }
 
 // phaseOutputText extracts the human-readable output a phase's own recorded

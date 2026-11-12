@@ -407,15 +407,22 @@ func reviewPrompt(diff, brief string, stage *config.DAGStage, repoName string, r
 	)
 }
 
-// phaseBrief is the brief an agent phase's prompt is built from: the run's
+// phaseBrief is PhaseBrief over the engine's store.
+func (e *Engine) phaseBrief(runID, phase string, stage *config.DAGStage, repoName string, repoCfg config.Repo) string {
+	return PhaseBrief(e.Store, runID, phase, stage, repoName, repoCfg)
+}
+
+// PhaseBrief is the brief an agent phase's prompt is built from: the run's
 // canonical intent brief for the repo (Store.RenderIntentBrief), else the
 // stage's Brief, else a generic prompt naming phase. A review renders it for
-// "build", so the critic judges against what the builder was given.
-func (e *Engine) phaseBrief(runID, phase string, stage *config.DAGStage, repoName string, repoCfg config.Repo) string {
+// "build", so the critic judges against what the builder was given, and an
+// operator fix on a HOLD (internal/ui) renders it the same way, so the
+// builder corrects against that same bar.
+func PhaseBrief(st *store.Store, runID, phase string, stage *config.DAGStage, repoName string, repoCfg config.Repo) string {
 	brief := stage.Brief
-	if run, err := e.Store.GetRun(runID); err == nil && run.IntentID != "" {
+	if run, err := st.GetRun(runID); err == nil && run.IntentID != "" {
 		gates := SortedGateNames(repoCfg)
-		if rendered, rerr := e.Store.RenderIntentBrief(run.IntentID, repoName, gates); rerr == nil {
+		if rendered, rerr := st.RenderIntentBrief(run.IntentID, repoName, gates); rerr == nil {
 			brief = rendered
 		}
 	}
