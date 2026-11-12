@@ -166,7 +166,7 @@ _need gh       gh       "opening a pull request"
 # claude is the default harness: a project that sets no defaults.agent runs
 # it, so it is looked for first.
 harness=""
-for h in claude opencode oc goose codex pi; do
+for h in claude opencode oc goose codex pi copilot; do
   if command -v "$h" &>/dev/null; then harness="$h"; break; fi
 done
 if [[ "$harness" == claude ]]; then
@@ -175,7 +175,7 @@ elif [[ -n "$harness" ]]; then
   printf "  %-10s  ok   %s\\n" "agent" "$harness"
   printf "  %-10s  note %s\\n" "" "claude is the default harness and is not on PATH; set defaults.agent in each project, or install claude"
 else
-  printf "  %-10s  MISSING  %s\\n" "agent" "one of: claude opencode oc goose codex pi"
+  printf "  %-10s  MISSING  %s\\n" "agent" "one of: claude opencode oc goose codex pi copilot"
   ok=false
 fi
 
@@ -184,6 +184,7 @@ fi
 # (defaults.gauntlet_roles: false opts out), so a problem here only warns. A
 # plugin counts when it mirrors the dispatch preflight: id gauntlet@*,
 # enabled, user or managed scope, with agents/alpha.md and agents/beta.md.
+# Reading the JSON needs python3; without it the check warns instead.
 _gauntlet_warn() {
   printf "  %-10s  WARNING  %s\\n" "gauntlet" "$1"
   printf "  %-10s           %s\\n" "" "projects with gauntlet roles on (the claude default) are refused at dispatch;"

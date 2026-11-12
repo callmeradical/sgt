@@ -21,6 +21,7 @@ func TestSectionsParsesInDocumentOrder(t *testing.T) {
 		"Day-to-day workflow",
 		"Filesystem and database",
 		"Configuration reference",
+		"Supported agents",
 		"Troubleshooting",
 		"Command reference",
 		"MCP tools for agents",

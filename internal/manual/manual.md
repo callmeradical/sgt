@@ -41,7 +41,8 @@ directly from the engine's own `exec.Command` call sites):
   resolves to a change before any run, intent, or worktree exists
 - `gh` — opening a pull request
 - A supported agent harness on `PATH`: `claude` (the default),
-  `opencode`, `oc`, `goose`, `codex`, or `pi`. With `claude`, the
+  `opencode`, `oc`, `goose`, `codex`, `pi`, or `copilot` (see Supported
+  agents). With `claude`, the
   gauntlet plugin too, unless the project opts out of gauntlet roles
   (see "Agent harness and gauntlet roles" under Configuration
   reference)
@@ -263,6 +264,57 @@ defaults:
 
 claude phases then run with no role, a repo that lists no pipeline
 keeps `plan, build, test`, and no request checks for the plugin.
+
+## Supported agents
+
+Sgt drives these agent harnesses. A harness is named by its executable
+on `PATH` (a path whose base name is one of these also works), per
+project with `defaults.agent` or per dispatch with `agent`. A name not
+in this table is refused.
+
+| Harness | Default | Gauntlet roles |
+|---|---|---|
+| `claude` | default | on by default, with an opt-out; the only harness that runs gauntlet roles |
+| `opencode` | — | never |
+| `oc` | — | never (the `opencode` CLI under its short name) |
+| `goose` | — | never |
+| `codex` | — | never |
+| `pi` | — | never |
+| `copilot` | — | never |
+
+`claude` is what runs when nothing names a harness. Only `claude` runs
+`build` and `fix` as `gauntlet:alpha` and `review` as `gauntlet:beta`,
+and only a `claude` project is checked for the gauntlet plugin (see
+"Agent harness and gauntlet roles" under Configuration reference).
+Every other harness runs its phases with no role, and a repo that lists
+no pipeline keeps `plan, build, test`.
+
+Every harness, `claude` included, gets the following. This is intended
+behaviour: a run's recorded outcome is only as good as the evidence
+behind it.
+
+- **Every gate in a repo re-runs after a fix.** A gate or review counts
+  as passed only if it passed after the repo's last `build` or `fix`.
+  After a fix, all of that repo's gates run again, not only the one
+  that failed, and a run is recorded `passed` only when every required
+  phase passes by that rule.
+- **Reviews see the run's whole diff.** A `review` phase is given the
+  diff from the run's base branch: committed, uncommitted and untracked
+  work, with `.sgt/` left out. Very large diffs are cut at 256 KiB, with
+  a marker saying so.
+- **A review with a blocking finding is recorded `failed`.** A finding of
+  severity `error` fails the review phase, so a resume runs the review
+  again instead of skipping it.
+- **A blocked bullet shows its failed phase's own error.** When no agent
+  named a reason and no current review finding applies, a blocked
+  bullet's reason is the newest failed phase's error, prefixed with its
+  repo and phase and cut to 300 characters. For a failed gate that
+  includes redacted gate output; it never includes raw agent output.
+- **`sgt run` follows the dispatch path.** `sgt run <project>` runs
+  through the same execution as `POST /api/dispatch`: it commits agent
+  output, records delivery, applies the final pass check, refuses a
+  project with no DAG stages, and exits 0 only when the stored run
+  status is `passed`.
 
 ## Troubleshooting
 

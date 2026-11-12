@@ -155,6 +155,20 @@ func TestMiseCheckValidatesV2EnginePrerequisites(t *testing.T) {
 		assertPluginWarning(t, out, err, "could not read claude's plugin list")
 	})
 
+	t.Run("without python3 the plugin check warns instead of guessing", func(t *testing.T) {
+		if _, err := os.Stat("/bin/python3"); err == nil {
+			t.Skip("/bin/python3 exists on this machine")
+		}
+		dir := t.TempDir()
+		writeRequiredStubs(dir)
+		writeClaudeStub(t, dir, usableGauntletPluginList(t))
+		cmd := exec.Command(checkScript)
+		// /bin has bash and cat but no python3.
+		cmd.Env = append(os.Environ(), "PATH="+dir+":/bin", "MISE_PROJECT_ROOT="+root)
+		outB, err := cmd.CombinedOutput()
+		assertPluginWarning(t, string(outB), err, "python3 not found")
+	})
+
 	t.Run("missing openspec fails even with an agent present", func(t *testing.T) {
 		dir := t.TempDir()
 		for _, cmd := range []string{"git", "gh"} {
