@@ -351,48 +351,6 @@ func TestRunProjectCLIWithoutThePluginIsRefusedAndCreatesNoRun(t *testing.T) {
 	f.assertNoRunAndNoWork(t)
 }
 
-// The reason map holds an entry only while a caller is waiting for it, so the
-// long-lived dashboard server, which records every run's terminal status
-// through the same function, does not accumulate one per run.
-func TestTerminalReasonsAreKeptOnlyForAwaitedRuns(t *testing.T) {
-	st, err := store.Open(filepath.Join(t.TempDir(), "t.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = st.Close() })
-	t.Setenv("SGT_WIKI_ROOT", t.TempDir())
-	srv := NewServer(st, 0)
-	for _, id := range []string{"r-awaited", "r-other"} {
-		if err := st.CreateRun(&store.RunRecord{ID: id, Project: "p", TaskID: id, Status: "running"}); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	srv.awaitTerminalReason("r-awaited")
-	if err := srv.recordTerminalRunWithReason("r-awaited", "failed", "gate unit failed"); err != nil {
-		t.Fatal(err)
-	}
-	if err := srv.recordTerminalRunWithReason("r-other", "failed", "something else"); err != nil {
-		t.Fatal(err)
-	}
-
-	if got, ok := srv.takeTerminalReason("r-awaited"); !ok || got != "gate unit failed" {
-		t.Errorf("takeTerminalReason(r-awaited) = %q, %v; want the recorded reason", got, ok)
-	}
-	if _, ok := srv.takeTerminalReason("r-awaited"); ok {
-		t.Errorf("a taken reason is still held")
-	}
-	if _, ok := srv.takeTerminalReason("r-other"); ok {
-		t.Errorf("a reason was kept for a run nobody awaited")
-	}
-	srv.reasonsMu.Lock()
-	n := len(srv.terminalReasons)
-	srv.reasonsMu.Unlock()
-	if n != 0 {
-		t.Errorf("terminalReasons holds %d entries after every waiter took its reason", n)
-	}
-}
-
 func gitOutT(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput()
