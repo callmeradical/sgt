@@ -88,8 +88,10 @@ Gauntlet plugin (warn, do not fail): when `claude` is present, check that
 `managed` scope whose install path holds `agents/alpha.md` and
 `agents/beta.md`. `mise run check` reports this as a `gauntlet` line. With
 roles on (the claude default), sgt runs `build` and `fix` as `gauntlet:alpha`
-and `review` as `gauntlet:beta`, and refuses to dispatch, approve, resume,
-fix or `sgt run` a project when the plugin is missing. If it is missing, tell
+and `review` as `gauntlet:beta`. When the plugin is missing, sgt refuses a
+dispatch that names repos, plan approval, resume, run-fix and `sgt run` for
+the project, before writing anything. A dispatch that names no repos still
+records a `proposed` plan; its approval is refused. If it is missing, tell
 the user to install it themselves inside claude, at user scope:
 
 ```
@@ -221,7 +223,8 @@ For a new project, interview the user for the fields documented in
    `test` (`plan, build, test, review`). Ask whether to keep them; only if the
    user declines, write `gauntlet_roles: false` under `defaults:`. If Phase 1
    found no usable gauntlet plugin and the user keeps roles on, remind them
-   that dispatches are refused until it is installed.
+   that dispatches naming repos, plan approvals, resumes, run-fix and
+   `sgt run` are refused until it is installed.
 
 Do not invent repository paths, groups, or instructions the user did not
 provide. Refuse to register a repo whose `path` does not exist; report it and
@@ -275,9 +278,9 @@ If the target project YAML exists but is invalid or incomplete:
 | Project absent from `/api/projects` | YAML missing, misnamed, or invalid | Re-run Phase 4/5 |
 | Repo path in YAML does not exist on disk | v2 does not clone repos automatically | Ask the user to clone it manually, then re-validate |
 | `openspec`, `gh`, or an agent harness missing | Prerequisite not installed | Re-run Phase 1; do not substitute a different tool silently |
-| Dispatch refused with `agent harness "claude" not found on PATH`, or (with `defaults.gauntlet_roles: false`) agent phases recorded `failed` with an error naming `claude` and `defaults.agent` | The project names no harness, so it runs claude, the default, and claude is not on `PATH`. With gauntlet roles on, the dispatch check refuses the request; with roles off, each agent phase fails at run time instead | Install claude, or set `defaults.agent` in the project (Phase 5) |
-| Dispatch refused: `claude reports no enabled gauntlet plugin` | Roles are on and the plugin is missing, disabled, project-scoped, or lacks a role | The user runs `/plugin install gauntlet@gauntlet` in claude, or set `defaults.gauntlet_roles: false` (Phase 5) |
-| Dispatch refused: `could not read claude's plugin list` | `claude plugin list --json` failed or timed out | Retry; if it persists, check claude itself, or set `defaults.gauntlet_roles: false` |
+| Request refused with `agent harness "claude" not found on PATH`, or (with `defaults.gauntlet_roles: false`) agent phases recorded `failed` with an error naming `claude` and `defaults.agent` | The project names no harness, so it runs claude, the default, and claude is not on `PATH`. With gauntlet roles on, the plugin check refuses the request; with roles off, each agent phase fails at run time instead | Install claude, or set `defaults.agent` in the project (Phase 5) |
+| Request refused: `claude reports no enabled gauntlet plugin` | Roles are on and the plugin is missing, disabled, project-scoped, or lacks a role | The user runs `/plugin install gauntlet@gauntlet` in claude, or set `defaults.gauntlet_roles: false` (Phase 5) |
+| Request refused: `could not read claude's plugin list` | `claude plugin list --json` failed or timed out | Retry; if it persists, check claude itself, or set `defaults.gauntlet_roles: false` |
 
 See `docs/troubleshooting.md` for problems with an already-registered project
 or an in-flight dispatch — those are out of scope for this skill.

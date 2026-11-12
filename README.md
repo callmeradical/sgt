@@ -229,9 +229,14 @@ Install the plugin inside claude, at user scope:
 /plugin install gauntlet@gauntlet
 ```
 
-Dispatch, plan approval, resume, run-fix and `sgt run` refuse a project with
-roles on, before creating anything, when claude reports no enabled gauntlet
-plugin. `mise run check` warns about the same. To opt a project out:
+For a project with roles on, a dispatch that names repos, plan approval,
+resume, run-fix and `sgt run` check claude's plugin list first. When claude
+reports no enabled gauntlet plugin, they are refused before they write
+anything: no new run, intent, branch or worktree, and an existing run or plan
+is left as it was. A dispatch that names no repos only records a `proposed`
+plan and is not checked; its approval is. A dispatch repeating a `request_id`
+that already created a run gets the original response. `mise run check` warns
+when claude reports no usable plugin. To opt a project out:
 
 ```yaml
 defaults:

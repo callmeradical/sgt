@@ -246,16 +246,35 @@ resume those instead.
 **Installing the plugin.** Inside claude, run
 `/plugin install gauntlet@gauntlet` at user scope. A project-scope
 install does not count: it is keyed to your own checkout, and agents
-run in fleet worktrees. Dispatch, plan approval, resume, run-fix and
-`sgt run` each ask `claude plugin list --json` first; a dispatch that
-repeats a `request_id` which already created a run is answered with the
-original response, without asking. Unless claude
-reports an enabled `gauntlet@` plugin at user or managed scope that
-carries both roles, the request is refused before any run, intent,
-branch or worktree exists, with a message naming what is missing and
-the opt-out. If `claude` itself is missing, the refusal names `claude`
-and `defaults.agent` instead. `mise run check` warns, without failing,
-when claude reports no usable gauntlet plugin.
+run in fleet worktrees.
+
+**When sgt checks for the plugin.** Only for a project whose gauntlet
+roles apply. For such a project, these requests ask
+`claude plugin list --json` before they write anything: a dispatch that
+names repos, plan approval, resume, run-fix, and `sgt run`. Two
+requests are not checked:
+
+- a dispatch that names no repos only records a `proposed` plan (an
+  intent); the plugin is checked when the plan is approved;
+- a dispatch that repeats a `request_id` which already created a run is
+  answered with the original response.
+
+Unless claude reports an enabled `gauntlet@` plugin at user or managed
+scope that carries both roles, a checked request is refused with a
+message naming what is missing and the opt-out. If claude's plugin list
+cannot be read, the message says so. If `claude` itself is missing, the
+message names `claude` and `defaults.agent` instead. A refusal changes
+nothing:
+
+- a refused dispatch or `sgt run` leaves no new run, intent, branch or
+  worktree;
+- a refused approval leaves the plan `proposed`, its bullets unchanged,
+  and no run;
+- a refused resume or run-fix leaves the run's status, its blocked
+  bullet and its phase records as they were.
+
+`mise run check` warns, without failing, when claude reports no usable
+gauntlet plugin.
 
 **Opting out.** A project turns gauntlet roles off with:
 
@@ -286,7 +305,8 @@ in this table is refused.
 
 `claude` is what runs when nothing names a harness. Only `claude` runs
 `build` and `fix` as `gauntlet:alpha` and `review` as `gauntlet:beta`,
-and only a `claude` project is checked for the gauntlet plugin (see
+and only a `claude` project with roles on is ever checked for the
+gauntlet plugin (see
 "Agent harness and gauntlet roles" under Configuration reference).
 Every other harness runs its phases with no role, and a repo that lists
 no pipeline keeps `plan, build, test`.

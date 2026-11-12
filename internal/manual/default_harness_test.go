@@ -69,3 +69,28 @@ func TestManualSearchForTheOptOutKeyLandsOnOneSection(t *testing.T) {
 		t.Errorf(`the section Search("gauntlet_roles") lands on does not describe the default harness: %q`, matches[0].Title)
 	}
 }
+
+// The manual lists every request that is not probed ("Requests that do not
+// use roles are never probed"): a dispatch naming no repos records a
+// proposed plan unprobed, and its approval is checked instead; a repeated
+// request_id is answered before the probe.
+func TestManualNamesEveryRequestThatIsNotProbed(t *testing.T) {
+	var body string
+	for _, s := range Sections() {
+		if s.Title == "Configuration reference" {
+			body = s.Body
+		}
+	}
+	for _, want := range []string{
+		"names no repos",
+		"`proposed`",
+		"checked when the plan is approved",
+		"repeats a `request_id`",
+		"no new run",
+		"run's status",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the gauntlet roles text does not contain %q", want)
+		}
+	}
+}
