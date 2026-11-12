@@ -117,7 +117,8 @@ and when asking about `defaults.agent` (Phase 4).
 
 Whichever harness the user picks, Sgt applies the same checks to every run,
 by design: every gate in a repo re-runs after a fix; reviews see the run's
-whole diff; a review with a blocking finding is recorded `failed`; a blocked
+whole diff (a very large one is cut to a harness-specific limit, with a marker
+naming it); a review with a blocking finding is recorded `failed`; a blocked
 bullet shows its failed phase's own error; and `sgt run` follows the dispatch
 path. `sgt help "Supported agents"` prints the full description.
 
@@ -274,7 +275,7 @@ If the target project YAML exists but is invalid or incomplete:
 | Project absent from `/api/projects` | YAML missing, misnamed, or invalid | Re-run Phase 4/5 |
 | Repo path in YAML does not exist on disk | v2 does not clone repos automatically | Ask the user to clone it manually, then re-validate |
 | `openspec`, `gh`, or an agent harness missing | Prerequisite not installed | Re-run Phase 1; do not substitute a different tool silently |
-| `agent harness "claude" not found on PATH` | The project names no harness, so it runs claude, the default. With gauntlet roles on, the dispatch is refused; with `defaults.gauntlet_roles: false`, each agent phase fails with this reason instead | Install claude, or set `defaults.agent` in the project (Phase 5) |
+| Dispatch refused with `agent harness "claude" not found on PATH`, or (with `defaults.gauntlet_roles: false`) agent phases recorded `failed` with an error naming `claude` and `defaults.agent` | The project names no harness, so it runs claude, the default, and claude is not on `PATH`. With gauntlet roles on, the dispatch check refuses the request; with roles off, each agent phase fails at run time instead | Install claude, or set `defaults.agent` in the project (Phase 5) |
 | Dispatch refused: `claude reports no enabled gauntlet plugin` | Roles are on and the plugin is missing, disabled, project-scoped, or lacks a role | The user runs `/plugin install gauntlet@gauntlet` in claude, or set `defaults.gauntlet_roles: false` (Phase 5) |
 | Dispatch refused: `could not read claude's plugin list` | `claude plugin list --json` failed or timed out | Retry; if it persists, check claude itself, or set `defaults.gauntlet_roles: false` |
 

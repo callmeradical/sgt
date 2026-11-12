@@ -259,7 +259,8 @@ Every harness, `claude` included, gets this behaviour, by design:
   it passed after the repo's last code change, and a run is recorded `passed`
   only when every required phase passes by that rule.
 - **Reviews see the run's whole diff** from its base branch: committed,
-  uncommitted and untracked work.
+  uncommitted and untracked work. A very large diff is cut to a
+  harness-specific limit, with a marker naming it.
 - **A review with a blocking finding is recorded `failed`**, so resume runs it
   again rather than skipping it.
 - **A blocked bullet shows its failed phase's own error** when no agent or

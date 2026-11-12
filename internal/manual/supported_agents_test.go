@@ -60,3 +60,16 @@ func TestSupportedAgentsSectionMarksClaudeAndListsEveryHarnessBehaviour(t *testi
 		}
 	}
 }
+
+// The review diff cap differs by harness (design decision 6, Size): 256 KiB
+// for claude, whose large prompts go on stdin; for every other harness the
+// whole prompt stays under 120 KiB, with the diff up to 96 KiB. The
+// every-harness list must not state the claude cap as everyone's.
+func TestSupportedAgentsSectionStatesBothReviewDiffCaps(t *testing.T) {
+	body := supportedAgentsSection(t)
+	for _, want := range []string{"256 KiB", "120 KiB", "96 KiB", "names the cap that applied"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("Supported agents section does not contain %q", want)
+		}
+	}
+}

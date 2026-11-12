@@ -247,7 +247,9 @@ resume those instead.
 `/plugin install gauntlet@gauntlet` at user scope. A project-scope
 install does not count: it is keyed to your own checkout, and agents
 run in fleet worktrees. Dispatch, plan approval, resume, run-fix and
-`sgt run` each ask `claude plugin list --json` first. Unless claude
+`sgt run` each ask `claude plugin list --json` first; a dispatch that
+repeats a `request_id` which already created a run is answered with the
+original response, without asking. Unless claude
 reports an enabled `gauntlet@` plugin at user or managed scope that
 carries both roles, the request is refused before any run, intent,
 branch or worktree exists, with a message naming what is missing and
@@ -300,8 +302,11 @@ behind it.
   phase passes by that rule.
 - **Reviews see the run's whole diff.** A `review` phase is given the
   diff from the run's base branch: committed, uncommitted and untracked
-  work, with `.sgt/` left out. Very large diffs are cut at 256 KiB, with
-  a marker saying so.
+  work, with `.sgt/` left out. A very large diff is cut, and a marker
+  in the prompt names the cap that applied: 256 KiB for `claude`, whose
+  large prompts go on stdin; for every other harness, whose prompt is
+  one command-line argument, whatever keeps the whole prompt under
+  120 KiB, and at most 96 KiB.
 - **A review with a blocking finding is recorded `failed`.** A finding of
   severity `error` fails the review phase, so a resume runs the review
   again instead of skipping it.
