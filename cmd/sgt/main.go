@@ -9,12 +9,9 @@ import (
 	"text/tabwriter"
 
 	"github.com/callmeradical/sgt/internal/config"
-	"github.com/callmeradical/sgt/internal/dag"
 	"github.com/callmeradical/sgt/internal/export"
-	"github.com/callmeradical/sgt/internal/handoff"
 	"github.com/callmeradical/sgt/internal/manual"
 	"github.com/callmeradical/sgt/internal/mcp"
-	"github.com/callmeradical/sgt/internal/naming"
 	"github.com/callmeradical/sgt/internal/store"
 	"github.com/callmeradical/sgt/internal/ui"
 	"github.com/callmeradical/sgt/internal/upgrademigrate"
@@ -189,6 +186,11 @@ func startMCP() {
 	}
 }
 
+// runProject is `sgt run <project>`. It owns no stage loop and writes no
+// status: ui.RunProjectCLI runs the project's DAG through the same execution
+// path a dispatch uses (design decision 10). The command prints the stored
+// outcome and the reason recorded with it, and exits 0 only when the stored
+// status is passed.
 func runProject(projName string) {
 	proj, err := config.LoadProject(projName)
 	if err != nil {
@@ -203,44 +205,23 @@ func runProject(projName string) {
 		fmt.Fprintf(os.Stderr, "Error opening store: %v\n", err)
 		os.Exit(1)
 	}
-	defer st.Close()
 
-	// The same generator the dispatch handler uses. Two id formats would let a
-	// CLI run and a dispatched run collide on the runs primary key.
-	taskID := naming.RunID()
-	// dag.FleetRoot is the single authority for the fleet root (D7). Building this
-	// path by hand here is how the CLI kept writing handoffs into v1's directory
-	// after the server stopped.
-	handoffBase := filepath.Join(dag.FleetRoot(), taskID, "handoff")
-	router := handoff.NewRouter(handoffBase)
-
-	runRec := &store.RunRecord{
-		ID:      taskID,
-		Project: proj.Name,
-		TaskID:  taskID,
-		Status:  "running",
+	fmt.Printf("Starting factory run for project %s\n", proj.Name)
+	status, reason, err := ui.RunProjectCLI(context.Background(), st, proj, nil)
+	_ = st.Close()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "sgt run %s: %v\n", proj.Name, err)
+		os.Exit(1)
 	}
-	_ = st.CreateRun(runRec)
-
-	fmt.Printf("🚀 Starting Multi-Repo Factory Run [%s] for project: %s\n", taskID, proj.Name)
-
-	engine := dag.NewEngine(proj, st, router)
-	ctx := context.Background()
-
-	if proj.DAG != nil && len(proj.DAG.Stages) > 0 {
-		for _, stage := range proj.DAG.Stages {
-			fmt.Printf("\n▶ Executing Stage: %s (Repos: %v)\n", stage.Name, stage.Repos)
-			if err := engine.RunStage(ctx, taskID, &stage); err != nil {
-				fmt.Fprintf(os.Stderr, "❌ Stage %s failed: %v\n", stage.Name, err)
-				_ = st.UpdateRunStatus(taskID, "failed")
-				os.Exit(1)
-			}
-			fmt.Printf("✔ Stage %s passed\n", stage.Name)
+	if status != "passed" {
+		if reason != "" {
+			fmt.Fprintf(os.Stderr, "Factory run for project %s %s: %s\n", proj.Name, status, reason)
+		} else {
+			fmt.Fprintf(os.Stderr, "Factory run for project %s %s\n", proj.Name, status)
 		}
+		os.Exit(1)
 	}
-
-	_ = st.UpdateRunStatus(taskID, "passed")
-	fmt.Printf("\n🎉 Factory Run [%s] completed successfully!\n", taskID)
+	fmt.Printf("Factory run for project %s passed\n", proj.Name)
 }
 
 func showStatus() {

@@ -692,6 +692,9 @@ func (srv *Server) recordTerminalRunWithReason(runID, status, reason string) err
 		reason = ""
 	}
 
+	// The same text the bullets and the wiki get, kept for a caller awaiting
+	// this run's outcome (RunProjectCLI); a run nobody awaits keeps nothing.
+	srv.keepTerminalReason(runID, reason)
 	srv.recordWikiEntry(runID, reason)
 	return nil
 }

@@ -51,6 +51,14 @@ type Server struct {
 	mu      sync.Mutex
 	cancels map[string]context.CancelFunc
 
+	// terminalReasons holds, for each run a caller is waiting on
+	// (awaitTerminalReason, runcli.go), the reason recordTerminalRunWithReason
+	// recorded with its terminal status: store.RunRecord has no reason
+	// column, and `sgt run` reports this text. It has its own lock because
+	// run goroutines write it while the waiting caller reads it.
+	reasonsMu       sync.Mutex
+	terminalReasons map[string]string
+
 	// fleet owns fleet worktree views and reclaim decisions (see fleet.go). It
 	// depends on fleetRunSource rather than *store.Store directly.
 	fleet *fleetCleaner
@@ -125,6 +133,7 @@ func NewServer(s *store.Store, port int) *Server {
 		Store:           s,
 		Port:            port,
 		cancels:         map[string]context.CancelFunc{},
+		terminalReasons: map[string]string{},
 		RunShippingGate: runner.RunShippingGate,
 		GauntletProbe:   defaultGauntletProbe,
 		fleet:           newFleetCleaner(s),
