@@ -75,7 +75,8 @@ Required:
 - At least one supported agent harness on `PATH`: `claude`, `opencode`, `oc`,
   `goose`, `codex`, `pi`, or `copilot` (see Supported agents below). The
   default agent harness is claude: a project that sets no `defaults.agent`
-  runs `claude`, so check for it first
+  runs `claude` unless a dispatch names another harness, so check for it
+  first
 - Go 1.21+ — to build the `sgt` binary
 
 Optional (skip, do not fail, if absent):
@@ -105,13 +106,15 @@ never touches. The alternative is to opt the project out of roles in Phase 4
 ### Supported agents
 
 Use this table when telling the user which harnesses Sgt can run (Phase 1)
-and when asking about `defaults.agent` (Phase 4).
+and when asking about `defaults.agent` (Phase 4). Sgt does not check a
+project's `defaults.agent` against it up front (only a dispatch request's
+`agent` is refused when not listed), so write only a name from this table.
 
 | Harness | Default | Gauntlet roles |
 |---|---|---|
 | `claude` | default | on by default; the only harness that runs gauntlet roles |
 | `opencode` | — | never |
-| `oc` | — | never (the `opencode` CLI under its short name) |
+| `oc` | — | never (invoked with the same arguments as `opencode`) |
 | `goose` | — | never |
 | `codex` | — | never |
 | `pi` | — | never |
@@ -279,8 +282,8 @@ If the target project YAML exists but is invalid or incomplete:
 | Repo path in YAML does not exist on disk | v2 does not clone repos automatically | Ask the user to clone it manually, then re-validate |
 | `openspec`, `gh`, or an agent harness missing | Prerequisite not installed | Re-run Phase 1; do not substitute a different tool silently |
 | Request refused with `agent harness "claude" not found on PATH`, or (with `defaults.gauntlet_roles: false`) agent phases recorded `failed` with an error naming `claude` and `defaults.agent` | The project names no harness, so it runs claude, the default, and claude is not on `PATH`. With gauntlet roles on, the plugin check refuses the request; with roles off, each agent phase fails at run time instead | Install claude, or set `defaults.agent` in the project (Phase 5) |
-| Request refused: `claude reports no enabled gauntlet plugin` | Roles are on and the plugin is missing, disabled, project-scoped, or lacks a role | The user runs `/plugin install gauntlet@gauntlet` in claude, or set `defaults.gauntlet_roles: false` (Phase 5) |
-| Request refused: `could not read claude's plugin list` | `claude plugin list --json` failed or timed out | Retry; if it persists, check claude itself, or set `defaults.gauntlet_roles: false` |
+| Request refused: `claude reports no enabled gauntlet plugin` | Roles are on and the plugin is missing, disabled, not installed at user or managed scope, or lacks `agents/alpha.md` or `agents/beta.md` | The user runs `/plugin install gauntlet@gauntlet` in claude, or set `defaults.gauntlet_roles: false` (Phase 5) |
+| Request refused: `could not read claude's plugin list` | `claude plugin list --json` failed, timed out, or printed something other than a JSON plugin list | Retry; if it persists, check claude itself, or set `defaults.gauntlet_roles: false` |
 
 See `docs/troubleshooting.md` for problems with an already-registered project
 or an in-flight dispatch — those are out of scope for this skill.

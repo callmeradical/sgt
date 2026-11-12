@@ -216,9 +216,9 @@ When the harness is `claude`, phases run as the roles of the
 
 - `build` and `fix` run as `gauntlet:alpha`, the test-first builder;
 - `review` runs as `gauntlet:beta`, the fresh-context critic, which judges the
-  run's diff against the intent and ends with `VERDICT: PASS` or
-  `VERDICT: HOLD: <gap>`. A HOLD fails the review and blocks the bullet with the
-  gap as its reason;
+  run's diff against the intent and is told to end with `VERDICT: PASS` or
+  `VERDICT: HOLD: <gap>`. A HOLD fails the review, and when the run ends
+  `failed` the bullet's blocked reason contains the gap;
 - other phases, such as `plan`, run with no role;
 - a repo that lists no `pipeline` gets `review` added after `test`
   (`plan, build, test, review`); a listed pipeline runs exactly as listed.
@@ -231,7 +231,8 @@ Install the plugin inside claude, at user scope:
 
 For a project with roles on, a dispatch that names repos, plan approval,
 resume, run-fix and `sgt run` check claude's plugin list first. When claude
-reports no enabled gauntlet plugin, they are refused before they write
+reports no enabled gauntlet plugin at user or managed scope with both roles,
+or its plugin list cannot be read, they are refused before they write
 anything: no new run, intent, branch or worktree, and an existing run or plan
 is left as it was. A dispatch that names no repos only records a `proposed`
 plan and is not checked; its approval is. A dispatch repeating a `request_id`
@@ -252,7 +253,7 @@ manual's full description.
 |---|---|---|
 | `claude` | default | on by default; the only harness that runs gauntlet roles |
 | `opencode` | — | never |
-| `oc` | — | never (the `opencode` CLI under its short name) |
+| `oc` | — | never (invoked with the same arguments as `opencode`) |
 | `goose` | — | never |
 | `codex` | — | never |
 | `pi` | — | never |
@@ -261,8 +262,9 @@ manual's full description.
 Every harness, `claude` included, gets this behaviour, by design:
 
 - **Every gate in a repo re-runs after a fix.** A gate or review counts only if
-  it passed after the repo's last code change, and a run is recorded `passed`
-  only when every required phase passes by that rule.
+  its newest record passed after the repo's last `fix` and after every agent
+  phase placed before it in the pipeline, such as `build`; a run is recorded
+  `passed` only when every required phase passes by that rule.
 - **Reviews see the run's whole diff** from its base branch: committed,
   uncommitted and untracked work. A very large diff is cut to a
   harness-specific limit, with a marker naming it.
@@ -273,6 +275,9 @@ Every harness, `claude` included, gets this behaviour, by design:
   for a failed gate.
 - **`sgt run` follows the dispatch path:** it commits output, records delivery,
   refuses a project with no DAG stages, and exits 0 only on `passed`.
+
+Only a dispatch request's `agent` is checked against this table, and refused
+when it is not in it. A project's `defaults.agent` is not checked up front.
 
 `sgt help "Supported agents"` prints the manual's version of this list.
 

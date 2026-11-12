@@ -73,3 +73,23 @@ func TestSupportedAgentsSectionStatesBothReviewDiffCaps(t *testing.T) {
 		}
 	}
 }
+
+// Only a dispatch request's `agent` is validated (runner.ValidateAgent's one
+// caller is handleDispatch, on req.Agent); a project's defaults.agent is not
+// checked up front. The section must say so rather than claim every
+// unlisted name is refused.
+func TestSupportedAgentsSectionSaysOnlyTheDispatchAgentIsValidated(t *testing.T) {
+	// Collapse line wrapping, so a sentence is found wherever it breaks.
+	body := strings.Join(strings.Fields(supportedAgentsSection(t)), " ")
+	if strings.Contains(body, "A name not in this table is refused.") {
+		t.Error("Supported agents section claims every unlisted name is refused")
+	}
+	for _, want := range []string{
+		"an `agent` on a dispatch request that is not in this table is refused",
+		"`defaults.agent` is not checked up front",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("Supported agents section does not contain %q", want)
+		}
+	}
+}

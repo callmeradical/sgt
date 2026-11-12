@@ -205,10 +205,13 @@ names, types, and defaults.
 
 The default agent harness is claude. A dispatch that names no `agent`,
 in a project whose YAML sets no `defaults.agent`, runs `claude`. If
-`claude` is not on `PATH`, the phase is recorded `failed` with a reason
-naming `claude` and `defaults.agent`, and no agent process starts. To
-use another harness, pin it per project; a harness named this way runs
-exactly as it did before claude became the default:
+`claude` is not on `PATH`, an agent phase that runs is recorded
+`failed` with a reason naming `claude` and `defaults.agent`, and no
+agent process starts. (With gauntlet roles on, the plugin check below
+refuses a checked request first.) To use another harness, pin it per project;
+a harness named this way is invoked with the same command as before
+claude became the default, and gets the run-level changes listed under
+Supported agents:
 
 ```yaml
 defaults:
@@ -223,11 +226,12 @@ the gauntlet plugin by default:
   `failed` with the handoff file's path, never `passed`.
 - `review` runs as `gauntlet:beta`, the fresh-context critic. Its
   prompt carries the repo's intent brief and the run's whole diff from
-  its base branch, and nothing from earlier phases. Beta ends with
-  `VERDICT: PASS` or `VERDICT: HOLD: <gap>`. A PASS passes the review.
-  A HOLD records the review `failed` with the gap as a blocking
-  finding, and the bullet is blocked with the gap as its reason. A
-  review with no verdict is never a pass.
+  its base branch, and nothing from earlier phases. Beta is told to end
+  with `VERDICT: PASS` or `VERDICT: HOLD: <gap>`, and the last such
+  line in its output decides. A PASS passes the review. A HOLD records
+  the review `failed` with the gap as a blocking finding; when the run
+  ends `failed`, the bullet's blocked reason contains the gap. A review
+  with no verdict is never a pass.
 - Every other phase, such as `plan`, runs with no role.
 - A repo whose factory lists no `pipeline` gets a `review` phase after
   `test`, so its pipeline is `plan, build, test, review`. A repo that
@@ -239,7 +243,8 @@ a phase that ran without a role shows `— no gauntlet role`.
 
 A HOLD is corrected by the operator: `POST /api/run-fix` starts a fix
 cycle whose prompt is the intent brief and the gap only, never beta's
-reasoning, and the next review is judged by a fresh beta. Run-fix
+reasoning, and the next review's brief does not carry the previous
+verdict. Run-fix
 refuses a review that produced no verdict, or a build that handed off;
 resume those instead.
 
@@ -249,7 +254,8 @@ install does not count: it is keyed to your own checkout, and agents
 run in fleet worktrees.
 
 **When sgt checks for the plugin.** Only for a project whose gauntlet
-roles apply. For such a project, these requests ask
+roles apply, judged after a dispatch's `agent` override. For such a
+project, these requests ask
 `claude plugin list --json` before they write anything: a dispatch that
 names repos, plan approval, resume, run-fix, and `sgt run`. Two
 requests are not checked:
@@ -263,8 +269,8 @@ Unless claude reports an enabled `gauntlet@` plugin at user or managed
 scope that carries both roles, a checked request is refused with a
 message naming what is missing and the opt-out. If claude's plugin list
 cannot be read, the message says so. If `claude` itself is missing, the
-message names `claude` and `defaults.agent` instead. A refusal changes
-nothing:
+message names `claude` and `defaults.agent` instead. A refusal is made
+before any write:
 
 - a refused dispatch or `sgt run` leaves no new run, intent, branch or
   worktree;
@@ -290,14 +296,18 @@ keeps `plan, build, test`, and no request checks for the plugin.
 
 Sgt drives these agent harnesses. A harness is named by its executable
 on `PATH` (a path whose base name is one of these also works), per
-project with `defaults.agent` or per dispatch with `agent`. A name not
-in this table is refused.
+project with `defaults.agent` or per dispatch with `agent`. Only the
+dispatch request is validated: an `agent` on a dispatch request that is
+not in this table is refused before anything is created. A project's
+`defaults.agent` is not checked up front; a name outside this table is
+run as `<name> <prompt>` when a phase starts, and fails if no such
+executable is on `PATH`.
 
 | Harness | Default | Gauntlet roles |
 |---|---|---|
 | `claude` | default | on by default, with an opt-out; the only harness that runs gauntlet roles |
 | `opencode` | — | never |
-| `oc` | — | never (the `opencode` CLI under its short name) |
+| `oc` | — | never (invoked with the same arguments as `opencode`) |
 | `goose` | — | never |
 | `codex` | — | never |
 | `pi` | — | never |
@@ -305,8 +315,8 @@ in this table is refused.
 
 `claude` is what runs when nothing names a harness. Only `claude` runs
 `build` and `fix` as `gauntlet:alpha` and `review` as `gauntlet:beta`,
-and only a `claude` project with roles on is ever checked for the
-gauntlet plugin (see
+and only a request whose harness, after any dispatch `agent` override,
+is `claude` with roles on is ever checked for the gauntlet plugin (see
 "Agent harness and gauntlet roles" under Configuration reference).
 Every other harness runs its phases with no role, and a repo that lists
 no pipeline keeps `plan, build, test`.
@@ -316,7 +326,9 @@ behaviour: a run's recorded outcome is only as good as the evidence
 behind it.
 
 - **Every gate in a repo re-runs after a fix.** A gate or review counts
-  as passed only if it passed after the repo's last `build` or `fix`.
+  as passed only if its newest record passed after the repo's last
+  `fix` and after every agent phase placed before it in the pipeline,
+  such as `build`.
   After a fix, all of that repo's gates run again, not only the one
   that failed, and a run is recorded `passed` only when every required
   phase passes by that rule.
