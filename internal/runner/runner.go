@@ -633,6 +633,11 @@ func (pr *PhaseRunner) phaseRole(phaseName string) string {
 	return roleFor(phaseName)
 }
 
+// PhaseRole is the gauntlet role phaseName runs as on this PhaseRunner, or
+// "" when it runs with no role: roles are off, the harness is not claude, or
+// the phase has no role (roleFor).
+func (pr *PhaseRunner) PhaseRole(phaseName string) string { return pr.phaseRole(phaseName) }
+
 // RunAgentPhase executes a bounded headless agent session and validates output
 // envelope with fallback safety. The second return is the blocked_reason the
 // agent's own envelope named, if any — read from env.Payload after it has
@@ -899,7 +904,7 @@ func (pr *PhaseRunner) RunAgentPhase(ctx context.Context, phaseName, prompt stri
 		// a successful retry does not inherit a previous iteration's lastErr value.
 		var deliverErr error
 		if de := pr.Store.DeliverEnvelope(envelopeID, pr.RepoName, true, func() error {
-			return pr.Router.SaveEnvelope(&env)
+			return pr.Router.SaveEnvelope(routerCopy(phaseName, &env))
 		}); de != nil {
 			deliverErr = fmt.Errorf("delivering envelope for phase %s on %s: %w", phaseName, pr.RepoName, de)
 		}

@@ -361,16 +361,39 @@ func SortedGateNames(repoCfg config.Repo) []string {
 	return names
 }
 
-// reviewPrompt builds the review agent's prompt from the diff and the
-// stage/repo context only — deliberately NOT from any prior phase's envelope
-// in this run. "Independent" (PRD) means the reviewer starts from the diff
-// and the spec, not from reading the implementing agent's own account of
-// itself; RunAgentPhase gives every phase a fresh headless process already,
-// so the only thing that can leak shared context is what this function
-// chooses to put in the prompt string — and its signature accepts no
-// envelope, making that exclusion structural rather than a convention to
-// remember.
-func reviewPrompt(diff string, stage *config.DAGStage, repoName string) string {
+// reviewPrompt builds the review agent's prompt from the diff, the brief the
+// change is judged against, and the stage/repo context only — deliberately
+// NOT from any prior phase's envelope in this run. "Independent" (PRD) means
+// the reviewer starts from the diff and the spec, not from reading the
+// implementing agent's own account of itself; RunAgentPhase gives every
+// phase a fresh headless process already, so the only thing that can leak
+// shared context is what this function chooses to put in the prompt string —
+// and its signature accepts no envelope, making that exclusion structural
+// rather than a convention to remember.
+//
+// With roles false the prompt is the role-less review prompt, which asks for
+// JSON findings and ignores brief. With roles true the review runs as
+// gauntlet:beta (design decision 6): brief is the bar, the diff is
+// orientation, the full files may be read in the worktree, and the prompt
+// closes with the one VERDICT: line the runner parses. sgt builds the
+// findings itself from that verdict, so this prompt asks for none.
+func reviewPrompt(diff, brief string, stage *config.DAGStage, repoName string, roles bool) string {
+	if roles {
+		return fmt.Sprintf(
+			"# Phase objective: review\n\n"+
+				"You are executing the \"review\" phase for repo %s. Do not modify files, do not commit, "+
+				"do not push, and do not open a pull request.\n\n"+
+				"## The bar\n\n"+
+				"Judge the change against this brief. It is the bar the change must meet.\n\n%s\n\n"+
+				"## The change\n\n"+
+				"The diff below is the change, for orientation. The full files are in this worktree; "+
+				"read any of them you need to judge the change against the bar.\n\nDiff:\n%s\n\n"+
+				"## Your answer\n\n"+
+				"Give your PASS or HOLD answer. End your output with exactly one line: "+
+				"`VERDICT: PASS`, or `VERDICT: HOLD: <gap>` where <gap> is the single biggest gap between the change and the bar.\n",
+			repoName, strings.TrimRight(brief, "\n"), strings.TrimRight(diff, "\n"),
+		)
+	}
 	return fmt.Sprintf(
 		"# Phase objective: review\n\n"+
 			"You are executing the \"review\" phase: judge the diff below, nothing else. "+
@@ -382,6 +405,24 @@ func reviewPrompt(diff string, stage *config.DAGStage, repoName string) string {
 			"{\"findings\":[{\"axis\":...,\"severity\":\"error\"|\"warning\"|\"info\",\"summary\":...,\"disposition\":...}]}.\n\nDiff:\n%s",
 		repoName, diff,
 	)
+}
+
+// phaseBrief is the brief an agent phase's prompt is built from: the run's
+// canonical intent brief for the repo (Store.RenderIntentBrief), else the
+// stage's Brief, else a generic prompt naming phase. A review renders it for
+// "build", so the critic judges against what the builder was given.
+func (e *Engine) phaseBrief(runID, phase string, stage *config.DAGStage, repoName string, repoCfg config.Repo) string {
+	brief := stage.Brief
+	if run, err := e.Store.GetRun(runID); err == nil && run.IntentID != "" {
+		gates := SortedGateNames(repoCfg)
+		if rendered, rerr := e.Store.RenderIntentBrief(run.IntentID, repoName, gates); rerr == nil {
+			brief = rendered
+		}
+	}
+	if brief == "" {
+		brief = fmt.Sprintf("Execute %s phase for stage %s on %s", phase, stage.Name, repoName)
+	}
+	return brief
 }
 
 // phaseObjective is the boundary text prepended to a phase's rendered
@@ -586,7 +627,8 @@ func (e *Engine) RunStage(ctx context.Context, runID string, stage *config.DAGSt
 				if err != nil {
 					return fmt.Errorf("collecting diff for review phase on %s: %w", repoName, err)
 				}
-				prompt := reviewPrompt(diff, stage, repoName)
+				brief := e.phaseBrief(runID, "build", stage, repoName, repoCfg)
+				prompt := reviewPrompt(diff, brief, stage, repoName, pr.PhaseRole("review") != "")
 				env, _, err := pr.RunAgentPhase(ctx, "review", prompt, e.Project.ResolvedRetries(repoName))
 				if err != nil {
 					return fmt.Errorf("review phase failed on repo %s: %w", repoName, err)
@@ -600,17 +642,7 @@ func (e *Engine) RunStage(ctx context.Context, runID string, stage *config.DAGSt
 				if e.phasePassed(runID, repoName, phase, "agent", pipeline) {
 					continue
 				}
-				prompt := stage.Brief
-				if run, err := e.Store.GetRun(runID); err == nil && run.IntentID != "" {
-					gates := SortedGateNames(repoCfg)
-					if rendered, rerr := e.Store.RenderIntentBrief(run.IntentID, repoName, gates); rerr == nil {
-						prompt = rendered
-					}
-				}
-				if prompt == "" {
-					prompt = fmt.Sprintf("Execute %s phase for stage %s on %s", phase, stage.Name, repoName)
-				}
-				prompt = phaseObjective(phase, pipeline) + prompt
+				prompt := phaseObjective(phase, pipeline) + e.phaseBrief(runID, phase, stage, repoName, repoCfg)
 				retries := e.Project.ResolvedRetries(repoName)
 				_, _, err := pr.RunAgentPhase(ctx, phase, prompt, retries)
 				if err != nil {

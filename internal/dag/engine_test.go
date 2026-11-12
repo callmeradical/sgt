@@ -1295,7 +1295,7 @@ func TestReviewPromptExcludesPriorPhaseEnvelopeContent(t *testing.T) {
 	diff := "diff --git a/webhook.go b/webhook.go\n+func retry() {}\n"
 	stage := &config.DAGStage{Name: "build-and-test", Repos: []string{"svc"}}
 
-	prompt := reviewPrompt(diff, stage, "svc")
+	prompt := reviewPrompt(diff, "", stage, "svc", false)
 
 	if !strings.Contains(prompt, diff) {
 		t.Errorf("prompt = %q, want it to contain the diff", prompt)
